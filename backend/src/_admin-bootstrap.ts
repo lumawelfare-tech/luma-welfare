@@ -170,20 +170,17 @@ async function main() {
 
     // ── Step 6: Audit log ───────────────────────────────────────────────
     console.log('\nStep 6: Writing audit log...')
+    const auditMeta = JSON.stringify({
+      email: ADMIN_EMAIL,
+      display_name: ADMIN_DISPLAY_NAME,
+      role: adminRole.name,
+      is_superadmin: true,
+      note: 'First administrator bootstrap',
+    })
     await client.query(
       `INSERT INTO audit_logs (actor_id, actor_role, action, resource, resource_id, meta)
-       VALUES ($1, $2, 'admin_bootstrapped', 'admin', $1, $3)`,
-      [
-        userId,
-        adminRole.name,
-        JSON.stringify({
-          email: ADMIN_EMAIL,
-          display_name: ADMIN_DISPLAY_NAME,
-          role: adminRole.name,
-          is_superadmin: true,
-          note: 'First administrator bootstrap',
-        }),
-      ],
+       VALUES ($1::uuid, $2, 'admin_bootstrapped', 'admin', $1::uuid, $3::jsonb)`,
+      [userId, adminRole.name, auditMeta],
     )
     console.log('  Audit log entry created.')
 

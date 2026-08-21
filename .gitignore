@@ -6,4 +6,7 @@ dist
 backend/.env
 frontend/.env
 *.log
+*.bat
 .DS_Store
+lt-error.txt
+lt-output.txt
