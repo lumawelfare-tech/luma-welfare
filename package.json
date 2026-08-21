@@ -1,0 +1,22 @@
+{
+  "name": "luma-welfare",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Luma Welfare membership and contribution management platform",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w frontend",
+    "dev:backend": "npm run dev -w backend",
+    "build": "npm run build -w frontend && npm run build -w backend",
+    "typecheck": "npm run typecheck -w frontend && npm run typecheck -w backend"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  },
+  "devDependencies": {
+    "pg": "^8.23.0"
+  }
+}
