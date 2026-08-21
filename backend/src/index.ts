@@ -15,7 +15,15 @@ import { HttpError } from './lib/http.js'
 
 const app = new Hono()
 
-app.use('*', cors())
+app.use('*', cors({
+  origin: [
+    'https://luma-welfare.vercel.app',
+    'http://localhost:5173',
+  ],
+  allowHeaders: ['Content-Type', 'Authorization', 'apikey'],
+  allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'OPTIONS'],
+  credentials: true,
+}))
 
 app.get('/health', (c) => c.json({ status: 'ok' }))
 
