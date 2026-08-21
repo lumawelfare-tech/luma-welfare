@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
+import { useHead } from '../../lib/seo'
 
 type DashboardData = {
   members: number
@@ -14,6 +15,7 @@ type DashboardData = {
 }
 
 export function AdminDashboard() {
+  useHead('Admin Dashboard', undefined, { noindex: true })
   const { member } = useAuth()
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)

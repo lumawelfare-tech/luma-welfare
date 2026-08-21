@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /packages
+Allow: /how-it-works
+Allow: /faq
+Allow: /contact
+Allow: /news
+Allow: /gallery
+
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /family
+Disallow: /contributions
+Disallow: /join
+Disallow: /login
+Disallow: /register
+Disallow: /api
+
+Sitemap: https://luma-welfare.vercel.app/sitemap.xml

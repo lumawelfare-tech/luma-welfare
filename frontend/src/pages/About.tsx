@@ -7,7 +7,10 @@ const values = [
   { name: 'Excellence', text: 'We run the welfare fund the way members deserve — properly.' },
 ]
 
+import { useHead } from '../lib/seo'
+
 export function About() {
+  useHead('About', 'Learn about Luma Welfare — our mission, values, and how we provide accessible welfare services for all members in Kenya.')
   return (
     <div className="container-luma py-14">
       <h1 className="text-3xl font-bold text-luma-900 sm:text-4xl">About Luma Welfare</h1>

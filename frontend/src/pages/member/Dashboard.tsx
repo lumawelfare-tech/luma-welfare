@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { useHead } from '../../lib/seo'
 
 type Qualification = {
   status: 'eligible' | 'not_eligible' | 'at_risk' | 'revoked'
@@ -40,6 +41,7 @@ function statusBadge(card: Card): { label: string; cls: string } {
 }
 
 export function Dashboard() {
+  useHead('Dashboard', undefined, { noindex: true })
   const [cards, setCards] = useState<Card[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

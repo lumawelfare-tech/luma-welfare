@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useHead } from '../lib/seo'
 
 const steps = [
   {
@@ -20,6 +21,7 @@ const steps = [
 ]
 
 export function HowItWorks() {
+  useHead('How It Works', 'Four steps from joining Luma Welfare to claiming benefits. Register, contribute monthly, wait, and access your benefits.')
   return (
     <div className="container-luma py-14">
       <h1 className="text-3xl font-bold text-luma-900 sm:text-4xl">How it works</h1>

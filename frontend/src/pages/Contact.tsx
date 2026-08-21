@@ -1,3 +1,5 @@
+import { useHead } from '../lib/seo'
+
 const details = [
   { label: 'Phone / WhatsApp', value: '0798635024', href: 'tel:0798635024' },
   { label: 'Email', value: 'info@lumawelfare.or.ke', href: 'mailto:info@lumawelfare.or.ke' },
@@ -6,6 +8,7 @@ const details = [
 ]
 
 export function Contact() {
+  useHead('Contact', 'Contact Luma Welfare — phone, WhatsApp, email, and address. Reach the welfare office for membership, payment, and claim questions.')
   return (
     <div className="container-luma py-14">
       <h1 className="text-3xl font-bold text-luma-900 sm:text-4xl">Contact us</h1>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { StatBar } from '../components/StatBar'
+import { useHead } from '../lib/seo'
 
 const offerCodes = ['hospital', 'education', 'business', 'building', 'dowry', 'wedding']
 
@@ -22,6 +23,7 @@ const offerDescriptions: Record<string, string> = {
 }
 
 export function Home() {
+  useHead('Home', 'Luma Welfare is a community welfare organization in Kenya. Members contribute monthly to support each other through key life events.')
   return (
     <div>
       {/* Hero — kept close to the existing copy */}

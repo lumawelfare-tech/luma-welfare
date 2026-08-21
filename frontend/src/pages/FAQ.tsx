@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useHead } from '../lib/seo'
 
 const faqs = [
   {
@@ -53,6 +54,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 }
 
 export function FAQ() {
+  useHead('FAQ', 'Frequently asked questions about Luma Welfare membership, contributions, waiting periods, claims, and more.')
   return (
     <div className="container-luma py-14">
       <h1 className="text-3xl font-bold text-luma-900 sm:text-4xl">Frequently asked questions</h1>

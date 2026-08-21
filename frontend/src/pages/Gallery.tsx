@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
+import { useHead } from '../lib/seo'
 
 type GalleryItem = {
   id: string
@@ -9,6 +10,7 @@ type GalleryItem = {
 }
 
 export function Gallery() {
+  useHead('Gallery', 'Photos from Luma Welfare events and member activities.')
   const [items, setItems] = useState<GalleryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

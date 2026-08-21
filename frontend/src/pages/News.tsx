@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
+import { useHead } from '../lib/seo'
 
 type NewsItem = {
   id: string
@@ -11,6 +12,7 @@ type NewsItem = {
 }
 
 export function News() {
+  useHead('News & Events', 'Updates from the Luma Welfare office and upcoming member events.')
   const [items, setItems] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
