@@ -113,6 +113,7 @@ app.post('/login', withSupabase({ auth: 'publishable' }), async (c) => {
 })
 
 // Authenticated profile for the member portal.
+// Also returns admin status if the user is in the admins table.
 app.get('/me', withSupabase({ auth: 'user' }), async (c) => {
   const { supabase, supabaseAdmin, userClaims } = typedDb(c.var.supabaseContext)
   const userId = userClaims!.id
@@ -129,7 +130,29 @@ app.get('/me', withSupabase({ auth: 'user' }), async (c) => {
     .eq('member_id', userId)
     .order('created_at')
 
-  return c.json({ member: member ?? null, error: error ? error.message : null, subscriptions: subscriptions ?? [] })
+  // Check admin status — never trust client-supplied role values.
+  // Server queries the admins table by the authenticated user's UUID.
+  let isAdmin = false
+  let adminRole: string | null = null
+  const { data: adminRecord } = await supabaseAdmin
+    .from('admins')
+    .select('id, is_active, is_superadmin, roles(name)')
+    .eq('id', userId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (adminRecord) {
+    isAdmin = true
+    adminRole = (adminRecord.roles as unknown as { name: string } | null)?.name ?? null
+  }
+
+  return c.json({
+    member: member ?? null,
+    error: error ? error.message : null,
+    subscriptions: subscriptions ?? [],
+    isAdmin,
+    adminRole,
+  })
 })
 
 export const authRoutes = app

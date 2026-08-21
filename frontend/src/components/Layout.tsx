@@ -14,7 +14,7 @@ const navLinks = [
 ]
 
 export function Layout() {
-  const { member, logout } = useAuth()
+  const { member, isAdmin, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const navigate = useNavigate()
@@ -65,6 +65,28 @@ export function Layout() {
 
             {member ? (
               <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <NavLink
+                    to="/admin"
+                    className={({ isActive }) =>
+                      `rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                        isActive ? 'bg-luma-50 text-luma-800' : 'text-stone-600 hover:bg-stone-100'
+                      }`
+                    }
+                  >
+                    Admin
+                  </NavLink>
+                )}
+                <NavLink
+                  to="/dashboard"
+                  className={({ isActive }) =>
+                    `rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive ? 'bg-luma-50 text-luma-800' : 'text-stone-600 hover:bg-stone-100'
+                    }`
+                  }
+                >
+                  Dashboard
+                </NavLink>
                 <span className="hidden text-sm text-stone-500 sm:block">{member.full_name}</span>
                 <button
                   onClick={logout}
@@ -107,6 +129,15 @@ export function Layout() {
                   {l.label}
                 </NavLink>
               ))}
+              {member && isAdmin && (
+                <NavLink
+                  to="/admin"
+                  onClick={() => setOpen(false)}
+                  className="rounded-md px-3 py-2 text-sm font-semibold text-luma-700 hover:bg-luma-50"
+                >
+                  Admin Panel
+                </NavLink>
+              )}
             </div>
           </nav>
         )}

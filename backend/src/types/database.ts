@@ -304,6 +304,8 @@ export type Database = {
           status: string
           channel: string
           payload: unknown | null
+          idempotency_key: string | null
+          checkout_request_id: string | null
           created_at: string
           updated_at: string
         }
@@ -319,6 +321,8 @@ export type Database = {
           status?: string
           channel?: string
           payload?: unknown | null
+          idempotency_key?: string | null
+          checkout_request_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -334,6 +338,8 @@ export type Database = {
           status?: string
           channel?: string
           payload?: unknown | null
+          idempotency_key?: string | null
+          checkout_request_id?: string | null
           created_at?: string
           updated_at?: string
         }

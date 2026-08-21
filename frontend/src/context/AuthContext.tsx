@@ -19,10 +19,17 @@ export type Member = {
   [key: string]: unknown
 }
 
+export type LoginResult = {
+  member: Member | null
+  isAdmin: boolean
+}
+
 type AuthState = {
   member: Member | null
+  isAdmin: boolean
+  adminRole: string | null
   loading: boolean
-  login: (email: string, password: string) => Promise<Member | null>
+  login: (email: string, password: string) => Promise<LoginResult>
   register: (input: {
     email: string
     password: string
@@ -37,6 +44,8 @@ const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [member, setMember] = useState<Member | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminRole, setAdminRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -48,8 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
       try {
-        const data = await api<{ member: Member }>('/auth/me', { auth: true })
-        if (!cancelled) setMember(data.member)
+        const data = await api<{ member: Member; isAdmin?: boolean; adminRole?: string | null }>('/auth/me', { auth: true })
+        if (!cancelled) {
+          setMember(data.member)
+          setIsAdmin(data.isAdmin === true)
+          setAdminRole(data.adminRole ?? null)
+        }
       } catch {
         clearSession()
       } finally {
@@ -62,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  async function login(email: string, password: string): Promise<Member | null> {
+  async function login(email: string, password: string): Promise<LoginResult> {
     const data = await api<{ session: { access_token: string }; member: Member }>(
       '/auth/login',
       { method: 'POST', body: { email, password } },
@@ -70,9 +83,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.session?.access_token) {
       setSession(data.session.access_token)
       setMember(data.member)
-      return data.member
+      // After login, fetch admin status from /auth/me
+      let userIsAdmin = false
+      let userAdminRole: string | null = null
+      try {
+        const me = await api<{ isAdmin?: boolean; adminRole?: string | null }>('/auth/me', { auth: true })
+        userIsAdmin = me.isAdmin === true
+        userAdminRole = me.adminRole ?? null
+      } catch {
+        // Non-admin members — this is fine
+      }
+      setIsAdmin(userIsAdmin)
+      setAdminRole(userAdminRole)
+      return { member: data.member, isAdmin: userIsAdmin }
     }
-    return null
+    return { member: null, isAdmin: false }
   }
 
   async function register(input: {
@@ -88,10 +113,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function logout() {
     clearSession()
     setMember(null)
+    setIsAdmin(false)
+    setAdminRole(null)
   }
 
   return (
-    <AuthContext.Provider value={{ member, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ member, isAdmin, adminRole, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   )

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { Layout } from './components/Layout'
 import { RequireMember } from './components/RequireMember'
+import { RequireAdmin } from './components/RequireAdmin'
 
 import { Home } from './pages/Home'
 import { About } from './pages/About'
@@ -48,6 +49,8 @@ export default function App() {
               <Route path="/join" element={<JoinPackages />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/family" element={<Family />} />
+            </Route>
+            <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/members" element={<AdminMembers />} />
               <Route path="/admin/packages" element={<AdminPackages />} />

@@ -2,8 +2,8 @@ import 'dotenv/config'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
-import { withSupabase } from '@supabase/server/adapters/hono'
 import { AuthError } from '@supabase/server'
+import { withSupabase } from '@supabase/server/adapters/hono'
 
 import { publicRoutes } from './routes/public.js'
 import { authRoutes } from './routes/auth.js'
@@ -42,12 +42,8 @@ app.onError((err, c) => {
   )
 })
 
-export default app
-
 const port = Number(process.env.PORT ?? 3001)
-if (process.env.NODE_ENV !== 'edge') {
-  const { serve } = await import('@hono/node-server')
-  serve({ fetch: app.fetch, port }, () => {
-    console.log(`Luma Welfare API listening on http://localhost:${port}`)
-  })
-}
+const { serve } = await import('@hono/node-server')
+serve({ fetch: app.fetch, port }, () => {
+  console.log(`Luma Welfare API listening on http://localhost:${port}`)
+})

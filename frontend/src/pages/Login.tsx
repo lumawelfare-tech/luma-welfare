@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../lib/api'
 
 export function Login() {
-  const { login, member } = useAuth()
+  const { login, member, isAdmin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string })?.from ?? '/dashboard'
@@ -19,8 +19,13 @@ export function Login() {
     setError(null)
     setBusy(true)
     try {
-      await login(email.trim(), password)
-      navigate(from, { replace: true })
+      const result = await login(email.trim(), password)
+      // Navigate admins to /admin, members to the page they came from (or /dashboard)
+      if (result.isAdmin) {
+        navigate('/admin', { replace: true })
+      } else {
+        navigate(from, { replace: true })
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
     } finally {
@@ -29,7 +34,7 @@ export function Login() {
   }
 
   if (member) {
-    navigate('/dashboard', { replace: true })
+    navigate(isAdmin ? '/admin' : '/dashboard', { replace: true })
   }
 
   return (
