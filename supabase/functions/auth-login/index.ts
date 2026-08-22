@@ -1,0 +1,53 @@
+import { handleCors, corsHeaders } from '../shared/cors.ts'
+import { createUserClient, createAdminClient } from '../shared/supabase.ts'
+
+Deno.serve(async (req) => {
+  const corsResponse = handleCors(req)
+  if (corsResponse) return corsResponse
+
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ message: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  try {
+    const body = await req.json()
+    const { email, password } = body
+
+    if (!email || !password) {
+      return new Response(JSON.stringify({ message: 'Email and password are required.', code: 'VALIDATION' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const userClient = createUserClient(req)
+    const { data, error } = await userClient.auth.signInWithPassword({ email, password })
+
+    if (error) {
+      return new Response(JSON.stringify({ message: 'Email or password is incorrect.', code: 'INVALID_LOGIN' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const adminClient = createAdminClient()
+    const { data: member } = await adminClient
+      .from('members')
+      .select('*')
+      .eq('id', data.user.id)
+      .single()
+
+    return new Response(JSON.stringify({ session: data.session, member }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  } catch (err) {
+    return new Response(JSON.stringify({ message: 'Internal server error', code: 'INTERNAL' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+})

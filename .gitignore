@@ -10,3 +10,5 @@ frontend/.env
 .DS_Store
 lt-error.txt
 lt-output.txt
+supabase/.temp/
+supabase/supabase/

@@ -8,15 +8,13 @@ Allow: /contact
 Allow: /news
 Allow: /gallery
 
-Disallow: /admin
-Disallow: /admin/
-Disallow: /dashboard
-Disallow: /profile
-Disallow: /family
-Disallow: /contributions
-Disallow: /join
 Disallow: /login
 Disallow: /register
-Disallow: /api
+Disallow: /dashboard
+Disallow: /contributions
+Disallow: /join
+Disallow: /profile
+Disallow: /family
+Disallow: /admin
 
 Sitemap: https://luma-welfare.vercel.app/sitemap.xml

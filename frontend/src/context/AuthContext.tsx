@@ -5,7 +5,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { api, getSession, setSession, clearSession } from '../lib/api'
+import { api, setSession, clearSession } from '../lib/api'
+import { supabase } from '../lib/supabase'
 
 export type Member = {
   id: string
@@ -51,11 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     async function hydrate() {
-      const session = getSession()
+      // Check Supabase session first
+      const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         setLoading(false)
         return
       }
+
+      // Store session in localStorage for backward compatibility
+      setSession(session.access_token, session.expires_at)
+
       try {
         const data = await api<{ member: Member; isAdmin?: boolean; adminRole?: string | null }>('/auth/me', { auth: true })
         if (!cancelled) {
@@ -65,39 +71,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch {
         clearSession()
+        await supabase.auth.signOut()
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
     hydrate()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
   async function login(email: string, password: string): Promise<LoginResult> {
-    const data = await api<{ session: { access_token: string }; member: Member }>(
-      '/auth/login',
-      { method: 'POST', body: { email, password } },
-    )
-    if (data.session?.access_token) {
-      setSession(data.session.access_token)
-      setMember(data.member)
-      // After login, fetch admin status from /auth/me
-      let userIsAdmin = false
-      let userAdminRole: string | null = null
-      try {
-        const me = await api<{ isAdmin?: boolean; adminRole?: string | null }>('/auth/me', { auth: true })
-        userIsAdmin = me.isAdmin === true
-        userAdminRole = me.adminRole ?? null
-      } catch {
-        // Non-admin members — this is fine
-      }
-      setIsAdmin(userIsAdmin)
-      setAdminRole(userAdminRole)
-      return { member: data.member, isAdmin: userIsAdmin }
+    // Use Supabase Auth client-side
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      throw new Error(error.message)
     }
-    return { member: null, isAdmin: false }
+
+    if (data.session?.access_token) {
+      setSession(data.session.access_token, data.session.expires_at)
+    }
+
+    // Fetch member profile and admin status
+    const me = await api<{ member: Member; isAdmin?: boolean; adminRole?: string | null }>('/auth/me', { auth: true })
+    setMember(me.member)
+    setIsAdmin(me.isAdmin === true)
+    setAdminRole(me.adminRole ?? null)
+    return { member: me.member, isAdmin: me.isAdmin === true }
   }
 
   async function register(input: {
@@ -112,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function logout() {
     clearSession()
+    supabase.auth.signOut()
     setMember(null)
     setIsAdmin(false)
     setAdminRole(null)

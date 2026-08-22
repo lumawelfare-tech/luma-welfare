@@ -1,0 +1,17 @@
+/**
+ * CORS headers for Edge Functions.
+ * Allows the Vercel frontend origin.
+ */
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://luma-welfare.vercel.app',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
+}
+
+export function handleCors(req: Request): Response | null {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+  return null
+}
