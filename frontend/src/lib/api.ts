@@ -155,6 +155,10 @@ function pathToFunctionName(path: string): string | null {
   if (cleanPath === 'payments/initiate') return 'payments-initiate'
   if (cleanPath.startsWith('payments') && !cleanPath.includes('callback')) return 'payments-list'
 
+  // Content management routes
+  if (cleanPath.startsWith('admin/gallery')) return 'admin-gallery'
+  if (cleanPath.startsWith('admin/news')) return 'admin-news'
+
   // Public routes
   if (cleanPath === 'packages') return 'public-data'
   if (cleanPath === 'settings') return 'public-data'
