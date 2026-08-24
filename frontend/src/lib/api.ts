@@ -123,10 +123,17 @@ export async function api<T = unknown>(
 
   // Call Edge Function, forwarding any query parameters
   const url = `${edgeFunctionUrl}/${functionName}${finalSearch}`
+
+  // Handle FormData (file uploads) vs JSON
+  const isFormData = body instanceof FormData
+  if (isFormData) {
+    delete headers['Content-Type'] // browser sets multipart boundary automatically
+  }
+
   const res = await fetch(url, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
   })
 
   const data = (await res.json().catch(() => null)) as

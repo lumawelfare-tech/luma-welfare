@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { supabase } from '../../lib/supabase'
 import { useHead } from '../../lib/seo'
 
 type GalleryItem = {
@@ -91,15 +90,13 @@ export function AdminGallery() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  async function uploadToStorage(file: File): Promise<string> {
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 50)
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
-    const { error: uploadError } = await supabase.storage
-      .from('gallery')
-      .upload(path, file, { contentType: file.type, upsert: false })
-    if (uploadError) throw new Error(uploadError.message)
-    const { data: urlData } = supabase.storage.from('gallery').getPublicUrl(path)
-    return urlData.publicUrl
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
   }
 
   async function save(e: React.FormEvent) {
@@ -109,14 +106,15 @@ export function AdminGallery() {
     setUploading(true)
 
     try {
-      let imageUrl = editing?.image_url ?? ''
-
-      // Upload new file if selected
-      if (selectedFile) {
-        imageUrl = await uploadToStorage(selectedFile)
+      const body: Record<string, unknown> = {
+        title: form.title || null,
+        caption: form.caption || null,
       }
 
-      if (!imageUrl) {
+      if (selectedFile) {
+        body.image_data = await fileToBase64(selectedFile)
+        body.image_filename = selectedFile.name
+      } else if (!editing) {
         setError('Please select an image.')
         setUploading(false)
         return
@@ -125,13 +123,13 @@ export function AdminGallery() {
       if (editing) {
         await api(`/admin/gallery/${editing.id}`, {
           method: 'PATCH', auth: true,
-          body: { title: form.title || null, caption: form.caption || null, image_url: imageUrl },
+          body,
         })
         setNotice('Image updated.')
       } else {
         await api('/admin/gallery', {
           method: 'POST', auth: true,
-          body: { title: form.title || null, caption: form.caption || null, image_url: imageUrl },
+          body,
         })
         setNotice('Image uploaded.')
       }
@@ -141,7 +139,7 @@ export function AdminGallery() {
       if (fileRef.current) fileRef.current.value = ''
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save.')
+      setError(err instanceof ApiError ? err.message : 'Could not save. Please try again.')
     } finally {
       setUploading(false)
     }

@@ -1,6 +1,46 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
 
+/** Generate a safe storage path */
+function makeStoragePath(filename: string): string {
+  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 50)
+  return `gallery/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
+}
+
+/** Extract storage path from a public URL */
+function extractStoragePath(url: string, bucket: string): string | null {
+  const prefix = `/storage/v1/object/public/${bucket}/`
+  const idx = url.indexOf(prefix)
+  if (idx === -1) return null
+  return url.slice(idx + prefix.length)
+}
+
+/** Upload a base64 data URL to Storage and return the public URL */
+async function uploadBase64(
+  adminClient: ReturnType<typeof createAdminClient>,
+  dataUrl: string,
+  filename: string,
+): Promise<string> {
+  // Parse data URL: data:image/jpeg;base64,/9j/4AAQ...
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+  if (!match) throw new Error('Invalid image data.')
+
+  const contentType = match[1]
+  const base64 = match[2]
+  const binaryStr = atob(base64)
+  const bytes = new Uint8Array(binaryStr.length)
+  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i)
+
+  const path = makeStoragePath(filename)
+  const { error } = await adminClient.storage
+    .from('gallery')
+    .upload(path, bytes, { contentType, upsert: false })
+  if (error) throw new Error(`Storage upload failed: ${error.message}`)
+
+  const { data: urlData } = adminClient.storage.from('gallery').getPublicUrl(path)
+  return urlData.publicUrl
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
@@ -46,37 +86,55 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && !isIdPath) {
       requirePermission(session, 'packages', 'create')
       const body = await req.json()
-      const { title, caption, image_url } = body
-      if (!image_url) {
-        return new Response(JSON.stringify({ message: 'image_url is required' }), {
+      const { title, caption, image_url, image_data, image_filename } = body
+
+      let imageUrl = image_url
+
+      // If base64 image data is provided, upload to Storage
+      if (image_data && !imageUrl) {
+        imageUrl = await uploadBase64(adminClient, image_data, image_filename || 'upload.jpg')
+      }
+
+      if (!imageUrl) {
+        return new Response(JSON.stringify({ message: 'Image is required.' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
+
       const { data, error } = await adminClient
         .from('gallery_items')
-        .insert({ title: title || null, caption: caption || null, image_url })
+        .insert({ title: title || null, caption: caption || null, image_url: imageUrl })
         .select()
         .single()
       if (error) throw new Error(error.message)
+
       await logAudit(adminClient, { actor_id: user.id, actor_role: session.role_name, action: 'gallery.created', resource: 'gallery', resource_id: data.id, meta: { title } })
+
       return new Response(JSON.stringify(data), {
         status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // PATCH /admin-gallery/:id — update item
+    // PATCH /admin-gallery?id=xxx — update item
     if (req.method === 'PATCH' && isIdPath) {
       requirePermission(session, 'packages', 'update')
       const body = await req.json()
       const updates: Record<string, unknown> = {}
+
       if (body.title !== undefined) updates.title = body.title
       if (body.caption !== undefined) updates.caption = body.caption
 
-      // Handle image replacement — clean up old storage file
+      // Handle image replacement
+      if (body.image_data && !body.image_url) {
+        const newUrl = await uploadBase64(adminClient, body.image_data, body.image_filename || 'upload.jpg')
+        body.image_url = newUrl
+      }
+
       if (body.image_url !== undefined) {
+        // Clean up old storage file
         const { data: old } = await adminClient.from('gallery_items').select('image_url').eq('id', itemId).single()
         if (old?.image_url && body.image_url && body.image_url !== old.image_url) {
-          const oldPath = old.image_url.split('/storage/v1/object/public/gallery/')[1]
+          const oldPath = extractStoragePath(old.image_url, 'gallery')
           if (oldPath) {
             try { await adminClient.storage.from('gallery').remove([oldPath]) } catch { /* best-effort */ }
           }
@@ -91,24 +149,24 @@ Deno.serve(async (req) => {
         .select()
         .single()
       if (error) throw new Error(error.message)
+
       await logAudit(adminClient, { actor_id: user.id, actor_role: session.role_name, action: 'gallery.updated', resource: 'gallery', resource_id: itemId, meta: body.image_url ? { image_replaced: true } : undefined })
+
       return new Response(JSON.stringify(data), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // DELETE /admin-gallery/:id — delete item and storage file
+    // DELETE /admin-gallery?id=xxx — delete item and storage file
     if (req.method === 'DELETE' && isIdPath) {
       requirePermission(session, 'packages', 'delete')
-      // Get the item to find the storage path
       const { data: item } = await adminClient.from('gallery_items').select('image_url').eq('id', itemId).single()
       const { error } = await adminClient.from('gallery_items').delete().eq('id', itemId)
       if (error) throw new Error(error.message)
 
-      // Try to delete associated storage file
       if (item?.image_url) {
         try {
-          const storagePath = item.image_url.split('/storage/v1/object/public/gallery/')[1]
+          const storagePath = extractStoragePath(item.image_url, 'gallery')
           if (storagePath) {
             await adminClient.storage.from('gallery').remove([storagePath])
           }
@@ -126,7 +184,7 @@ Deno.serve(async (req) => {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal error'
-    const status = message.includes('FORBIDDEN') ? 403 : 500
+    const status = message.includes('FORBIDDEN') ? 403 : message.includes('Storage upload failed') ? 400 : 500
     return new Response(JSON.stringify({ message }), {
       status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

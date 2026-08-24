@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ message: 'Code and name are required', code: 'VALIDATION' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       const { data, error } = await adminClient.from('packages').insert({
-        code, name, description, coverage: coverage ?? '', waiting_period_months: waitingPeriodMonths ?? '', sort_order: sortOrder ?? 0, payout_rule: payoutRule ?? '',
+        code, name, description: description || null, coverage: Array.isArray(coverage) ? coverage : null, waiting_period_months: waitingPeriodMonths != null ? Number(waitingPeriodMonths) : null, sort_order: sortOrder ?? 0, payout_rule: payoutRule || null,
       }).select().single()
       if (error) throw new Error(error.message)
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'created_package', resource: 'package', resource_id: data.id })
