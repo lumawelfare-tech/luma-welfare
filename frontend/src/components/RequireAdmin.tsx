@@ -22,13 +22,16 @@ export function RequireAdmin() {
     )
   }
 
+  // Admins may not have a members record (e.g. the original admin account).
+  // Check isAdmin first so superadmins are not stuck on the login page.
+  if (isAdmin) {
+    return <Outlet />
+  }
+
   if (!member) {
     return <AdminLogin />
   }
 
-  if (!isAdmin) {
-    return <Navigate to="/dashboard" replace />
-  }
-
-  return <Outlet />
+  // Authenticated but not admin
+  return <Navigate to="/dashboard" replace />
 }
