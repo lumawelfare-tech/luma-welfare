@@ -33,6 +33,11 @@ const AdminMembers = lazy(() => import('./pages/admin/AdminMembers').then(m => (
 const AdminPackages = lazy(() => import('./pages/admin/AdminPackages').then(m => ({ default: m.AdminPackages })))
 const AdminContributions = lazy(() => import('./pages/admin/AdminContributions').then(m => ({ default: m.AdminContributions })))
 const AdminClaims = lazy(() => import('./pages/admin/AdminClaims').then(m => ({ default: m.AdminClaims })))
+const AdminSubscriptions = lazy(() => import('./pages/admin/AdminSubscriptions').then(m => ({ default: m.AdminSubscriptions })))
+const AdminNews = lazy(() => import('./pages/admin/AdminNews').then(m => ({ default: m.AdminNews })))
+const AdminGallery = lazy(() => import('./pages/admin/AdminGallery').then(m => ({ default: m.AdminGallery })))
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings').then(m => ({ default: m.AdminSettings })))
+const AdminAuditLogs = lazy(() => import('./pages/admin/AdminAuditLogs').then(m => ({ default: m.AdminAuditLogs })))
 
 function PageLoader() {
   return (
@@ -80,6 +85,11 @@ export default function App() {
                 <Route path="packages" element={<AdminPackages />} />
                 <Route path="contributions" element={<AdminContributions />} />
                 <Route path="claims" element={<AdminClaims />} />
+                <Route path="subscriptions" element={<AdminSubscriptions />} />
+                <Route path="news" element={<AdminNews />} />
+                <Route path="gallery" element={<AdminGallery />} />
+                <Route path="settings" element={<AdminSettings />} />
+                <Route path="audit-logs" element={<AdminAuditLogs />} />
               </Route>
             </Route>
           </Routes>
