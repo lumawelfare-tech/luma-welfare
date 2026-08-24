@@ -91,8 +91,38 @@ export async function api<T = unknown>(
     throw new ApiError(404, `Unknown API path: ${path}`, 'NOT_FOUND')
   }
 
+  // Extract sub-resource IDs from path segments and forward as query params
+  // e.g. /member/family/{id} → ?resource_id={id}
+  // e.g. /admin/members/{id}/status → ?resource_id={id}&action=status
+  // e.g. /admin/audit-logs → ?resource_id=audit-logs
+  const pathSegments = pathname.split('/')
+  const baseSegments = functionName.replace(/-/g, '/').split('/')
+  let extraParams: string[] = []
+
+  // Find where path diverges from function name segments
+  let divergeIndex = 0
+  for (let i = 0; i < Math.min(pathSegments.length, baseSegments.length); i++) {
+    if (pathSegments[i] !== baseSegments[i]) break
+    divergeIndex = i + 1
+  }
+
+  const subSegments = pathSegments.slice(divergeIndex)
+  if (subSegments.length > 0 && subSegments[0]) {
+    extraParams.push(`resource_id=${encodeURIComponent(subSegments[0])}`)
+  }
+  if (subSegments.length > 1 && subSegments[1]) {
+    extraParams.push(`action=${encodeURIComponent(subSegments[1])}`)
+  }
+
+  // Merge extra params with existing query string
+  let finalSearch = search
+  if (extraParams.length > 0) {
+    const sep = finalSearch ? '&' : '?'
+    finalSearch += `${sep}${extraParams.join('&')}`
+  }
+
   // Call Edge Function, forwarding any query parameters
-  const url = `${edgeFunctionUrl}/${functionName}${search}`
+  const url = `${edgeFunctionUrl}/${functionName}${finalSearch}`
   const res = await fetch(url, {
     method,
     headers,

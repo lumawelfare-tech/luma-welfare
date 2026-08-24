@@ -24,11 +24,11 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url)
-    const pathParts = url.pathname.split('/').filter(Boolean)
-    const memberId = pathParts[pathParts.length - 1]
+    // Use query params for sub-resource operations (Supabase Edge Functions don't support path params)
+    const resourceId = url.searchParams.get('resource_id')
 
     // GET /admin-members — list members
-    if (req.method === 'GET' && !memberId) {
+    if (req.method === 'GET' && !resourceId) {
       requirePermission(session, 'members', 'read')
       const status = url.searchParams.get('status')
       const q = url.searchParams.get('q')
@@ -46,20 +46,20 @@ Deno.serve(async (req) => {
       })
     }
 
-    // GET /admin-members/:id — get member detail
-    if (req.method === 'GET' && memberId) {
+    // GET /admin-members?resource_id=xxx — get member detail
+    if (req.method === 'GET' && resourceId) {
       requirePermission(session, 'members', 'read')
       const { data: member, error } = await adminClient
         .from('members')
         .select('*')
-        .eq('id', memberId)
+        .eq('id', resourceId)
         .single()
       if (error) throw new Error('Member not found')
 
       const [subs, family, contribs] = await Promise.all([
-        adminClient.from('subscriptions').select('id, status, started_at, next_due_date, package_id, packages(code, name), package_tiers(name, amount)').eq('member_id', memberId),
-        adminClient.from('family_members').select('*').eq('member_id', memberId).eq('is_active', true),
-        adminClient.from('contributions').select('id, period, amount, status, package_id, created_at').eq('member_id', memberId).order('period', { ascending: false }),
+        adminClient.from('subscriptions').select('id, status, started_at, next_due_date, package_id, packages(code, name), package_tiers(name, amount)').eq('member_id', resourceId),
+        adminClient.from('family_members').select('*').eq('member_id', resourceId).eq('is_active', true),
+        adminClient.from('contributions').select('id, period, amount, status, package_id, created_at').eq('member_id', resourceId).order('period', { ascending: false }),
       ])
 
       return new Response(JSON.stringify({
@@ -73,8 +73,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // PATCH /admin-members/:id/status — approve/suspend/close member
-    if (req.method === 'PATCH' && memberId) {
+    // PATCH /admin-members?resource_id=xxx&action=status — approve/suspend/close member
+    if (req.method === 'PATCH' && resourceId) {
       requirePermission(session, 'members', 'approve')
       const body = await req.json()
       const { status: memberStatus } = body
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
           approved_at: memberStatus === 'active' ? now : undefined,
           approved_by: memberStatus === 'active' ? session.id : undefined,
         })
-        .eq('id', memberId)
+        .eq('id', resourceId)
         .select()
         .single()
       if (error) throw new Error('Member not found')
@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
         actor_role: session.role_name,
         action: `member_${memberStatus}`,
         resource: 'member',
-        resource_id: memberId,
+        resource_id: resourceId,
         meta: { by: session.display_name },
       })
 

@@ -11,11 +11,11 @@ Deno.serve(async (req) => {
 
     const adminClient = createAdminClient()
     const url = new URL(req.url)
-    const pathParts = url.pathname.split('/').filter(Boolean)
-    const familyId = pathParts[pathParts.length - 1]
+    // Use query param resource_id for sub-resource operations (Supabase Edge Functions don't support path params)
+    const resourceId = url.searchParams.get('resource_id')
 
     // GET /member-family — list family members
-    if (req.method === 'GET' && !familyId) {
+    if (req.method === 'GET' && !resourceId) {
       const { data, error } = await adminClient
         .from('family_members').select('*').eq('member_id', user.id).eq('is_active', true).order('created_at')
       if (error) throw new Error(error.message)
@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     }
 
     // POST /member-family — add family member
-    if (req.method === 'POST' && !familyId) {
+    if (req.method === 'POST' && !resourceId) {
       const body = await req.json()
       const { data, error } = await adminClient
         .from('family_members').insert({
@@ -35,20 +35,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ family_member: data }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // PATCH /member-family/:id — update family member
-    if (req.method === 'PATCH' && familyId) {
+    // PATCH /member-family?id=xxx — update family member
+    if (req.method === 'PATCH' && resourceId) {
       const body = await req.json()
       const { data, error } = await adminClient
-        .from('family_members').update(body).eq('id', familyId).eq('member_id', user.id).select().single()
+        .from('family_members').update(body).eq('id', resourceId).eq('member_id', user.id).select().single()
       if (error) throw new Error('Family member not found')
       await logAudit(adminClient, { actor_id: user.id, action: 'updated_family_member', resource: 'family_member', resource_id: data.id })
       return new Response(JSON.stringify({ family_member: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // DELETE /member-family/:id — soft delete
-    if (req.method === 'DELETE' && familyId) {
+    // DELETE /member-family?id=xxx — soft delete
+    if (req.method === 'DELETE' && resourceId) {
       const { data, error } = await adminClient
-        .from('family_members').update({ is_active: false }).eq('id', familyId).eq('member_id', user.id).select().single()
+        .from('family_members').update({ is_active: false }).eq('id', resourceId).eq('member_id', user.id).select().single()
       if (error) throw new Error('Family member not found')
       await logAudit(adminClient, { actor_id: user.id, action: 'removed_family_member', resource: 'family_member', resource_id: data.id })
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

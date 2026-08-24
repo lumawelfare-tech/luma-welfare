@@ -14,8 +14,9 @@ Deno.serve(async (req) => {
     if (!session) return new Response(JSON.stringify({ message: 'No admin access' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
     const url = new URL(req.url)
-    const pathParts = url.pathname.split('/').filter(Boolean)
-    const resource = pathParts[pathParts.length - 1]
+    const resourceId = url.searchParams.get("resource_id")
+    const action = url.searchParams.get("action")
+    const resource = resourceId
 
     // GET /admin-settings/audit-logs
     if (req.method === 'GET' && resource === 'audit-logs') {
@@ -33,12 +34,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ open_questions: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // POST /admin-settings/open-questions/:id/resolve
-    if (req.method === 'POST' && resource === 'resolve') {
+    // POST /admin-settings/resolve?id={questionId}
+    if (req.method === 'POST' && action === 'resolve') {
       requirePermission(session, 'members', 'update')
       const body = await req.json()
-      const questionId = pathParts[pathParts.length - 2]
-      const { data, error } = await adminClient.from('open_questions').update({ status: 'resolved', answer: body.answer ?? '' }).eq('id', questionId).select().single()
+      const { data, error } = await adminClient.from('open_questions').update({ status: 'resolved', answer: body.answer ?? '' }).eq('id', resourceId).select().single()
       if (error) throw new Error('Question not found')
       return new Response(JSON.stringify({ question: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }

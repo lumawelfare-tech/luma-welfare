@@ -39,8 +39,8 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url)
-    const pathParts = url.pathname.split('/').filter(Boolean)
-    const itemId = pathParts[pathParts.length - 1]
+    const resourceId = url.searchParams.get("resource_id")
+    const itemId = resourceId
     const isIdPath = itemId && itemId !== 'admin-news'
 
     // GET /admin-news — list items

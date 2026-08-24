@@ -14,8 +14,8 @@ Deno.serve(async (req) => {
     if (!session) return new Response(JSON.stringify({ message: 'No admin access' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
     const url = new URL(req.url)
-    const pathParts = url.pathname.split('/').filter(Boolean)
-    const claimId = pathParts[pathParts.length - 1]
+    const resourceId = url.searchParams.get("resource_id")
+    const claimId = resourceId
 
     if (req.method === 'GET' && !claimId) {
       requirePermission(session, 'claims', 'read')
