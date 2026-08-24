@@ -31,6 +31,7 @@ type AuthState = {
   adminRole: string | null
   loading: boolean
   login: (email: string, password: string) => Promise<LoginResult>
+  signInWithGoogle: () => Promise<void>
   register: (input: {
     email: string
     password: string
@@ -43,45 +44,115 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null)
 
+/**
+ * After OAuth login, ensure the user has a member record.
+ * Google users don't go through auth-register, so we create the member
+ * record server-side if it doesn't exist yet.
+ */
+async function ensureMemberRecord(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }) {
+  try {
+    // Try to fetch existing member
+    await api<{ member: Member | null }>('/auth/me', { auth: true })
+  } catch {
+    // No member record — create one via the auth-register Edge Function
+    // but only if the user doesn't already exist
+    try {
+      await api('/auth/register', {
+        method: 'POST',
+        body: {
+          email: user.email ?? '',
+          password: '__oauth_placeholder__',
+          fullName: (user.user_metadata?.full_name as string) ?? user.email?.split('@')[0] ?? 'Member',
+          phone: '0000000000',
+        },
+      })
+    } catch {
+      // If registration fails (e.g. email already taken), that's okay —
+      // the member record may already exist or will be created by other means
+    }
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [member, setMember] = useState<Member | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRole, setAdminRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Fetch member profile and admin status from the server
+  async function loadProfile(): Promise<{ member: Member | null; isAdmin: boolean; adminRole: string | null }> {
+    try {
+      const data = await api<{ member: Member; isAdmin?: boolean; adminRole?: string | null }>('/auth/me', { auth: true })
+      return { member: data.member, isAdmin: data.isAdmin === true, adminRole: data.adminRole ?? null }
+    } catch {
+      return { member: null, isAdmin: false, adminRole: null }
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
+
+    // Initial session hydration
     async function hydrate() {
-      // Check Supabase session first
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         setLoading(false)
         return
       }
 
-      // Store session in localStorage for backward compatibility
       setSession(session.access_token, session.expires_at)
 
-      try {
-        const data = await api<{ member: Member; isAdmin?: boolean; adminRole?: string | null }>('/auth/me', { auth: true })
-        if (!cancelled) {
-          setMember(data.member)
-          setIsAdmin(data.isAdmin === true)
-          setAdminRole(data.adminRole ?? null)
-        }
-      } catch {
-        clearSession()
-        await supabase.auth.signOut()
-      } finally {
-        if (!cancelled) setLoading(false)
+      // Ensure OAuth users have a member record
+      if (session.user.app_metadata?.provider !== 'email') {
+        await ensureMemberRecord(session.user)
+      }
+
+      const profile = await loadProfile()
+      if (!cancelled) {
+        setMember(profile.member)
+        setIsAdmin(profile.isAdmin)
+        setAdminRole(profile.adminRole)
       }
     }
-    hydrate()
-    return () => { cancelled = true }
+
+    hydrate().finally(() => { if (!cancelled) setLoading(false) })
+
+    // Listen for auth state changes (OAuth redirects, token refresh, sign out)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (cancelled) return
+
+      if (event === 'SIGNED_OUT' || !session) {
+        setMember(null)
+        setIsAdmin(false)
+        setAdminRole(null)
+        clearSession()
+        return
+      }
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.access_token) {
+          setSession(session.access_token, session.expires_at)
+        }
+
+        // For OAuth sign-ins, ensure member record exists
+        if (session?.user && session.user.app_metadata?.provider !== 'email') {
+          await ensureMemberRecord(session.user)
+        }
+
+        const profile = await loadProfile()
+        setMember(profile.member)
+        setIsAdmin(profile.isAdmin)
+        setAdminRole(profile.adminRole)
+      }
+    })
+
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function login(email: string, password: string): Promise<LoginResult> {
-    // Use Supabase Auth client-side
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       throw new Error(error.message)
@@ -91,12 +162,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session.access_token, data.session.expires_at)
     }
 
-    // Fetch member profile and admin status
-    const me = await api<{ member: Member; isAdmin?: boolean; adminRole?: string | null }>('/auth/me', { auth: true })
+    const me = await loadProfile()
     setMember(me.member)
-    setIsAdmin(me.isAdmin === true)
-    setAdminRole(me.adminRole ?? null)
-    return { member: me.member, isAdmin: me.isAdmin === true }
+    setIsAdmin(me.isAdmin)
+    setAdminRole(me.adminRole)
+    return { member: me.member, isAdmin: me.isAdmin }
+  }
+
+  async function signInWithGoogle(): Promise<void> {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
+    })
+    if (error) throw error
   }
 
   async function register(input: {
@@ -118,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ member, isAdmin, adminRole, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ member, isAdmin, adminRole, loading, login, signInWithGoogle, register, logout }}>
       {children}
     </AuthContext.Provider>
   )
