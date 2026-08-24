@@ -1,18 +1,18 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { AdminLogin } from './AdminLogin'
 
 /**
  * Admin-gated routes. Server-side authorization remains authoritative
  * (every admin API endpoint independently verifies the admins table).
  * This is a convenience layer — it never grants access on its own.
  *
- * Unauthenticated → /login
- * Authenticated but not admin → /dashboard
+ * Unauthenticated → show Admin Login inline at /admin (no redirect)
+ * Authenticated but not admin → redirect to /dashboard
  * Authenticated admin → render children (Outlet)
  */
 export function RequireAdmin() {
   const { member, isAdmin, loading } = useAuth()
-  const location = useLocation()
 
   if (loading) {
     return (
@@ -23,7 +23,7 @@ export function RequireAdmin() {
   }
 
   if (!member) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />
+    return <AdminLogin />
   }
 
   if (!isAdmin) {
