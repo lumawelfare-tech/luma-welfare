@@ -31,8 +31,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    if (!/^[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-      return new Response(JSON.stringify({ message: 'Password must contain a letter and a number.', code: 'VALIDATION' }), {
+    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      return new Response(JSON.stringify({ message: 'Password must contain at least one letter and one number.', code: 'VALIDATION' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
