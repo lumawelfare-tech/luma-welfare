@@ -46,30 +46,23 @@ const AuthContext = createContext<AuthState | null>(null)
 
 /**
  * After OAuth login, ensure the user has a member record.
- * Google users don't go through auth-register, so we create the member
- * record server-side if it doesn't exist yet.
+ * Uses a dedicated Edge Function that creates the member directly
+ * from the authenticated user's Supabase Auth identity — no phone required.
  */
-async function ensureMemberRecord(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }) {
+async function ensureMemberRecord() {
   try {
-    // Try to fetch existing member
-    await api<{ member: Member | null }>('/auth/me', { auth: true })
+    // Try to fetch existing member first
+    const data = await api<{ member: Member | null }>('/auth/me', { auth: true })
+    if (data.member) return
   } catch {
-    // No member record — create one via the auth-register Edge Function
-    // but only if the user doesn't already exist
-    try {
-      await api('/auth/register', {
-        method: 'POST',
-        body: {
-          email: user.email ?? '',
-          password: '__oauth_placeholder__',
-          fullName: (user.user_metadata?.full_name as string) ?? user.email?.split('@')[0] ?? 'Member',
-          phone: '0000000000',
-        },
-      })
-    } catch {
-      // If registration fails (e.g. email already taken), that's okay —
-      // the member record may already exist or will be created by other means
-    }
+    // No member record — create one via the OAuth provisioning endpoint
+  }
+
+  try {
+    await api('/auth/oauth-provision', { method: 'POST', auth: true })
+  } catch {
+    // Provisioning may fail if there's a race condition — that's okay
+    // The auth-me check above will handle it on next request
   }
 }
 
@@ -100,12 +93,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      setSession(session.access_token, session.expires_at)
-
-      // Ensure OAuth users have a member record
-      if (session.user.app_metadata?.provider !== 'email') {
-        await ensureMemberRecord(session.user)
-      }
+      setSession(session.access_token, session.expires_at)        // Ensure OAuth users have a member record
+        if (session.user.app_metadata?.provider !== 'email') {
+          await ensureMemberRecord()
+        }
 
       const profile = await loadProfile()
       if (!cancelled) {
@@ -136,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // For OAuth sign-ins, ensure member record exists
         if (session?.user && session.user.app_metadata?.provider !== 'email') {
-          await ensureMemberRecord(session.user)
+          await ensureMemberRecord()
         }
 
         const profile = await loadProfile()

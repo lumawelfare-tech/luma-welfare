@@ -164,6 +164,7 @@ function pathToFunctionName(path: string): string | null {
   if (cleanPath === 'auth/register') return 'auth-register'
   if (cleanPath === 'auth/login') return 'auth-login'
   if (cleanPath === 'auth/me') return 'auth-me'
+  if (cleanPath === 'auth/oauth-provision') return 'auth-oauth-provision'
 
   // Member routes
   if (cleanPath === 'member/dashboard') return 'member-dashboard'
