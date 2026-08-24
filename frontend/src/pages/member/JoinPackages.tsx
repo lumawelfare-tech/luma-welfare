@@ -45,9 +45,7 @@ export function JoinPackages() {
         auth: true,
         body: { packageId: p.id, packageTierId: tierId || undefined },
       })
-      setNotice(
-        `${p.name} added! Your subscription is pending activation. Browse your dashboard to track contributions and qualification.`,
-      )
+      setNotice(`${p.name} added! Your subscription is pending activation.`)
       const d = await api<{ subscriptions: Subscription[] }>('/auth/me', { auth: true })
       setMine(d.subscriptions ?? [])
     } catch (e) {
@@ -59,68 +57,66 @@ export function JoinPackages() {
 
   if (member && (member.status === 'suspended' || member.status === 'closed')) {
     return (
-      <div className="container-luma py-16">
-        <div className="mx-auto max-w-lg rounded-2xl border border-stone-200 bg-white p-8 text-center">
-          <h1 className="text-xl font-bold text-luma-900">Account {member.status}</h1>
-          <p className="mt-3 text-sm leading-relaxed text-stone-600">
-            Your account has been {member.status}. Please contact support for assistance.
-          </p>
-          <Link to="/dashboard" className="mt-5 inline-block rounded-md bg-luma-600 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-700">
-            Back to dashboard
-          </Link>
+      <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
+        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
+          <h1 className="text-lg font-semibold text-gray-900">Account {member.status}</h1>
+          <p className="mt-2 text-sm text-gray-500">Your account has been {member.status}. Please contact support.</p>
+          <Link to="/dashboard" className="mt-4 inline-block rounded-lg bg-luma-700 px-4 py-2 text-sm font-medium text-white hover:bg-luma-800">Dashboard</Link>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="container-luma py-10">
-      <h1 className="text-2xl font-bold text-luma-900">Join a package</h1>
-      <p className="mt-1 text-sm text-stone-600">
-        You can hold several packages. Each one is tracked and qualified separately.
-      </p>
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Explore Packages</h1>
+        <p className="mt-1 text-sm text-gray-500">Find the welfare packages available to you. Each is tracked separately.</p>
+      </div>
 
-      {notice && <p className="mt-4 rounded-md bg-luma-50 px-4 py-3 text-sm text-luma-800">{notice}</p>}
-      {error && <p className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      {notice && <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
+      {error && <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {packages.map((p) => {
           const joined = joinedIds.has(p.id)
           return (
-            <div key={p.id} className="flex flex-col rounded-2xl border border-stone-200 bg-white p-5">
-              <h2 className="font-semibold text-luma-900">{p.name}</h2>
-              <p className="mt-1 flex-1 text-sm text-stone-600">{p.description}</p>
+            <div key={p.id} className={`flex flex-col rounded-xl border bg-white p-5 transition-all ${joined ? 'border-luma-200 bg-luma-50/50' : 'border-gray-200 hover:shadow-md'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="font-semibold text-gray-900">{p.name}</h2>
+                {joined && <span className="inline-flex rounded-full bg-luma-100 px-2 py-0.5 text-[10px] font-semibold text-luma-700">Joined</span>}
+              </div>
+              <p className="mt-2 flex-1 text-sm text-gray-500 line-clamp-3">{p.description}</p>
 
               {p.tiers.length > 1 && (
                 <select
                   value={tierChoice[p.id] ?? ''}
                   onChange={(e) => setTierChoice((t) => ({ ...t, [p.id]: e.target.value }))}
-                  className="mt-3 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm outline-none focus:border-luma-500"
+                  className="mt-3 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-luma-500 focus:bg-white"
                 >
-                  <option value="" disabled>
-                    Choose your tier
-                  </option>
+                  <option value="" disabled>Choose your tier</option>
                   {p.tiers.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} — KSh {t.amount}/month
-                    </option>
+                    <option key={t.id} value={t.id}>{t.name} — KSh {t.amount}/month</option>
                   ))}
                 </select>
               )}
 
-              <div className="mt-3 text-sm text-stone-500">
-                {p.tiers.length === 1 ? `KSh ${p.tiers[0].amount}/month · ` : ''}
-                {p.waiting_period_months === null
-                  ? 'No waiting period — keep contributions current'
-                  : `${p.waiting_period_months}-month waiting period`}
+              <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                {p.tiers.length === 1 && <span className="font-medium text-gray-700">KSh {p.tiers[0].amount}/month</span>}
+                <span>·</span>
+                <span>{p.waiting_period_months == null ? 'No waiting period' : `${p.waiting_period_months}-month wait`}</span>
               </div>
 
               <button
                 onClick={() => join(p)}
                 disabled={joined || busyId === p.id || (p.tiers.length > 1 && !tierChoice[p.id])}
-                className="mt-4 rounded-md bg-luma-600 px-3 py-2 text-sm font-semibold text-white hover:bg-luma-700 disabled:cursor-not-allowed disabled:bg-stone-300"
+                className={`mt-4 w-full rounded-lg py-2.5 text-sm font-semibold transition-all disabled:cursor-not-allowed ${
+                  joined
+                    ? 'bg-gray-100 text-gray-400'
+                    : 'bg-luma-700 text-white hover:bg-luma-800 disabled:bg-gray-200 disabled:text-gray-400'
+                }`}
               >
-                {joined ? 'Joined' : busyId === p.id ? 'Joining…' : 'Join'}
+                {joined ? 'Already joined' : busyId === p.id ? 'Joining…' : 'Join Package'}
               </button>
             </div>
           )

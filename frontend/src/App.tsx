@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext'
 import { Layout } from './components/Layout'
 import { AdminLayout } from './components/AdminLayout'
 import { RequireMember } from './components/RequireMember'
+import { MemberLayout } from './components/MemberLayout'
 import { RequireAdmin } from './components/RequireAdmin'
 
 // Public pages — loaded eagerly (small, high-traffic)
@@ -70,8 +71,12 @@ export default function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
 
-              {/* Member pages — inside public layout with navbar */}
-              <Route element={<RequireMember />}>
+
+            </Route>
+
+            {/* ===== MEMBER PORTAL ===== */}
+            <Route element={<RequireMember />}>
+              <Route element={<MemberLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/contributions" element={<Contributions />} />
                 <Route path="/join" element={<JoinPackages />} />

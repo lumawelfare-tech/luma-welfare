@@ -28,11 +28,7 @@ export function Profile() {
     setSaved(false)
     setSaving(true)
     try {
-      await api('/member/profile', {
-        method: 'PATCH',
-        auth: true,
-        body: form,
-      })
+      await api('/member/profile', { method: 'PATCH', auth: true, body: form })
       setSaved(true)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save your profile.')
@@ -41,54 +37,74 @@ export function Profile() {
     }
   }
 
-  return (
-    <div className="container-luma py-10">
-      <h1 className="text-2xl font-bold text-luma-900">Your profile</h1>
-      <p className="mt-1 text-sm text-stone-600">
-        Keep this up to date so the office can reach you.
-      </p>
+  const memberName = member?.full_name ?? ''
+  const initials = memberName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
 
-      <form onSubmit={submit} className="mt-6 max-w-2xl rounded-2xl border border-stone-200 bg-white p-6">
+  return (
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-4xl mx-auto">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+        <p className="mt-1 text-sm text-gray-500">Keep your information up to date.</p>
+      </div>
+
+      {/* Profile header */}
+      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+        <div className="flex items-center gap-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-luma-100 text-xl font-bold text-luma-700">
+            {initials}
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">{member?.full_name ?? 'Member'}</h2>
+            <p className="text-sm text-gray-500">{member?.email ?? ''}</p>
+            <div className="mt-1 flex items-center gap-2">
+              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                member?.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-600 border-gray-200'
+              }`}>
+                {member?.status ?? 'unknown'}
+              </span>
+              {member?.membership_number && (
+                <span className="text-xs text-gray-400">#{member.membership_number}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit form */}
+      <form onSubmit={submit} className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">Personal Information</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-stone-700">Full name</label>
-            <input value={form.fullName ?? ''} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className="w-full rounded-md border border-stone-300 px-3 py-2 outline-none focus:border-luma-500" />
+            <label className="mb-1 block text-xs font-medium text-gray-600">Full name</label>
+            <input value={form.fullName ?? ''} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-stone-700">ID number</label>
-            <input value={form.idNumber ?? ''} onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))} className="w-full rounded-md border border-stone-300 px-3 py-2 outline-none focus:border-luma-500" />
+            <label className="mb-1 block text-xs font-medium text-gray-600">ID number</label>
+            <input value={form.idNumber ?? ''} onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-stone-700">Alt phone</label>
-            <input value={form.altPhone ?? ''} onChange={(e) => setForm((f) => ({ ...f, altPhone: e.target.value }))} className="w-full rounded-md border border-stone-300 px-3 py-2 outline-none focus:border-luma-500" />
+            <label className="mb-1 block text-xs font-medium text-gray-600">Alternate phone</label>
+            <input value={form.altPhone ?? ''} onChange={(e) => setForm((f) => ({ ...f, altPhone: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-stone-700">Occupation</label>
-            <input value={form.occupation ?? ''} onChange={(e) => setForm((f) => ({ ...f, occupation: e.target.value }))} className="w-full rounded-md border border-stone-300 px-3 py-2 outline-none focus:border-luma-500" />
+            <label className="mb-1 block text-xs font-medium text-gray-600">Occupation</label>
+            <input value={form.occupation ?? ''} onChange={(e) => setForm((f) => ({ ...f, occupation: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-stone-700">County</label>
-            <input value={form.county ?? ''} onChange={(e) => setForm((f) => ({ ...f, county: e.target.value }))} className="w-full rounded-md border border-stone-300 px-3 py-2 outline-none focus:border-luma-500" />
+            <label className="mb-1 block text-xs font-medium text-gray-600">County</label>
+            <input value={form.county ?? ''} onChange={(e) => setForm((f) => ({ ...f, county: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-stone-700">Location</label>
-            <input value={form.location ?? ''} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} className="w-full rounded-md border border-stone-300 px-3 py-2 outline-none focus:border-luma-500" />
+            <label className="mb-1 block text-xs font-medium text-gray-600">Location</label>
+            <input value={form.location ?? ''} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
           </div>
         </div>
 
-        {member && (
-          <div className="mt-4 rounded-lg bg-stone-50 px-4 py-3 text-sm text-stone-600">
-            <div>Email: <span className="font-medium">{member.email}</span></div>
-            <div>Phone: <span className="font-medium">{member.phone}</span></div>
-            <div>Membership status: <span className="font-medium">{member.status}</span></div>
-          </div>
-        )}
+        {error && <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
+        {saved && <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">Profile saved successfully.</div>}
 
-        {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        {saved && <p className="mt-4 rounded-md bg-luma-50 px-3 py-2 text-sm text-luma-800">Profile saved.</p>}
-
-        <button disabled={saving} className="mt-5 rounded-md bg-luma-600 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-700 disabled:opacity-60">
-          {saving ? 'Saving…' : 'Save profile'}
+        <button disabled={saving} className="mt-5 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-60 transition-all">
+          {saving ? 'Saving…' : 'Save Profile'}
         </button>
       </form>
     </div>
