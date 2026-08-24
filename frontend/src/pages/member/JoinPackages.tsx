@@ -24,7 +24,7 @@ export function JoinPackages() {
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
-    api<{ packages: Package[] }>('/packages')
+    api<{ packages: Package[] }>('/packages?resource=packages')
       .then((d) => setPackages(d.packages))
       .catch((e) => setError(e.message))
     api<{ subscriptions: Subscription[] }>('/auth/me', { auth: true })
@@ -46,7 +46,7 @@ export function JoinPackages() {
         body: { packageId: p.id, packageTierId: tierId || undefined },
       })
       setNotice(
-        `${p.name} added. An admin approves subscriptions before the waiting period starts.`,
+        `${p.name} added! Your subscription is pending activation. Browse your dashboard to track contributions and qualification.`,
       )
       const d = await api<{ subscriptions: Subscription[] }>('/auth/me', { auth: true })
       setMine(d.subscriptions ?? [])
@@ -57,14 +57,13 @@ export function JoinPackages() {
     }
   }
 
-  if (member && member.status !== 'active') {
+  if (member && (member.status === 'suspended' || member.status === 'closed')) {
     return (
       <div className="container-luma py-16">
         <div className="mx-auto max-w-lg rounded-2xl border border-stone-200 bg-white p-8 text-center">
-          <h1 className="text-xl font-bold text-luma-900">Your account is not approved yet</h1>
+          <h1 className="text-xl font-bold text-luma-900">Account {member.status}</h1>
           <p className="mt-3 text-sm leading-relaxed text-stone-600">
-            An admin needs to approve your membership before you can join packages. This usually
-            takes a day or two.
+            Your account has been {member.status}. Please contact support for assistance.
           </p>
           <Link to="/dashboard" className="mt-5 inline-block rounded-md bg-luma-600 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-700">
             Back to dashboard

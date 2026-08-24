@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
       phone,
       id_number: idNumber || null,
       email: email.toLowerCase(),
-      status: 'pending_approval',
+      status: 'active',
     })
 
     if (memberError) {
@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     })
 
     return new Response(JSON.stringify({
-      message: 'Account created. Check your email to confirm your address. An admin will approve your membership.',
+      message: 'Account created. Check your email to confirm your address. Once your email is confirmed, you can sign in, explore available packages, and choose the package that best suits you.',
       userId,
     }), {
       status: 201,

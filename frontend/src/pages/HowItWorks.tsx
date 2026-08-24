@@ -5,7 +5,7 @@ const steps = [
   {
     step: '01',
     title: 'Register',
-    text: 'Create an account with your name, email and phone number. Your membership goes to an admin for approval. You cannot join packages until your account is approved.',
+    text: 'Create an account with your name, email and phone number. Verify your email, and you\'re ready to explore packages and start contributing.',
     icon: (
       <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />

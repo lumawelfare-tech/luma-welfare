@@ -19,10 +19,13 @@ Deno.serve(async (req) => {
 
     if (!packageId) return new Response(JSON.stringify({ message: 'packageId is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
-    // Check member status
+    // Verify member exists and is not suspended/closed
     const { data: member } = await adminClient.from('members').select('status').eq('id', user.id).single()
-    if (!member || member.status !== 'active') {
-      return new Response(JSON.stringify({ message: 'Your account is not approved yet.', code: 'ACCOUNT_PENDING' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    if (!member) {
+      return new Response(JSON.stringify({ message: 'Member account not found.', code: 'NOT_FOUND' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    if (member.status === 'suspended' || member.status === 'closed') {
+      return new Response(JSON.stringify({ message: 'Your account has been ' + member.status + '.', code: 'ACCOUNT_' + member.status.toUpperCase() }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // Check for existing subscription
