@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { Layout } from './components/Layout'
+import { AdminLayout } from './components/AdminLayout'
 import { RequireMember } from './components/RequireMember'
 import { RequireAdmin } from './components/RequireAdmin'
 
@@ -47,8 +48,8 @@ export default function App() {
       <BrowserRouter>
         <Suspense fallback={<PageLoader />}>
           <Routes>
+            {/* ===== PUBLIC WEBSITE ===== */}
             <Route element={<Layout />}>
-              {/* Public pages */}
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
               <Route path="/packages" element={<PackagesPage />} />
@@ -60,7 +61,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
 
-              {/* Member pages */}
+              {/* Member pages — inside public layout with navbar */}
               <Route element={<RequireMember />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/contributions" element={<Contributions />} />
@@ -68,14 +69,17 @@ export default function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/family" element={<Family />} />
               </Route>
+            </Route>
 
-              {/* Admin pages */}
-              <Route element={<RequireAdmin />}>
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/members" element={<AdminMembers />} />
-                <Route path="/admin/packages" element={<AdminPackages />} />
-                <Route path="/admin/contributions" element={<AdminContributions />} />
-                <Route path="/admin/claims" element={<AdminClaims />} />
+            {/* ===== ADMIN PORTAL ===== */}
+            <Route path="/admin" element={<RequireAdmin />}>
+              <Route element={<AdminLayout />}>
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="members" element={<AdminMembers />} />
+                <Route path="packages" element={<AdminPackages />} />
+                <Route path="contributions" element={<AdminContributions />} />
+                <Route path="claims" element={<AdminClaims />} />
               </Route>
             </Route>
           </Routes>
