@@ -56,7 +56,6 @@ export class ApiError extends Error {
 
 /**
  * Make an API call to a Supabase Edge Function.
- * Falls back to the Hono backend if configured.
  */
 export async function api<T = unknown>(
   path: string,
@@ -85,14 +84,16 @@ export async function api<T = unknown>(
   }
 
   // Determine the Edge Function name from the path
-  const functionName = pathToFunctionName(path)
+  const { pathname, search } = splitPath(path)
+  const functionName = pathToFunctionName(pathname)
 
   if (!functionName) {
     throw new ApiError(404, `Unknown API path: ${path}`, 'NOT_FOUND')
   }
 
-  // Call Edge Function
-  const res = await fetch(`${edgeFunctionUrl}/${functionName}`, {
+  // Call Edge Function, forwarding any query parameters
+  const url = `${edgeFunctionUrl}/${functionName}${search}`
+  const res = await fetch(url, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -113,11 +114,21 @@ export async function api<T = unknown>(
 }
 
 /**
+ * Split a path string into pathname and query string.
+ * '/packages?resource=packages' → { pathname: 'packages', search: '?resource=packages' }
+ */
+function splitPath(path: string): { pathname: string; search: string } {
+  const clean = path.replace(/^\/+/, '')
+  const qi = clean.indexOf('?')
+  if (qi === -1) return { pathname: clean, search: '' }
+  return { pathname: clean.slice(0, qi), search: clean.slice(qi) }
+}
+
+/**
  * Map API paths to Edge Function names.
- * Returns null if the path should fall back to the Hono backend.
  */
 function pathToFunctionName(path: string): string | null {
-  const cleanPath = path.replace(/^\/+/, '')
+  const cleanPath = path
 
   // Auth routes
   if (cleanPath === 'auth/register') return 'auth-register'
@@ -150,6 +161,6 @@ function pathToFunctionName(path: string): string | null {
   if (cleanPath === 'news') return 'public-data'
   if (cleanPath === 'gallery') return 'public-data'
 
-  // Fallback — return null to use Hono backend
+  // Unknown path
   return null
 }
