@@ -23,9 +23,11 @@ export function AdminGallery() {
   const [editing, setEditing] = useState<GalleryItem | null>(null)
   const [form, setForm] = useState({ title: '', caption: '' })
   const [preview, setPreview] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function load() {
@@ -43,6 +45,7 @@ export function AdminGallery() {
     setEditing(null)
     setForm({ title: '', caption: '' })
     setPreview(null)
+    setSelectedFile(null)
     setShowForm(true)
   }
 
@@ -50,29 +53,47 @@ export function AdminGallery() {
     setEditing(item)
     setForm({ title: item.title ?? '', caption: item.caption ?? '' })
     setPreview(item.image_url)
+    setSelectedFile(null)
     setShowForm(true)
   }
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  function validateAndPreview(file: File) {
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      setError('Only JPG, PNG, and WEBP images are accepted.')
+      setError('Please upload a JPEG, PNG, or WEBP image.')
       return
     }
     if (file.size > MAX_SIZE) {
-      setError('File must be under 5MB.')
+      setError('Image must be 5MB or smaller.')
       return
     }
     setError(null)
+    setSelectedFile(file)
     const reader = new FileReader()
     reader.onload = () => setPreview(reader.result as string)
     reader.readAsDataURL(file)
   }
 
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) validateAndPreview(file)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) validateAndPreview(file)
+  }
+
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
   async function uploadToStorage(file: File): Promise<string> {
-    const ext = file.name.split('.').pop() ?? 'jpg'
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 50)
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
     const { error: uploadError } = await supabase.storage
       .from('gallery')
       .upload(path, file, { contentType: file.type, upsert: false })
@@ -91,8 +112,8 @@ export function AdminGallery() {
       let imageUrl = editing?.image_url ?? ''
 
       // Upload new file if selected
-      if (fileRef.current?.files?.[0]) {
-        imageUrl = await uploadToStorage(fileRef.current.files[0])
+      if (selectedFile) {
+        imageUrl = await uploadToStorage(selectedFile)
       }
 
       if (!imageUrl) {
@@ -116,6 +137,7 @@ export function AdminGallery() {
       }
       setShowForm(false)
       setPreview(null)
+      setSelectedFile(null)
       if (fileRef.current) fileRef.current.value = ''
       await load()
     } catch (err) {
@@ -163,12 +185,32 @@ export function AdminGallery() {
         <form onSubmit={save} className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
           <h2 className="font-semibold text-gray-900">{editing ? 'Edit Image' : 'Upload Image'}</h2>
           <div className="mt-4 space-y-4">
-            {/* File upload */}
+            {/* File upload with drag-and-drop */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Image</label>
-              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-luma-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-luma-700 hover:file:bg-luma-100" />
-              <p className="mt-1 text-xs text-gray-400">JPG, PNG, or WEBP. Max 5MB.</p>
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                className={`relative rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+                  dragOver ? 'border-luma-500 bg-luma-50' : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect}
+                  className="absolute inset-0 cursor-pointer opacity-0" />
+                <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+                <p className="mt-2 text-sm text-gray-600">Click or drag to upload</p>
+                <p className="mt-1 text-xs text-gray-400">JPG, PNG, WEBP. Max 5MB.</p>
+              </div>
+              {selectedFile && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                  <span className="font-medium">{selectedFile.name}</span>
+                  <span>({formatSize(selectedFile.size)})</span>
+                  <button type="button" onClick={() => { setSelectedFile(null); setPreview(null); if (fileRef.current) fileRef.current.value = '' }} className="text-red-500 hover:text-red-700">Remove</button>
+                </div>
+              )}
             </div>
 
             {/* Preview */}

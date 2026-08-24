@@ -71,7 +71,19 @@ Deno.serve(async (req) => {
       const updates: Record<string, unknown> = {}
       if (body.title !== undefined) updates.title = body.title
       if (body.caption !== undefined) updates.caption = body.caption
-      if (body.image_url !== undefined) updates.image_url = body.image_url
+
+      // Handle image replacement — clean up old storage file
+      if (body.image_url !== undefined) {
+        const { data: old } = await adminClient.from('gallery_items').select('image_url').eq('id', itemId).single()
+        if (old?.image_url && body.image_url && body.image_url !== old.image_url) {
+          const oldPath = old.image_url.split('/storage/v1/object/public/gallery/')[1]
+          if (oldPath) {
+            try { await adminClient.storage.from('gallery').remove([oldPath]) } catch { /* best-effort */ }
+          }
+        }
+        updates.image_url = body.image_url
+      }
+
       const { data, error } = await adminClient
         .from('gallery_items')
         .update(updates)
@@ -79,7 +91,7 @@ Deno.serve(async (req) => {
         .select()
         .single()
       if (error) throw new Error(error.message)
-      await logAudit(adminClient, { actor_id: user.id, actor_role: session.role_name, action: 'gallery.updated', resource: 'gallery', resource_id: itemId })
+      await logAudit(adminClient, { actor_id: user.id, actor_role: session.role_name, action: 'gallery.updated', resource: 'gallery', resource_id: itemId, meta: body.image_url ? { image_replaced: true } : undefined })
       return new Response(JSON.stringify(data), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
