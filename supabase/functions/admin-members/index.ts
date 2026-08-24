@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // PATCH /admin-members?resource_id=xxx&action=status — approve/suspend/close member
+    // PATCH /admin-members?resource_id=xxx — approve/suspend/close member
     if (req.method === 'PATCH' && resourceId) {
       requirePermission(session, 'members', 'approve')
       const body = await req.json()
@@ -108,6 +108,58 @@ Deno.serve(async (req) => {
       })
 
       return new Response(JSON.stringify({ member: data }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // DELETE /admin-members?resource_id=xxx — soft-delete (deactivate) member
+    if (req.method === 'DELETE' && resourceId) {
+      requirePermission(session, 'members', 'delete')
+
+      // Prevent self-deletion
+      if (resourceId === user.id) {
+        return new Response(JSON.stringify({ message: 'Administrators cannot delete their own account', code: 'SELF_DELETE_BLOCKED' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Prevent deleting another administrator
+      const { data: targetAdmin } = await adminClient
+        .from('admins')
+        .select('id, display_name')
+        .eq('id', resourceId)
+        .maybeSingle()
+      if (targetAdmin) {
+        return new Response(JSON.stringify({ message: 'Cannot delete an administrator account through member management', code: 'ADMIN_DELETE_BLOCKED' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Soft-delete: set status to 'closed'
+      const { data: member, error } = await adminClient
+        .from('members')
+        .update({
+          status: 'closed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', resourceId)
+        .select('id, full_name, email')
+        .single()
+      if (error) throw new Error('Member not found')
+
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: 'member.deleted',
+        resource: 'member',
+        resource_id: resourceId,
+        meta: { member_name: member.full_name, by: session.display_name },
+      })
+
+      return new Response(JSON.stringify({ message: 'Member deactivated', member }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

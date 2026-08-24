@@ -19,6 +19,7 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url)
     const resourceId = url.searchParams.get("resource_id")
+    const action = url.searchParams.get("action")
     const pkgId = resourceId
 
     // GET /admin-packages — list all packages with tiers and rules
@@ -64,8 +65,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ package: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // POST /admin-packages/:id/tiers — add tier
-    if (req.method === 'POST' && pkgId && url.pathname.endsWith('/tiers')) {
+    // POST /admin-packages?id=xxx&action=tiers — add tier
+    if (req.method === 'POST' && pkgId && action === 'tiers') {
       requirePermission(session, 'packages', 'update')
       const body = await req.json()
       const { data, error } = await adminClient.from('package_tiers').insert({ package_id: pkgId, name: body.name, amount: body.amount, description: body.description }).select().single()
@@ -73,8 +74,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ tier: data }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // PUT /admin-packages/:id/rules — replace rules
-    if (req.method === 'PUT' && pkgId && url.pathname.endsWith('/rules')) {
+    // PUT /admin-packages?id=xxx&action=rules — replace rules
+    if (req.method === 'PUT' && pkgId && action === 'rules') {
       requirePermission(session, 'packages', 'update')
       const body = await req.json()
       await adminClient.from('package_rules').delete().eq('package_id', pkgId)
@@ -85,8 +86,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // POST /admin-packages/:id/retire — retire package
-    if (req.method === 'POST' && pkgId && url.pathname.endsWith('/retire')) {
+    // POST /admin-packages?id=xxx&action=retire — retire package
+    if (req.method === 'POST' && pkgId && action === 'retire') {
       requirePermission(session, 'packages', 'update')
       const { data, error } = await adminClient.from('packages').update({ is_active: false }).eq('id', pkgId).select('id, name').single()
       if (error) throw new Error('Package not found')
