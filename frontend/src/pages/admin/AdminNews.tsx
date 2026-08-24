@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { supabase } from '../../lib/supabase'
 import { useHead } from '../../lib/seo'
 
 type NewsEvent = {
@@ -87,13 +86,13 @@ export function AdminNews() {
     reader.readAsDataURL(file)
   }
 
-  async function uploadCover(file: File): Promise<string> {
-    const ext = file.name.split('.').pop() ?? 'jpg'
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-    const { error } = await supabase.storage.from('news').upload(path, file, { contentType: file.type })
-    if (error) throw new Error(error.message)
-    const { data } = supabase.storage.from('news').getPublicUrl(path)
-    return data.publicUrl
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
   }
 
   async function save(e: React.FormEvent) {
@@ -102,18 +101,26 @@ export function AdminNews() {
     setNotice(null)
     setSaving(true)
     try {
-      let coverUrl = editing?.cover_image ?? null
-      if (fileRef.current?.files?.[0]) {
-        coverUrl = await uploadCover(fileRef.current.files[0])
-      }
-
-      const payload = {
+      const payload: Record<string, unknown> = {
         ...form,
-        cover_image: coverUrl,
         event_date: form.event_date || null,
         event_time: form.event_time || null,
         location: form.location || null,
         excerpt: form.excerpt || null,
+      }
+
+      // If a new file is selected, send as base64 to Edge Function for server-side Storage upload
+      if (fileRef.current?.files?.[0]) {
+        const file = fileRef.current.files[0]
+        const dataUrl = await fileToBase64(file)
+        payload.cover_image_data = dataUrl
+        payload.cover_image_filename = file.name
+      } else if (!editing) {
+        // New item with no image
+        payload.cover_image = null
+      } else if (editing && coverPreview === null && editing.cover_image) {
+        // Editing and user removed the cover image
+        payload.cover_image = null
       }
 
       if (editing) {

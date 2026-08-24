@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
       let newCoverImage: string | null = null
 
       const body = await req.json()
-      const fields = ['title', 'body', 'type', 'event_date', 'event_time', 'location', 'excerpt', 'cover_image', 'is_featured']
+      const fields = ['title', 'body', 'type', 'event_date', 'event_time', 'location', 'excerpt', 'cover_image', 'is_featured', 'is_published']
       for (const f of fields) {
         if (body[f] !== undefined) updates[f] = body[f]
       }
