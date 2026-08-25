@@ -178,6 +178,7 @@ function pathToFunctionName(path: string): string | null {
   if (cleanPath === 'member/profile') return 'member-profile'
   if (cleanPath.startsWith('member/family')) return 'member-family'
   if (cleanPath === 'member/subscriptions') return 'member-subscriptions'
+  if (cleanPath.startsWith('member/registration-fee')) return 'member-registration-fee'
   if (cleanPath === 'contributions') return 'member-contributions'
 
   // Admin routes
@@ -187,6 +188,7 @@ function pathToFunctionName(path: string): string | null {
   if (cleanPath.startsWith('admin/contributions')) return 'admin-contributions'
   if (cleanPath.startsWith('admin/claims')) return 'admin-claims'
   if (cleanPath.startsWith('admin/subscriptions')) return 'admin-subscriptions'
+  if (cleanPath.startsWith('admin/registration-fee')) return 'admin-registration-fee'
   if (cleanPath.startsWith('admin/open-questions') || cleanPath.startsWith('admin/audit-logs') || cleanPath === 'admin/settings') return 'admin-settings'
 
   // Payment routes

@@ -59,7 +59,7 @@ app.post('/register', withSupabase({ auth: 'publishable' }), async (c) => {
     phone: parsed.data.phone,
     id_number: parsed.data.idNumber ?? null,
     email: parsed.data.email.toLowerCase(),
-    status: 'pending_approval',
+    status: 'active',
   })
   if (memberError) {
     throw new HttpError(500, memberError.message, 'DB_ERROR')
@@ -72,10 +72,19 @@ app.post('/register', withSupabase({ auth: 'publishable' }), async (c) => {
     resource_id: userId,
   })
 
+  // Create registration fee record (KSh 300 one-time)
+  await supabaseAdmin.from('registration_fees').insert({
+    member_id: userId,
+    fee_type: 'registration',
+    amount: 300,
+    currency: 'KES',
+    status: 'unpaid',
+  })
+
   return c.json(
     {
       message:
-        'Account created. Check your email to confirm your address. An admin will approve your membership before you can join packages.',
+        'Account created. Check your email to confirm your address. Once confirmed, sign in and pay the KSh 300 registration fee to activate your membership and access welfare packages.',
       userId,
     },
     201,
@@ -146,12 +155,23 @@ app.get('/me', withSupabase({ auth: 'user' }), async (c) => {
     adminRole = (adminRecord.roles as unknown as { name: string } | null)?.name ?? null
   }
 
+  // Check registration fee status
+  const { data: regFee } = await supabaseAdmin
+    .from('registration_fees')
+    .select('status')
+    .eq('member_id', userId)
+    .eq('fee_type', 'registration')
+    .maybeSingle()
+
+  const registrationFeePaid = regFee?.status === 'paid'
+
   return c.json({
     member: member ?? null,
     error: error ? error.message : null,
     subscriptions: subscriptions ?? [],
     isAdmin,
     adminRole,
+    registrationFeePaid,
   })
 })
 

@@ -23,6 +23,17 @@ Deno.serve(async (req) => {
 
     const adminClient = createAdminClient()
 
+    // Check registration fee status
+    const { data: regFee } = await adminClient
+      .from('registration_fees')
+      .select('status, amount, paid_at')
+      .eq('member_id', user.id)
+      .eq('fee_type', 'registration')
+      .maybeSingle()
+
+    const registrationFeeStatus = regFee?.status ?? 'unpaid'
+    const registrationFeePaid = registrationFeeStatus === 'paid'
+
     // Use RPC for complex dashboard building
     const { data: cards, error } = await adminClient
       .rpc('build_member_dashboard', { p_member_id: user.id })
@@ -114,13 +125,13 @@ Deno.serve(async (req) => {
         }
       })
 
-      return new Response(JSON.stringify({ cards: result }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    return new Response(JSON.stringify({ cards: result, registration_fee_status: registrationFeeStatus, registration_fee_paid: registrationFeePaid }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
     }
 
-    return new Response(JSON.stringify({ cards: cards ?? [] }), {
+    return new Response(JSON.stringify({ cards: cards ?? [], registration_fee_status: registrationFeeStatus, registration_fee_paid: registrationFeePaid }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

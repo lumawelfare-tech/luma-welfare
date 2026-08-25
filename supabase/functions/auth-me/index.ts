@@ -38,6 +38,16 @@ Deno.serve(async (req) => {
       .eq('member_id', userId)
       .order('created_at')
 
+    // Check registration fee status
+    const { data: regFee } = await adminClient
+      .from('registration_fees')
+      .select('status')
+      .eq('member_id', userId)
+      .eq('fee_type', 'registration')
+      .maybeSingle()
+
+    const registrationFeePaid = regFee?.status === 'paid'
+
     // Check admin status — server queries the admins table
     let isAdmin = false
     let adminRole: string | null = null
@@ -59,6 +69,7 @@ Deno.serve(async (req) => {
       subscriptions: subscriptions ?? [],
       isAdmin,
       adminRole,
+      registrationFeePaid,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

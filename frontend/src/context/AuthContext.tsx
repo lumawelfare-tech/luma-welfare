@@ -29,6 +29,7 @@ type AuthState = {
   member: Member | null
   isAdmin: boolean
   adminRole: string | null
+  registrationFeePaid: boolean
   loading: boolean
   login: (email: string, password: string) => Promise<LoginResult>
   signInWithGoogle: () => Promise<void>
@@ -70,15 +71,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [member, setMember] = useState<Member | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRole, setAdminRole] = useState<string | null>(null)
+  const [registrationFeePaid, setRegistrationFeePaid] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // Fetch member profile and admin status from the server
-  async function loadProfile(): Promise<{ member: Member | null; isAdmin: boolean; adminRole: string | null }> {
+  async function loadProfile(): Promise<{ member: Member | null; isAdmin: boolean; adminRole: string | null; registrationFeePaid: boolean }> {
     try {
-      const data = await api<{ member: Member; isAdmin?: boolean; adminRole?: string | null }>('/auth/me', { auth: true })
-      return { member: data.member, isAdmin: data.isAdmin === true, adminRole: data.adminRole ?? null }
+      const data = await api<{ member: Member; isAdmin?: boolean; adminRole?: string | null; registrationFeePaid?: boolean }>('/auth/me', { auth: true })
+      return { member: data.member, isAdmin: data.isAdmin === true, adminRole: data.adminRole ?? null, registrationFeePaid: data.registrationFeePaid === true }
     } catch {
-      return { member: null, isAdmin: false, adminRole: null }
+      return { member: null, isAdmin: false, adminRole: null, registrationFeePaid: false }
     }
   }
 
@@ -103,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMember(profile.member)
         setIsAdmin(profile.isAdmin)
         setAdminRole(profile.adminRole)
+        setRegistrationFeePaid(profile.registrationFeePaid)
       }
     }
 
@@ -134,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMember(profile.member)
         setIsAdmin(profile.isAdmin)
         setAdminRole(profile.adminRole)
+        setRegistrationFeePaid(profile.registrationFeePaid)
       }
     })
 
@@ -157,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMember(me.member)
     setIsAdmin(me.isAdmin)
     setAdminRole(me.adminRole)
+    setRegistrationFeePaid(me.registrationFeePaid)
     return { member: me.member, isAdmin: me.isAdmin }
   }
 
@@ -186,10 +191,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMember(null)
     setIsAdmin(false)
     setAdminRole(null)
-  }
-
-  return (
-    <AuthContext.Provider value={{ member, isAdmin, adminRole, loading, login, signInWithGoogle, register, logout }}>
+    setRegistrationFeePaid(false)
+  }    return (
+    <AuthContext.Provider value={{ member, isAdmin, adminRole, registrationFeePaid, loading, login, signInWithGoogle, register, logout }}>
       {children}
     </AuthContext.Provider>
   )

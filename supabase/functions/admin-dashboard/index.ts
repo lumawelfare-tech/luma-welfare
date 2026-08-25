@@ -32,24 +32,22 @@ Deno.serve(async (req) => {
 
     requirePermission(session, 'members', 'read')
 
-    const [members, pending, subs, pendingContribs, pendingClaims, settings, openQ] = await Promise.all([
+    const [members, subs, pendingContribs, pendingClaims, approvedClaims, settings] = await Promise.all([
       adminClient.from('members').select('id', { count: 'exact', head: true }),
-      adminClient.from('members').select('id', { count: 'exact', head: true }).eq('status', 'pending_approval'),
       adminClient.from('subscriptions').select('id', { count: 'exact', head: true }),
       adminClient.from('contributions').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
-      adminClient.from('claims').select('id', { count: 'exact', head: true }).neq('status', 'Paid'),
+      adminClient.from('claims').select('id', { count: 'exact', head: true }).in('status', ['Submitted', 'Under Review', 'Additional Information Required']),
+      adminClient.from('claims').select('id', { count: 'exact', head: true }).eq('status', 'Approved'),
       adminClient.from('platform_settings').select('key, value').eq('key', 'stats'),
-      adminClient.from('open_questions').select('*').eq('status', 'open'),
     ])
 
     return new Response(JSON.stringify({
       members: members.count ?? 0,
-      pending_approvals: pending.count ?? 0,
       subscriptions: subs.count ?? 0,
       pending_contributions: pendingContribs.count ?? 0,
-      open_claims: pendingClaims.count ?? 0,
+      pending_claims: pendingClaims.count ?? 0,
+      approved_claims: approvedClaims.count ?? 0,
       confirmed_stats: settings.data?.[0]?.value ?? {},
-      open_questions: openQ.data ?? [],
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

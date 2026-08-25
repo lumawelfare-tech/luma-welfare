@@ -6,12 +6,11 @@ import { useHead } from '../../lib/seo'
 
 type DashboardData = {
   members: number
-  pending_approvals: number
   subscriptions: number
   pending_contributions: number
-  open_claims: number
+  pending_claims: number
+  approved_claims: number
   confirmed_stats: Record<string, unknown>
-  open_questions: { id: string; topic: string; question: string; options: unknown; status: string }[]
 }
 
 export function AdminDashboard() {
@@ -31,69 +30,54 @@ export function AdminDashboard() {
   if (error) {
     return (
       <div className="container-luma py-16 text-center">
-        <p className="text-lg font-semibold text-red-700">No admin access</p>
-        <p className="mt-2 text-sm text-stone-600">
-          {error}. If you are an admin, make sure your account is in the admins table.
-        </p>
+        <div className="mx-auto max-w-md rounded-3xl border border-red-200 bg-red-50 p-8">
+          <p className="text-lg font-bold text-red-700">No admin access</p>
+          <p className="mt-2 text-sm text-gray-600">
+            {error}. If you are an admin, make sure your account is in the admins table.
+          </p>
+        </div>
       </div>
     )
   }
 
   if (loading || !data) {
-    return <div className="container-luma py-16 text-center text-stone-500">Loading admin…</div>
+    return <div className="container-luma py-16 text-center text-gray-500">Loading admin…</div>
   }
 
   const stats = [
-    { label: 'Members', value: data.members },
-    { label: 'Pending approvals', value: data.pending_approvals },
-    { label: 'Subscriptions', value: data.subscriptions },
-    { label: 'Pending contributions', value: data.pending_contributions },
-    { label: 'Open claims', value: data.open_claims },
+    { label: 'Total Members', value: data.members, color: 'bg-luma-50 text-luma-700' },
+    { label: 'Active Subscriptions', value: data.subscriptions, color: 'bg-blue-50 text-blue-700' },
+    { label: 'Pending Contributions', value: data.pending_contributions, color: 'bg-orange-50 text-orange-700' },
+    { label: 'Pending Claims', value: data.pending_claims, color: 'bg-purple-50 text-purple-700' },
+    { label: 'Approved Claims', value: data.approved_claims, color: 'bg-emerald-50 text-emerald-700' },
   ]
 
   return (
     <div className="container-luma py-10">
-      <h1 className="text-2xl font-bold text-luma-900">Admin</h1>
-      <p className="mt-1 text-sm text-stone-600">Signed in as {member?.full_name}. Figures are live from the database.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">Signed in as {member?.full_name}. Figures are live from the database.</p>
+        </div>
+      </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (
-          <div key={s.label} className="rounded-xl border border-stone-200 bg-white p-4">
-            <div className="text-2xl font-bold text-luma-700">{s.value}</div>
-            <div className="mt-1 text-xs font-medium uppercase tracking-wide text-stone-500">{s.label}</div>
+          <div key={s.label} className={`rounded-2xl border border-gray-100 p-5 transition-all hover:shadow-md ${s.color}`}>
+            <div className="text-3xl font-extrabold">{s.value}</div>
+            <div className="mt-1 text-xs font-semibold uppercase tracking-wide opacity-75">{s.label}</div>
           </div>
         ))}
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link to="/admin/members" className="rounded-md bg-luma-600 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-700">Members</Link>
-        <Link to="/admin/packages" className="rounded-md bg-luma-600 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-700">Packages</Link>
-        <Link to="/admin/contributions" className="rounded-md bg-luma-600 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-700">Contributions</Link>
-        <Link to="/admin/claims" className="rounded-md bg-luma-600 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-700">Claims</Link>
+        <Link to="/admin/members" className="rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-luma-800 shadow-sm transition-all">Members</Link>
+        <Link to="/admin/packages" className="rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-luma-800 shadow-sm transition-all">Packages</Link>
+        <Link to="/admin/contributions" className="rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-luma-800 shadow-sm transition-all">Contributions</Link>
+        <Link to="/admin/claims" className="rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-luma-800 shadow-sm transition-all">Claims</Link>
       </div>
 
-      <div className="mt-10">
-        <h2 className="text-lg font-semibold text-luma-900">Open questions for Luma</h2>
-        <p className="mt-1 text-sm text-stone-600">
-          These come from Section 9 of the build spec — the printed materials disagree with each
-          other, so nothing here is decided silently.
-        </p>
-        <div className="mt-4 space-y-3">
-          {data.open_questions.map((q) => (
-            <div key={q.id} className="rounded-xl border border-gold-400/60 bg-gold-400/10 p-5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gold-600">{q.topic}</div>
-              <p className="mt-1 text-sm leading-relaxed text-stone-800">{q.question}</p>
-              {Array.isArray(q.options) && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {q.options.map((o) => (
-                    <span key={String(o)} className="rounded bg-white/70 px-2 py-0.5 text-xs text-stone-600">{String(o)}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+
     </div>
   )
 }

@@ -84,7 +84,7 @@ create table members (
   county text,
   location text,
   occupation text,
-  status member_status not null default 'pending_approval',
+  status member_status not null default 'active',
   joined_at timestamptz default now(),
   approved_at timestamptz,
   approved_by uuid,
@@ -106,6 +106,27 @@ create table family_members (
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- Registration Fees
+-- One-time KSh 300 registration/membership activation fee.
+-- A member must pay this before subscribing to welfare packages.
+-- ---------------------------------------------------------------------------
+create table registration_fees (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid not null references members(id) on delete cascade,
+  fee_type text not null default 'registration' check (fee_type in ('registration')),
+  amount numeric(12,2) not null default 300,
+  currency text not null default 'KES',
+  status text not null default 'unpaid' check (status in ('unpaid', 'pending', 'paid', 'failed', 'cancelled')),
+  payment_method text,
+  transaction_reference text,
+  mpesa_receipt text,
+  paid_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (member_id, fee_type)
 );
 
 -- ---------------------------------------------------------------------------
@@ -343,6 +364,8 @@ create index idx_claims_status on claims(status);
 create index idx_payouts_status on payouts(status);
 create index idx_qualifications_subscription on qualifications(subscription_id);
 create index idx_family_members_member on family_members(member_id);
+create index idx_registration_fees_member on registration_fees(member_id);
+create index idx_registration_fees_status on registration_fees(status);
 
 -- ---------------------------------------------------------------------------
 -- updated_at triggers
@@ -357,7 +380,7 @@ $$ language plpgsql;
 do $$
 declare t text;
 begin
-  foreach t in array array['packages','package_tiers','members','family_members','subscriptions','payments','contributions','claims','payouts','admins','news_events']
+  foreach t in array array['packages','package_tiers','members','family_members','subscriptions','payments','contributions','claims','payouts','admins','news_events','registration_fees']
   loop
     execute format('create trigger trg_%s_updated before update on %I for each row execute function set_updated_at()', t, t);
   end loop;
@@ -396,6 +419,10 @@ create policy "claim_documents_read_own" on claim_documents for select using (
 );
 create policy "qualifications_read_own" on qualifications for select using (member_id = auth.uid());
 create policy "notifications_read_own" on notifications for select using (member_id = auth.uid());
+
+create policy "registration_fees_read_own" on registration_fees for select using (member_id = auth.uid());
+create policy "registration_fees_insert_own" on registration_fees for insert with check (member_id = auth.uid());
+create policy "registration_fees_update_own" on registration_fees for update using (member_id = auth.uid()) with check (member_id = auth.uid());
 
 -- Public catalog: active packages, tiers and rules are readable by anyone.
 create policy "packages_public_read" on packages for select using (is_active = true);

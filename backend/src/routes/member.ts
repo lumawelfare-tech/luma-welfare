@@ -33,6 +33,72 @@ const subscribeSchema = z.object({
 
 app.use('*', withSupabase({ auth: 'user' }))
 
+// ---------------------------------------------------------------------------
+// Registration Fee (KSh 300 one-time)
+// ---------------------------------------------------------------------------
+
+// Check registration fee status
+app.get('/registration-fee', async (c) => {
+  const { supabaseAdmin, userClaims } = typedDb(c.var.supabaseContext)
+  const { data: fee } = await supabaseAdmin
+    .from('registration_fees')
+    .select('*')
+    .eq('member_id', userClaims!.id)
+    .eq('fee_type', 'registration')
+    .maybeSingle()
+  return c.json({ registration_fee: fee ?? null })
+})
+
+// Record registration fee as pending (after STK Push initiated)
+app.post('/registration-fee/initiate', async (c) => {
+  const { supabaseAdmin, userClaims } = typedDb(c.var.supabaseContext)
+  const memberId = userClaims!.id
+
+  // Check if already paid
+  const { data: existing } = await supabaseAdmin
+    .from('registration_fees')
+    .select('status')
+    .eq('member_id', memberId)
+    .eq('fee_type', 'registration')
+    .maybeSingle()
+
+  if (existing?.status === 'paid') {
+    throw new HttpError(409, 'Registration fee already paid.', 'ALREADY_PAID')
+  }
+
+  if (existing?.status === 'pending') {
+    return c.json({ message: 'Payment already in progress.', status: 'pending' })
+  }
+
+  // Mark as pending
+  if (existing) {
+    await supabaseAdmin
+      .from('registration_fees')
+      .update({ status: 'pending', payment_method: 'mpesa' })
+      .eq('member_id', memberId)
+      .eq('fee_type', 'registration')
+  } else {
+    await supabaseAdmin
+      .from('registration_fees')
+      .insert({
+        member_id: memberId,
+        fee_type: 'registration',
+        amount: 300,
+        currency: 'KES',
+        status: 'pending',
+        payment_method: 'mpesa',
+      })
+  }
+
+  return c.json({ message: 'Registration fee payment initiated.', status: 'pending' })
+})
+
+// NOTE: Registration fee confirmation is NOT available to members.
+// Confirmation is only possible via:
+// 1. M-Pesa callback handler (Phase 2 — automatic verification)
+// 2. Admin verification endpoint (admin route, not here)
+// Members cannot mark their own fee as paid.
+
 app.patch('/profile', async (c) => {
   const { supabase, supabaseAdmin, userClaims } = typedDb(c.var.supabaseContext)
   const userId = userClaims!.id
@@ -172,8 +238,23 @@ app.post('/subscriptions', async (c) => {
   if (!member || member.status !== 'active') {
     throw new HttpError(
       403,
-      'Your account is not approved yet. An admin must approve your membership before you can join packages.',
-      'ACCOUNT_PENDING',
+      'Your account is not active. Please contact support if you believe this is an error.',
+      'ACCOUNT_INACTIVE',
+    )
+  }
+
+  // Check if registration fee has been paid
+  const { data: regFee } = await supabaseAdmin
+    .from('registration_fees')
+    .select('status')
+    .eq('member_id', userClaims!.id)
+    .eq('fee_type', 'registration')
+    .maybeSingle()
+  if (!regFee || regFee.status !== 'paid') {
+    throw new HttpError(
+      403,
+      'You must pay the KSh 300 registration fee before subscribing to packages.',
+      'REGISTRATION_FEE_REQUIRED',
     )
   }
 

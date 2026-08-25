@@ -95,8 +95,20 @@ Deno.serve(async (req) => {
       resource_id: userId,
     })
 
+    // Create registration fee record (KSh 300 one-time)
+    const { error: feeError } = await adminClient.from('registration_fees').insert({
+      member_id: userId,
+      fee_type: 'registration',
+      amount: 300,
+      currency: 'KES',
+      status: 'unpaid',
+    })
+    if (feeError) {
+      console.error('Failed to create registration fee record:', feeError.message)
+    }
+
     return new Response(JSON.stringify({
-      message: 'Account created. Check your email to confirm your address. Once your email is confirmed, you can sign in, explore available packages, and choose the package that best suits you.',
+      message: 'Account created. Check your email to confirm your address. Once confirmed, sign in and pay the KSh 300 registration fee to activate your membership and access welfare packages.',
       userId,
     }), {
       status: 201,

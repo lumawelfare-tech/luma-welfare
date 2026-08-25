@@ -68,30 +68,104 @@ app.get('/dashboard', async (c) => {
   const { supabaseAdmin } = typedDb(c.var.supabaseContext)
   requirePermission(c.get('adminSession'), 'members', 'read')
 
-  const [members, pending, subs, pendingContribs, pendingClaims, settings, openQ] =
+  const [members, subs, pendingContribs, pendingClaims, approvedClaims, settings] =
     await Promise.all([
       supabaseAdmin.from('members').select('id', { count: 'exact', head: true }),
-      supabaseAdmin.from('members').select('id', { count: 'exact', head: true }).eq('status', 'pending_approval'),
       supabaseAdmin.from('subscriptions').select('id', { count: 'exact', head: true }),
       supabaseAdmin.from('contributions').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
-      supabaseAdmin.from('claims').select('id', { count: 'exact', head: true }).neq('status', 'Paid'),
+      supabaseAdmin.from('claims').select('id', { count: 'exact', head: true }).in('status', ['Submitted', 'Under Review', 'Additional Information Required']),
+      supabaseAdmin.from('claims').select('id', { count: 'exact', head: true }).eq('status', 'Approved'),
       supabaseAdmin.from('platform_settings').select('key, value').eq('key', 'stats'),
-      supabaseAdmin.from('open_questions').select('*').eq('status', 'open'),
     ])
 
   return c.json({
     members: members.count ?? 0,
-    pending_approvals: pending.count ?? 0,
     subscriptions: subs.count ?? 0,
     pending_contributions: pendingContribs.count ?? 0,
-    open_claims: pendingClaims.count ?? 0,
+    pending_claims: pendingClaims.count ?? 0,
+    approved_claims: approvedClaims.count ?? 0,
     confirmed_stats: settings.data?.[0]?.value ?? {},
-    open_questions: openQ.data ?? [],
   })
 })
 
 // ---------------------------------------------------------------------------
-// Dashboard — confirmed figures only. The marketing stats (12,000+ members,
+// Registration Fee — Admin confirmation
+// Only admins can confirm that a member has paid the registration fee.
+// Members cannot self-confirm (security requirement).
+// ---------------------------------------------------------------------------
+const confirmRegistrationFeeSchema = z.object({
+  memberId: z.string().uuid('Invalid member ID.'),
+  mpesaReceipt: z.string().optional(),
+  transactionReference: z.string().optional(),
+  notes: z.string().optional(),
+})
+
+app.post('/registration-fee/confirm', async (c) => {
+  const { supabaseAdmin } = typedDb(c.var.supabaseContext)
+  requirePermission(c.get('adminSession'), 'members', 'approve')
+
+  const body = await c.req.json().catch(() => null)
+  if (!body) throw new HttpError(400, 'Send a JSON body.', 'VALIDATION')
+  const parsed = confirmRegistrationFeeSchema.safeParse(body)
+  if (!parsed.success) throw new HttpError(400, parsed.error.issues[0].message, 'VALIDATION')
+
+  const { memberId, mpesaReceipt, transactionReference } = parsed.data
+
+  // Check existing record
+  const { data: existing } = await supabaseAdmin
+    .from('registration_fees')
+    .select('status')
+    .eq('member_id', memberId)
+    .eq('fee_type', 'registration')
+    .maybeSingle()
+
+  if (!existing) {
+    throw new HttpError(404, 'Registration fee record not found for this member.', 'NOT_FOUND')
+  }
+
+  if (existing.status === 'paid') {
+    return c.json({ message: 'Registration fee already confirmed.', status: 'paid' })
+  }
+
+  // Update to paid
+  await supabaseAdmin
+    .from('registration_fees')
+    .update({
+      status: 'paid',
+      mpesa_receipt: mpesaReceipt ?? null,
+      transaction_reference: transactionReference ?? null,
+      paid_at: new Date().toISOString(),
+    })
+    .eq('member_id', memberId)
+    .eq('fee_type', 'registration')
+
+  await logAudit(supabaseAdmin, {
+    actor_id: c.get('adminSession').id,
+    actor_role: c.get('adminSession').role_name,
+    action: 'registration_fee_confirmed',
+    resource: 'registration_fee',
+    resource_id: memberId,
+    meta: { mpesa_receipt: mpesaReceipt, by: c.get('adminSession').display_name },
+  })
+
+  return c.json({ message: 'Registration fee confirmed. Member can now access packages.', status: 'paid' })
+})
+
+// List pending registration fees (for admin review)
+app.get('/registration-fee/pending', async (c) => {
+  const { supabaseAdmin } = typedDb(c.var.supabaseContext)
+  requirePermission(c.get('adminSession'), 'members', 'read')
+
+  const { data, error } = await supabaseAdmin
+    .from('registration_fees')
+    .select('id, member_id, amount, currency, status, payment_method, paid_at, created_at, members(full_name, phone, email)')
+    .eq('fee_type', 'registration')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+
+  if (error) throw new HttpError(500, error.message, 'DB_ERROR')
+  return c.json({ pending_fees: data ?? [] })
+})
 
 // ---------------------------------------------------------------------------
 // Members

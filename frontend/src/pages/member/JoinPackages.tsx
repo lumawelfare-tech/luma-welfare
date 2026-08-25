@@ -15,7 +15,7 @@ type Package = {
 type Subscription = { id: string; package_id: string; status: string }
 
 export function JoinPackages() {
-  const { member } = useAuth()
+  const { member, registrationFeePaid } = useAuth()
   const [packages, setPackages] = useState<Package[]>([])
   const [mine, setMine] = useState<Subscription[]>([])
   const [tierChoice, setTierChoice] = useState<Record<string, string>>({})
@@ -62,6 +62,21 @@ export function JoinPackages() {
           <h1 className="text-lg font-semibold text-gray-900">Account {member.status}</h1>
           <p className="mt-2 text-sm text-gray-500">Your account has been {member.status}. Please contact support.</p>
           <Link to="/dashboard" className="mt-4 inline-block rounded-lg bg-luma-700 px-4 py-2 text-sm font-medium text-white hover:bg-luma-800">Dashboard</Link>
+        </div>
+      </div>
+    )
+  }
+
+  // Block package access if registration fee is not paid
+  if (!registrationFeePaid) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
+          <h1 className="text-lg font-semibold text-gray-900">Registration Fee Required</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Please pay the one-time KSh 300 registration fee to activate your membership and access welfare packages.
+          </p>
+          <Link to="/dashboard" className="mt-4 inline-block rounded-lg bg-luma-700 px-4 py-2 text-sm font-medium text-white hover:bg-luma-800">Go to Dashboard</Link>
         </div>
       </div>
     )

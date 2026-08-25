@@ -28,6 +28,17 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ message: 'Your account has been ' + member.status + '.', code: 'ACCOUNT_' + member.status.toUpperCase() }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    // Check registration fee has been paid
+    const { data: regFee } = await adminClient
+      .from('registration_fees')
+      .select('status')
+      .eq('member_id', user.id)
+      .eq('fee_type', 'registration')
+      .maybeSingle()
+    if (!regFee || regFee.status !== 'paid') {
+      return new Response(JSON.stringify({ message: 'You must pay the KSh 300 registration fee before subscribing to packages.', code: 'REGISTRATION_FEE_REQUIRED' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     // Check for existing subscription
     const { data: existing } = await adminClient
       .from('subscriptions').select('id').eq('member_id', user.id).eq('package_id', packageId).maybeSingle()
