@@ -123,3 +123,6 @@ verify_jwt = true
 
 [functions.send-email]
 verify_jwt = true
+
+[functions.send-report-email]
+verify_jwt = false
