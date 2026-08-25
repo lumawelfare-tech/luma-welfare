@@ -82,6 +82,9 @@ verify_jwt = true
 [functions.member-notifications]
 verify_jwt = true
 
+[functions.admin-2fa]
+verify_jwt = true
+
 # Admin functions — require user JWT (admin check done inside the function)
 [functions.admin-dashboard]
 verify_jwt = true

@@ -23,6 +23,7 @@ export type Member = {
 export type LoginResult = {
   member: Member | null
   isAdmin: boolean
+  requires2fa?: boolean
 }
 
 type AuthState = {
@@ -167,6 +168,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAdmin(me.isAdmin)
     setAdminRole(me.adminRole)
     setRegistrationFeePaid(me.registrationFeePaid)
+
+    // Check if admin has 2FA enabled
+    if (me.isAdmin) {
+      try {
+        const d = await api<{ two_factor_enabled: boolean }>('/admin/2fa', { auth: true })
+        if (d.two_factor_enabled) {
+          return { member: me.member, isAdmin: true, requires2fa: true }
+        }
+      } catch { /* continue without 2FA check */ }
+    }
+
     return { member: me.member, isAdmin: me.isAdmin }
   }
 

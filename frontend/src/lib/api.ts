@@ -191,6 +191,7 @@ function pathToFunctionName(path: string): string | null {
   if (cleanPath.startsWith('admin/claims')) return 'admin-claims'
   if (cleanPath.startsWith('admin/subscriptions')) return 'admin-subscriptions'
   if (cleanPath.startsWith('admin/registration-fee')) return 'admin-registration-fee'
+  if (cleanPath.startsWith('admin/2fa')) return 'admin-2fa'
   if (cleanPath.startsWith('admin/open-questions') || cleanPath.startsWith('admin/audit-logs') || cleanPath === 'admin/settings') return 'admin-settings'
 
   // Member routes (extended)
