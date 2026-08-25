@@ -52,6 +52,32 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
   const monthName = new Date(calYear, calMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
+  // Live history state
+  const [liveHistory, setLiveHistory] = useState<{ id: string; schedule_name: string; generated_at: string; status: string; record_count: number }[]>([])
+  const [generating, setGenerating] = useState<Set<string>>(new Set())
+
+  // Fetch recent history for this month
+  useEffect(() => {
+    const from = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-01`
+    const to = new Date(calYear, calMonth + 1, 0).toISOString().split('T')[0]
+    api<{ history: typeof liveHistory }>(`/admin/scheduled-reports?action=history&date_from=${from}&date_to=${to}&per_page=50`, { auth: true })
+      .then(d => setLiveHistory(d.history ?? []))
+      .catch(() => {})
+  }, [calMonth, calYear])
+
+  // Supabase Realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('report-history-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'report_history' }, (payload) => {
+        const rec = payload.new as typeof liveHistory[0]
+        setLiveHistory(prev => [rec, ...prev].slice(0, 50))
+        setGenerating(prev => { const next = new Set(prev); next.delete(rec.schedule_name); return next })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
   // Build map of schedule runs for this month
   const runMap: Record<number, { name: string; frequency: string; nextRun: Date | null }[]> = {}
   for (const s of schedules) {
@@ -81,14 +107,26 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
     }
   }
 
-  // Also mark history dates
-  const histDates = new Set<string>()
-  // We don't have history loaded here, so mark based on last_generated_at
+  // Build history map from live data
+  const histMap: Record<number, { count: number; latest: string; status: string }[]> = {}
+  for (const rec of liveHistory) {
+    const d = new Date(rec.generated_at)
+    if (d.getMonth() === calMonth && d.getFullYear() === calYear) {
+      const day = d.getDate()
+      if (!histMap[day]) histMap[day] = []
+      histMap[day].push({ count: 1, latest: rec.schedule_name, status: rec.status })
+    }
+  }
+  // Also mark from last_generated_at on schedules
   for (const s of schedules) {
     if (s.last_generated_at) {
       const lg = new Date(s.last_generated_at)
       if (lg.getMonth() === calMonth && lg.getFullYear() === calYear) {
-        histDates.add(String(lg.getDate()))
+        const day = lg.getDate()
+        if (!histMap[day]) histMap[day] = []
+        if (!histMap[day].find(h => h.latest === s.name)) {
+          histMap[day].push({ count: 1, latest: s.name, status: 'success' })
+        }
       }
     }
   }
@@ -133,24 +171,28 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
           if (day === null) return <div key={`empty-${i}`} className="bg-white min-h-[80px]" />
           const isToday = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear()
           const runs = runMap[day] ?? []
-          const hasHistory = histDates.has(String(day))
+          const histEntries = histMap[day] ?? []
+          const isGenerating = generating.size > 0 && isToday && day === today.getDate()
           return (
             <div key={day} className={`bg-white min-h-[80px] p-1.5 ${isToday ? 'ring-2 ring-inset ring-blue-400' : ''}`}>
-              <div className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{day}</div>
+              <div className="flex items-center justify-between">
+                <div className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{day}</div>
+                {isGenerating && <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" title="Generating..." />}
+              </div>
               <div className="mt-1 space-y-0.5">
-                {hasHistory && (
-                  <div className="flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] text-emerald-600 truncate">generated</span>
+                {histEntries.slice(0, 2).map((h, j) => (
+                  <div key={`h-${j}`} className="flex items-center gap-1">
+                    <span className={`h-1.5 w-1.5 rounded-full ${h.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                    <span className={`text-[10px] truncate ${h.status === 'success' ? 'text-emerald-600' : 'text-red-500'}`} title={h.latest}>{h.latest}</span>
                   </div>
-                )}
-                {runs.slice(0, 3).map((r, j) => (
-                  <div key={j} className="flex items-center gap-1">
+                ))}
+                {runs.slice(0, 2).map((r, j) => (
+                  <div key={`r-${j}`} className="flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-luma-500" />
                     <span className="text-[10px] text-gray-600 truncate" title={r.name}>{r.name}</span>
                   </div>
                 ))}
-                {runs.length > 3 && <span className="text-[10px] text-gray-400">+{runs.length - 3} more</span>}
+                {(histEntries.length + runs.length) > 4 && <span className="text-[10px] text-gray-400">+{(histEntries.length + runs.length) - 4} more</span>}
               </div>
             </div>
           )
