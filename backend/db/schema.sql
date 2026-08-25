@@ -422,7 +422,9 @@ create policy "notifications_read_own" on notifications for select using (member
 
 create policy "registration_fees_read_own" on registration_fees for select using (member_id = auth.uid());
 create policy "registration_fees_insert_own" on registration_fees for insert with check (member_id = auth.uid());
-create policy "registration_fees_update_own" on registration_fees for update using (member_id = auth.uid()) with check (member_id = auth.uid());
+-- NOTE: No UPDATE policy for members. Registration fee status can only be
+-- changed by service-role (admin, M-Pesa callback). This prevents members
+-- from self-marking their fee as paid.
 
 -- Public catalog: active packages, tiers and rules are readable by anyone.
 create policy "packages_public_read" on packages for select using (is_active = true);
