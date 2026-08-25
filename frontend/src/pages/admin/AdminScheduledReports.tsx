@@ -43,55 +43,21 @@ function frequencyColor(f: string) {
   }
 }
 
-function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }: {
-  schedules: Schedule[]; calMonth: number; calYear: number
-  setCalMonth: (m: number) => void; setCalYear: (y: number) => void
-}) {
-  const today = new Date()
-  const firstDay = new Date(calYear, calMonth, 1).getDay()
-  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
-  const monthName = new Date(calYear, calMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+type RunEntry = { name: string; frequency: string; nextRun: Date | null }
 
-  // Live history state
-  const [liveHistory, setLiveHistory] = useState<{ id: string; schedule_name: string; generated_at: string; status: string; record_count: number }[]>([])
-  const [generating, setGenerating] = useState<Set<string>>(new Set())
-
-  // Fetch recent history for this month
-  useEffect(() => {
-    const from = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-01`
-    const to = new Date(calYear, calMonth + 1, 0).toISOString().split('T')[0]
-    api<{ history: typeof liveHistory }>(`/admin/scheduled-reports?action=history&date_from=${from}&date_to=${to}&per_page=50`, { auth: true })
-      .then(d => setLiveHistory(d.history ?? []))
-      .catch(() => {})
-  }, [calMonth, calYear])
-
-  // Supabase Realtime subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel('report-history-live')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'report_history' }, (payload) => {
-        const rec = payload.new as typeof liveHistory[0]
-        setLiveHistory(prev => [rec, ...prev].slice(0, 50))
-        setGenerating(prev => { const next = new Set(prev); next.delete(rec.schedule_name); return next })
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [])
-
-  // Build map of schedule runs for this month
-  const runMap: Record<number, { name: string; frequency: string; nextRun: Date | null }[]> = {}
+function getRunMap(schedules: Schedule[], calMonth: number, calYear: number): Record<number, RunEntry[]> {
+  const runMap: Record<number, RunEntry[]> = {}
+  const endOfMonth = new Date(calYear, calMonth + 1, 0)
   for (const s of schedules) {
     if (!s.enabled || !s.next_run_at) continue
     const nr = new Date(s.next_run_at)
-    // Mark the next run date
     if (nr.getMonth() === calMonth && nr.getFullYear() === calYear) {
       const day = nr.getDate()
       if (!runMap[day]) runMap[day] = []
       runMap[day].push({ name: s.name, frequency: s.frequency, nextRun: nr })
     }
-    // Also project future runs based on frequency
     let projected = new Date(nr)
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       if (s.frequency === 'daily') projected.setDate(projected.getDate() + 1)
       else if (s.frequency === 'weekly') projected.setDate(projected.getDate() + 7)
       else if (s.frequency === 'monthly') projected.setMonth(projected.getMonth() + 1)
@@ -103,11 +69,13 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
           runMap[day].push({ name: s.name, frequency: s.frequency, nextRun: projected })
         }
       }
-      if (projected > new Date(calYear, calMonth + 1, 0)) break
+      if (projected > endOfMonth) break
     }
   }
+  return runMap
+}
 
-  // Build history map from live data
+function getHistMap(liveHistory: { id: string; schedule_name: string; generated_at: string; status: string; record_count: number }[], schedules: Schedule[], calMonth: number, calYear: number): Record<number, { count: number; latest: string; status: string }[]> {
   const histMap: Record<number, { count: number; latest: string; status: string }[]> = {}
   for (const rec of liveHistory) {
     const d = new Date(rec.generated_at)
@@ -117,7 +85,6 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
       histMap[day].push({ count: 1, latest: rec.schedule_name, status: rec.status })
     }
   }
-  // Also mark from last_generated_at on schedules
   for (const s of schedules) {
     if (s.last_generated_at) {
       const lg = new Date(s.last_generated_at)
@@ -130,10 +97,67 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
       }
     }
   }
+  return histMap
+}
 
-  const days = []
-  for (let i = 0; i < firstDay; i++) days.push(null)
-  for (let d = 1; d <= daysInMonth; d++) days.push(d)
+function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }: {
+  schedules: Schedule[]; calMonth: number; calYear: number
+  setCalMonth: (m: number) => void; setCalYear: (y: number) => void
+}) {
+  const today = new Date()
+  const [calView, setCalView] = useState<'month' | 'week'>('month')
+  const [weekStart, setWeekStart] = useState(() => {
+    const d = new Date(calYear, calMonth, today.getDate())
+    d.setDate(d.getDate() - d.getDay())
+    return d
+  })
+
+  // Sync weekStart when month/year changes
+  useEffect(() => {
+    if (calView === 'week') {
+      const d = new Date(calYear, calMonth, 1)
+      d.setDate(d.getDate() - d.getDay())
+      setWeekStart(d)
+    }
+  }, [calMonth, calYear, calView])
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay()
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
+  const monthName = new Date(calYear, calMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+  // Live history state
+  const [liveHistory, setLiveHistory] = useState<{ id: string; schedule_name: string; generated_at: string; status: string; record_count: number }[]>([])
+  const [generating, setGenerating] = useState<Set<string>>(new Set())
+
+  // Fetch recent history for the visible range
+  useEffect(() => {
+    let from: string, to: string
+    if (calView === 'month') {
+      from = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-01`
+      to = new Date(calYear, calMonth + 1, 0).toISOString().split('T')[0]
+    } else {
+      const ws = new Date(weekStart)
+      const we = new Date(weekStart); we.setDate(we.getDate() + 6)
+      from = ws.toISOString().split('T')[0]
+      to = we.toISOString().split('T')[0]
+    }
+    api<{ history: typeof liveHistory }>(`/admin/scheduled-reports?action=history&date_from=${from}&date_to=${to}&per_page=100`, { auth: true })
+      .then(d => setLiveHistory(d.history ?? []))
+      .catch(() => {})
+  }, [calMonth, calYear, calView, weekStart])
+
+  // Supabase Realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('report-history-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'report_history' }, (payload) => {
+        const rec = payload.new as typeof liveHistory[0]
+        setLiveHistory(prev => [rec, ...prev].slice(0, 100))
+        setGenerating(prev => { const next = new Set(prev); next.delete(rec.schedule_name); return next })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   function prevMonth() {
     if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1) }
@@ -143,61 +167,230 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
     if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1) }
     else setCalMonth(calMonth + 1)
   }
+  function prevWeek() {
+    const d = new Date(weekStart); d.setDate(d.getDate() - 7)
+    setWeekStart(d)
+    if (d.getMonth() !== calMonth || d.getFullYear() !== calYear) {
+      setCalMonth(d.getMonth()); setCalYear(d.getFullYear())
+    }
+  }
+  function nextWeek() {
+    const d = new Date(weekStart); d.setDate(d.getDate() + 7)
+    setWeekStart(d)
+    if (d.getMonth() !== calMonth || d.getFullYear() !== calYear) {
+      setCalMonth(d.getMonth()); setCalYear(d.getFullYear())
+    }
+  }
+  function goToToday() {
+    const now = new Date()
+    setCalMonth(now.getMonth()); setCalYear(now.getFullYear())
+    const d = new Date(now); d.setDate(d.getDate() - d.getDay())
+    setWeekStart(d)
+  }
 
-  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const weekDayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  // Month view data
+  const runMap = getRunMap(schedules, calMonth, calYear)
+  const histMap = getHistMap(liveHistory, schedules, calMonth, calYear)
+  const monthDays = []
+  for (let i = 0; i < firstDay; i++) monthDays.push(null)
+  for (let d = 1; d <= daysInMonth; d++) monthDays.push(d)
+
+  // Week view data
+  const weekDays: Date[] = []
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart); d.setDate(d.getDate() + i)
+    weekDays.push(d)
+  }
+  const weekRangeLabel = `${weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+
+  // Build week run map
+  const weekRunMap: Record<number, RunEntry[]> = {}
+  const weekHistMap: Record<number, { count: number; latest: string; status: string }[]> = {}
+  for (const s of schedules) {
+    if (!s.enabled || !s.next_run_at) continue
+    const nr = new Date(s.next_run_at)
+    for (let i = 0; i < 7; i++) {
+      const wd = new Date(weekStart); wd.setDate(wd.getDate() + i)
+      if (nr.toDateString() === wd.toDateString()) {
+        const dayIdx = i
+        if (!weekRunMap[dayIdx]) weekRunMap[dayIdx] = []
+        weekRunMap[dayIdx].push({ name: s.name, frequency: s.frequency, nextRun: nr })
+      }
+    }
+  }
+  for (const rec of liveHistory) {
+    const d = new Date(rec.generated_at)
+    for (let i = 0; i < 7; i++) {
+      const wd = new Date(weekStart); wd.setDate(wd.getDate() + i)
+      if (d.toDateString() === wd.toDateString()) {
+        if (!weekHistMap[i]) weekHistMap[i] = []
+        weekHistMap[i].push({ count: 1, latest: rec.schedule_name, status: rec.status })
+      }
+    }
+  }
+  for (const s of schedules) {
+    if (s.last_generated_at) {
+      const lg = new Date(s.last_generated_at)
+      for (let i = 0; i < 7; i++) {
+        const wd = new Date(weekStart); wd.setDate(wd.getDate() + i)
+        if (lg.toDateString() === wd.toDateString()) {
+          if (!weekHistMap[i]) weekHistMap[i] = []
+          if (!weekHistMap[i].find(h => h.latest === s.name)) {
+            weekHistMap[i].push({ count: 1, latest: s.name, status: 'success' })
+          }
+        }
+      }
+    }
+  }
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6">
-      {/* Header */}
+      {/* Header with toggle */}
       <div className="flex items-center justify-between">
-        <button onClick={prevMonth} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">← Prev</button>
-        <h2 className="text-lg font-bold text-gray-900">{monthName}</h2>
-        <button onClick={nextMonth} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">Next →</button>
+        <div className="flex items-center gap-2">
+          <button onClick={calView === 'month' ? prevMonth : prevWeek} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">← Prev</button>
+          <button onClick={goToToday} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-luma-700 hover:bg-luma-50 transition-colors">Today</button>
+        </div>
+        <h2 className="text-lg font-bold text-gray-900">{calView === 'month' ? monthName : weekRangeLabel}</h2>
+        <div className="flex items-center gap-2">
+          <button onClick={calView === 'month' ? nextMonth : nextWeek} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">Next →</button>
+        </div>
       </div>
 
-      {/* Legend */}
-      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-luma-500" /> Scheduled run</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Report generated</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Today</span>
+      {/* View toggle */}
+      <div className="mt-4 flex items-center justify-between">
+        <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+          <button onClick={() => setCalView('month')} className={`rounded-md px-4 py-1.5 text-xs font-medium transition-colors ${calView === 'month' ? 'bg-white text-luma-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📅 Month</button>
+          <button onClick={() => setCalView('week')} className={`rounded-md px-4 py-1.5 text-xs font-medium transition-colors ${calView === 'week' ? 'bg-white text-luma-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📋 Week</button>
+        </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-luma-500" /> Scheduled</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Generated</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Today</span>
+        </div>
       </div>
 
-      {/* Calendar Grid */}
-      <div className="mt-4 grid grid-cols-7 gap-px rounded-lg border border-gray-200 bg-gray-200">
-        {weekDays.map(d => (
-          <div key={d} className="bg-gray-50 px-2 py-2 text-center text-xs font-semibold text-gray-500 uppercase">{d}</div>
-        ))}
-        {days.map((day, i) => {
-          if (day === null) return <div key={`empty-${i}`} className="bg-white min-h-[80px]" />
-          const isToday = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear()
-          const runs = runMap[day] ?? []
-          const histEntries = histMap[day] ?? []
-          const isGenerating = generating.size > 0 && isToday && day === today.getDate()
-          return (
-            <div key={day} className={`bg-white min-h-[80px] p-1.5 ${isToday ? 'ring-2 ring-inset ring-blue-400' : ''}`}>
-              <div className="flex items-center justify-between">
-                <div className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{day}</div>
-                {isGenerating && <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" title="Generating..." />}
+      {/* Month View */}
+      {calView === 'month' && (
+        <div className="mt-4 grid grid-cols-7 gap-px rounded-lg border border-gray-200 bg-gray-200">
+          {weekDayNames.map(d => (
+            <div key={d} className="bg-gray-50 px-2 py-2 text-center text-xs font-semibold text-gray-500 uppercase">{d}</div>
+          ))}
+          {monthDays.map((day, i) => {
+            if (day === null) return <div key={`empty-${i}`} className="bg-white min-h-[80px]" />
+            const isToday = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear()
+            const runs = runMap[day] ?? []
+            const histEntries = histMap[day] ?? []
+            const isGenerating = generating.size > 0 && isToday && day === today.getDate()
+            return (
+              <div key={day} className={`bg-white min-h-[80px] p-1.5 ${isToday ? 'ring-2 ring-inset ring-blue-400' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <div className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{day}</div>
+                  {isGenerating && <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" title="Generating..." />}
+                </div>
+                <div className="mt-1 space-y-0.5">
+                  {histEntries.slice(0, 2).map((h, j) => (
+                    <div key={`h-${j}`} className="flex items-center gap-1">
+                      <span className={`h-1.5 w-1.5 rounded-full ${h.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                      <span className={`text-[10px] truncate ${h.status === 'success' ? 'text-emerald-600' : 'text-red-500'}`} title={h.latest}>{h.latest}</span>
+                    </div>
+                  ))}
+                  {runs.slice(0, 2).map((r, j) => (
+                    <div key={`r-${j}`} className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-luma-500" />
+                      <span className="text-[10px] text-gray-600 truncate" title={r.name}>{r.name}</span>
+                    </div>
+                  ))}
+                  {(histEntries.length + runs.length) > 4 && <span className="text-[10px] text-gray-400">+{(histEntries.length + runs.length) - 4} more</span>}
+                </div>
               </div>
-              <div className="mt-1 space-y-0.5">
-                {histEntries.slice(0, 2).map((h, j) => (
-                  <div key={`h-${j}`} className="flex items-center gap-1">
-                    <span className={`h-1.5 w-1.5 rounded-full ${h.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                    <span className={`text-[10px] truncate ${h.status === 'success' ? 'text-emerald-600' : 'text-red-500'}`} title={h.latest}>{h.latest}</span>
-                  </div>
-                ))}
-                {runs.slice(0, 2).map((r, j) => (
-                  <div key={`r-${j}`} className="flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-luma-500" />
-                    <span className="text-[10px] text-gray-600 truncate" title={r.name}>{r.name}</span>
-                  </div>
-                ))}
-                {(histEntries.length + runs.length) > 4 && <span className="text-[10px] text-gray-400">+{(histEntries.length + runs.length) - 4} more</span>}
+            )
+          })}
+        </div>
+      )}
+
+      {/* Week View */}
+      {calView === 'week' && (
+        <div className="mt-4 rounded-lg border border-gray-200 overflow-hidden">
+          {/* Week header */}
+          <div className="grid grid-cols-[100px_repeat(7,1fr)] border-b border-gray-200">
+            <div className="bg-gray-50 px-2 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Time</div>
+            {weekDays.map((d, i) => {
+              const isToday = d.toDateString() === today.toDateString()
+              return (
+                <div key={i} className={`px-2 py-3 text-center ${isToday ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                  <div className="text-xs font-semibold text-gray-500 uppercase">{weekDayNames[d.getDay()]}</div>
+                  <div className={`mt-0.5 text-lg font-bold ${isToday ? 'text-blue-600' : 'text-gray-900'}`}>{d.getDate()}</div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Week body: hourly slots from 6 AM to 8 PM */}
+          {Array.from({ length: 15 }, (_, hourIdx) => {
+            const hour = 6 + hourIdx
+            const label = hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`
+            return (
+              <div key={hour} className="grid grid-cols-[100px_repeat(7,1fr)] border-b border-gray-100 last:border-b-0">
+                <div className="bg-gray-50 px-2 py-4 text-right text-[11px] font-medium text-gray-400 border-r border-gray-200">
+                  {label}
+                </div>
+                {weekDays.map((d, dayIdx) => {
+                  const isToday = d.toDateString() === today.toDateString()
+                  // Show scheduled runs in the 6 AM slot and generated reports in their respective hour
+                  const isSixAM = hour === 6
+                  const runs = isSixAM ? (weekRunMap[dayIdx] ?? []) : []
+                  const histEntries = (weekHistMap[dayIdx] ?? []).filter(() => isSixAM)
+                  const hasActivity = runs.length > 0 || histEntries.length > 0
+                  return (
+                    <div key={dayIdx} className={`relative px-1.5 py-2 min-h-[52px] ${isToday ? 'bg-blue-50/40' : ''} ${hasActivity ? '' : 'hover:bg-gray-50/50'} transition-colors`}>
+                      {runs.map((r, j) => (
+                        <div key={`r-${j}`} className="mb-1 flex items-center gap-1 rounded-md bg-luma-50 border border-luma-200 px-2 py-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-luma-500 flex-shrink-0" />
+                          <span className="text-[10px] font-medium text-luma-700 truncate" title={`${r.name} (${r.frequency})`}>{r.name}</span>
+                          {r.nextRun && <span className="ml-auto text-[9px] text-luma-500 flex-shrink-0">{r.nextRun.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</span>}
+                        </div>
+                      ))}
+                      {histEntries.map((h, j) => (
+                        <div key={`h-${j}`} className={`mb-1 flex items-center gap-1 rounded-md border px-2 py-1 ${h.status === 'success' ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${h.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                          <span className={`text-[10px] font-medium truncate ${h.status === 'success' ? 'text-emerald-700' : 'text-red-700'}`} title={h.latest}>{h.latest}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })}
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+
+          {/* All-day / summary row at bottom */}
+          <div className="grid grid-cols-[100px_repeat(7,1fr)] border-t-2 border-gray-200 bg-gray-50">
+            <div className="px-2 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase">Events</div>
+            {weekDays.map((d, dayIdx) => {
+              const totalRuns = (weekRunMap[dayIdx] ?? []).length
+              const totalHist = (weekHistMap[dayIdx] ?? []).length
+              const isToday = d.toDateString() === today.toDateString()
+              return (
+                <div key={dayIdx} className={`px-2 py-3 text-center ${isToday ? 'bg-blue-50' : ''}`}>
+                  {(totalRuns + totalHist) === 0 ? (
+                    <span className="text-[10px] text-gray-300">—</span>
+                  ) : (
+                    <div className="flex flex-col items-center gap-0.5">
+                      {totalRuns > 0 && <span className="text-[10px] font-medium text-luma-600">{totalRuns} scheduled</span>}
+                      {totalHist > 0 && <span className="text-[10px] font-medium text-emerald-600">{totalHist} generated</span>}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Upcoming runs list */}
       <div className="mt-6">
