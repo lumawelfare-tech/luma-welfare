@@ -128,28 +128,35 @@ export function Dashboard() {
           <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
             Pay the one-time KSh 300 registration fee to activate your Luma Welfare membership and access available welfare packages.
           </p>
-          <button
-            onClick={handlePayRegistrationFee}
-            disabled={payingFee}
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-luma-700 px-6 py-3 text-sm font-semibold text-white hover:bg-luma-800 transition-all disabled:opacity-50"
-          >
-            {payingFee ? (
-              <>Processing…</>
-            ) : (
-              <>
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
-                Pay KSh 300
-              </>
-            )}
-          </button>
+          {notice ? (
+            <div className="mt-6 rounded-lg bg-amber-50 border border-amber-200 px-6 py-4">
+              <div className="flex items-center gap-2">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm font-medium text-amber-800">Payment pending — waiting for admin verification.</span>
+              </div>
+              <p className="mt-1 text-xs text-amber-600">You will have access to packages once your payment is confirmed.</p>
+            </div>
+          ) : (
+            <button
+              onClick={handlePayRegistrationFee}
+              disabled={payingFee}
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-luma-700 px-6 py-3 text-sm font-semibold text-white hover:bg-luma-800 transition-all disabled:opacity-50"
+            >
+              {payingFee ? (
+                <>Processing…</>
+              ) : (
+                <>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
+                  Pay KSh 300
+                </>
+              )}
+            </button>
+          )}
           <p className="mt-3 text-xs text-gray-500">
             This is a one-time fee. You will not be charged again.
           </p>
-          {notice && (
-            <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">
-              {notice}
-            </div>
-          )}
         </div>
       </div>
     )
@@ -187,7 +194,7 @@ export function Dashboard() {
       {error && !loading && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm text-red-700">We couldn't load your membership information.</p>
-          <button onClick={() => { setError(null); setLoading(true); api<{ cards: Card[] }>('/member/dashboard', { auth: true }).then((d) => setCards(d.cards ?? [])).catch((e) => setError(e.message)).finally(() => setLoading(false)) }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+          <button onClick={() => { setError(null); setLoading(true); setRegistrationFeeLoading(true); api<{ cards: Card[]; registration_fee_paid: boolean }>('/member/dashboard', { auth: true }).then((d) => { setCards(d.cards ?? []); setRegistrationFeePaid(d.registration_fee_paid ?? false) }).catch((e) => setError(e.message)).finally(() => { setLoading(false); setRegistrationFeeLoading(false) }) }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
             Try Again
           </button>
         </div>

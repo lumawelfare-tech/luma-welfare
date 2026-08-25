@@ -12,7 +12,7 @@ type Package = {
   waiting_period_months: number | null
   tiers: Tier[]
 }
-type Subscription = { id: string; package_id: string; status: string }
+type Subscription = { id: string; package_id: string; status: string; packages?: { name: string }[] }
 
 export function JoinPackages() {
   const { member, registrationFeePaid } = useAuth()
@@ -20,16 +20,21 @@ export function JoinPackages() {
   const [mine, setMine] = useState<Subscription[]>([])
   const [tierChoice, setTierChoice] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [cancelingId, setCancelingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+
+  function reloadSubscriptions() {
+    api<{ subscriptions: Subscription[] }>('/auth/me', { auth: true })
+      .then((d) => setMine(d.subscriptions ?? []))
+      .catch(() => {})
+  }
 
   useEffect(() => {
     api<{ packages: Package[] }>('/packages?resource=packages')
       .then((d) => setPackages(d.packages))
       .catch((e) => setError(e.message))
-    api<{ subscriptions: Subscription[] }>('/auth/me', { auth: true })
-      .then((d) => setMine(d.subscriptions ?? []))
-      .catch(() => {})
+    reloadSubscriptions()
   }, [])
 
   const joinedIds = new Set(mine.filter((s) => s.status !== 'cancelled').map((s) => s.package_id))
@@ -46,12 +51,29 @@ export function JoinPackages() {
         body: { packageId: p.id, packageTierId: tierId || undefined },
       })
       setNotice(`${p.name} added! Your subscription is pending activation.`)
-      const d = await api<{ subscriptions: Subscription[] }>('/auth/me', { auth: true })
-      setMine(d.subscriptions ?? [])
+      reloadSubscriptions()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not join this package.')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  async function cancelSubscription(sub: Subscription) {
+    if (!confirm(`Are you sure you want to cancel your ${sub.packages?.[0]?.name ?? 'package'} subscription? This action cannot be undone.`)) return
+    setCancelingId(sub.id)
+    setError(null)
+    try {
+      await api(`/member/subscriptions/${sub.id}`, {
+        method: 'DELETE',
+        auth: true,
+      })
+      setNotice('Subscription cancelled successfully.')
+      reloadSubscriptions()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not cancel subscription.')
+    } finally {
+      setCancelingId(null)
     }
   }
 
@@ -91,6 +113,32 @@ export function JoinPackages() {
 
       {notice && <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
       {error && <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+      {/* Active Subscriptions */}
+      {mine.filter(s => s.status !== 'cancelled').length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">Your Active Subscriptions</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {mine.filter(s => s.status !== 'cancelled').map((sub) => (
+              <div key={sub.id} className="flex items-center justify-between rounded-xl border border-luma-200 bg-luma-50/50 px-4 py-3">
+                <div>
+                  <span className="text-sm font-medium text-gray-900">{sub.packages?.[0]?.name ?? 'Package'}</span>
+                  <span className={`ml-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${sub.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                    {sub.status}
+                  </span>
+                </div>
+                <button
+                  onClick={() => cancelSubscription(sub)}
+                  disabled={cancelingId === sub.id}
+                  className="text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50 transition-colors"
+                >
+                  {cancelingId === sub.id ? 'Cancelling…' : 'Cancel'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {packages.map((p) => {

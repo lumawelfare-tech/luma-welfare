@@ -29,6 +29,7 @@ const Contributions = lazy(() => import('./pages/member/Contributions').then(m =
 const JoinPackages = lazy(() => import('./pages/member/JoinPackages').then(m => ({ default: m.JoinPackages })))
 const Profile = lazy(() => import('./pages/member/Profile').then(m => ({ default: m.Profile })))
 const Family = lazy(() => import('./pages/member/Family').then(m => ({ default: m.Family })))
+const ReceiptsStatements = lazy(() => import('./pages/member/ReceiptsStatements').then(m => ({ default: m.ReceiptsStatements })))
 
 // Admin pages — lazy loaded (largest, least frequently used)
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })))
@@ -41,6 +42,8 @@ const AdminNews = lazy(() => import('./pages/admin/AdminNews').then(m => ({ defa
 const AdminGallery = lazy(() => import('./pages/admin/AdminGallery').then(m => ({ default: m.AdminGallery })))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings').then(m => ({ default: m.AdminSettings })))
 const AdminAuditLogs = lazy(() => import('./pages/admin/AdminAuditLogs').then(m => ({ default: m.AdminAuditLogs })))
+const AdminRegistrationFees = lazy(() => import('./pages/admin/AdminRegistrationFees').then(m => ({ default: m.AdminRegistrationFees })))
+const AdminReports = lazy(() => import('./pages/admin/AdminReports').then(m => ({ default: m.AdminReports })))
 
 function PageLoader() {
   return (
@@ -82,6 +85,7 @@ export default function App() {
                 <Route path="/join" element={<JoinPackages />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/family" element={<Family />} />
+                <Route path="/receipts-statements" element={<ReceiptsStatements />} />
               </Route>
             </Route>
 
@@ -91,12 +95,14 @@ export default function App() {
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="members" element={<AdminMembers />} />
+                <Route path="registration-fees" element={<AdminRegistrationFees />} />
                 <Route path="packages" element={<AdminPackages />} />
                 <Route path="contributions" element={<AdminContributions />} />
                 <Route path="claims" element={<AdminClaims />} />
                 <Route path="subscriptions" element={<AdminSubscriptions />} />
                 <Route path="news" element={<AdminNews />} />
                 <Route path="gallery" element={<AdminGallery />} />
+                <Route path="reports" element={<AdminReports />} />
                 <Route path="settings" element={<AdminSettings />} />
                 <Route path="audit-logs" element={<AdminAuditLogs />} />
               </Route>

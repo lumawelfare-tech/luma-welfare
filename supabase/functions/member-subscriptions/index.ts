@@ -5,6 +5,46 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
+  // DELETE — cancel a subscription
+  if (req.method === 'DELETE') {
+    try {
+      const user = await getAuthenticatedUser(req)
+      if (!user) return new Response(JSON.stringify({ message: 'Not authenticated' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+      const adminClient = createAdminClient()
+      const url = new URL(req.url)
+      // Subscription ID from path: /member-subscriptions/{id}
+      const pathParts = url.pathname.split('/')
+      const subId = pathParts[pathParts.length - 1]
+
+      if (!subId) return new Response(JSON.stringify({ message: 'Subscription ID required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+      // Verify subscription belongs to this member
+      const { data: sub, error } = await adminClient
+        .from('subscriptions')
+        .select('id, member_id, status, packages(name)')
+        .eq('id', subId)
+        .eq('member_id', user.id)
+        .single()
+
+      if (error || !sub) return new Response(JSON.stringify({ message: 'Subscription not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      if (sub.status === 'cancelled') return new Response(JSON.stringify({ message: 'Already cancelled' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+      const { error: cancelErr } = await adminClient
+        .from('subscriptions')
+        .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+        .eq('id', subId)
+
+      if (cancelErr) throw new Error(cancelErr.message)
+
+      await logAudit(adminClient, { actor_id: user.id, action: 'cancelled_subscription', resource: 'subscription', resource_id: subId })
+
+      return new Response(JSON.stringify({ message: 'Subscription cancelled' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    } catch (err) {
+      return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+  }
+
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ message: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
