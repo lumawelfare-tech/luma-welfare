@@ -12,6 +12,8 @@ import { Home } from './pages/Home'
 import { About } from './pages/About'
 import { HowItWorks } from './pages/HowItWorks'
 import { FAQ } from './pages/FAQ'
+import { Privacy } from './pages/Privacy'
+import { Terms } from './pages/Terms'
 import { Contact } from './pages/Contact'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
@@ -69,6 +71,8 @@ export default function App() {
               <Route path="/packages" element={<PackagesPage />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/faq" element={<FAQ />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/news" element={<News />} />
               <Route path="/gallery" element={<Gallery />} />

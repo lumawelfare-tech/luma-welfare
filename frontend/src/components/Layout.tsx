@@ -253,6 +253,17 @@ export function Layout() {
               </ul>
             </div>
 
+            {/* Information */}
+            <div>
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">Information</h3>
+              <ul className="space-y-2.5 text-sm">
+                <li><Link className="text-luma-200 hover:text-white transition-colors" to="/faq">FAQ</Link></li>
+                <li><Link className="text-luma-200 hover:text-white transition-colors" to="/privacy">Privacy Policy</Link></li>
+                <li><Link className="text-luma-200 hover:text-white transition-colors" to="/terms">Terms & Conditions</Link></li>
+                <li><Link className="text-luma-200 hover:text-white transition-colors" to="/contact">Contact</Link></li>
+              </ul>
+            </div>
+
             {/* Packages */}
             <div>
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">Packages</h3>
