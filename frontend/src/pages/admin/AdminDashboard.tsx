@@ -7,6 +7,13 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area,
 } from 'recharts'
+import {
+  exportContributionsCSV, exportContributionsPDF,
+  exportPackageBreakdownCSV, exportPackageBreakdownPDF,
+  exportClaimsStatusCSV, exportClaimsStatusPDF,
+  exportRegistrationFeesCSV, exportRegistrationFeesPDF,
+  exportTransactionsCSV, exportTransactionsPDF,
+} from '../../lib/exports'
 
 type DashboardData = {
   members: number
@@ -24,6 +31,21 @@ type DashboardData = {
 }
 
 const PIE_COLORS = ['#6D9B3A', '#2563EB', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899', '#14B8A6']
+
+function ExportButtons({ onCSV, onPDF }: { onCSV: () => void; onPDF: () => void }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <button onClick={onCSV} className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+        CSV
+      </button>
+      <button onClick={onPDF} className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+        PDF
+      </button>
+    </div>
+  )
+}
 
 function StatCard({ label, value, color, icon }: { label: string; value: number | string; color: string; icon: React.ReactNode }) {
   return (
@@ -222,6 +244,7 @@ export function AdminDashboard() {
               <h2 className="text-base font-bold text-gray-900">Monthly Contributions</h2>
               <p className="mt-1 text-xs text-gray-500">Last 12 months — verified vs pending</p>
             </div>
+            <ExportButtons onCSV={() => exportContributionsCSV(data.monthly_contributions)} onPDF={() => exportContributionsPDF(data.monthly_contributions)} />
             <div className="text-right">
               <div className="text-lg font-bold text-luma-700">{formatKes(totalContributions)}</div>
               <div className="text-xs text-gray-500">Total (12 months)</div>
@@ -234,8 +257,13 @@ export function AdminDashboard() {
 
         {/* Claims Status Pie */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-bold text-gray-900">Claims by Status</h2>
-          <p className="mt-1 text-xs text-gray-500">All-time claims breakdown</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Claims by Status</h2>
+              <p className="mt-1 text-xs text-gray-500">All-time claims breakdown</p>
+            </div>
+            <ExportButtons onCSV={() => exportClaimsStatusCSV(data.claims_by_status)} onPDF={() => exportClaimsStatusPDF(data.claims_by_status)} />
+          </div>
           <div className="mt-4 h-64">
             <ClaimsPieChart data={data.claims_by_status} />
           </div>
@@ -246,8 +274,13 @@ export function AdminDashboard() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Package Breakdown */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-bold text-gray-900">Active Subscriptions by Package</h2>
-          <p className="mt-1 text-xs text-gray-500">Current active subscriber counts</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Active Subscriptions by Package</h2>
+              <p className="mt-1 text-xs text-gray-500">Current active subscriber counts</p>
+            </div>
+            <ExportButtons onCSV={() => exportPackageBreakdownCSV(data.package_breakdown)} onPDF={() => exportPackageBreakdownPDF(data.package_breakdown)} />
+          </div>
           <div className="mt-4 h-64">
             <PackageBarChart data={data.package_breakdown} />
           </div>
@@ -255,8 +288,13 @@ export function AdminDashboard() {
 
         {/* Registration Fee Stats + Summary */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-bold text-gray-900">Registration Fees</h2>
-          <p className="mt-1 text-xs text-gray-500">KSh 300 one-time activation fees</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Registration Fees</h2>
+              <p className="mt-1 text-xs text-gray-500">KSh 300 one-time activation fees</p>
+            </div>
+            <ExportButtons onCSV={() => exportRegistrationFeesCSV(data.registration_fees)} onPDF={() => exportRegistrationFeesPDF(data.registration_fees)} />
+          </div>
 
           <div className="mt-5 grid grid-cols-3 gap-3">
             <div className="rounded-xl bg-gray-50 p-4 text-center">
@@ -297,7 +335,10 @@ export function AdminDashboard() {
             <h2 className="text-base font-bold text-gray-900">Recent Transactions</h2>
             <p className="mt-1 text-xs text-gray-500">Latest 10 contribution records</p>
           </div>
-          <Link to="/admin/contributions" className="text-sm font-medium text-luma-700 hover:text-luma-800">View All →</Link>
+          <div className="flex items-center gap-3">
+            <ExportButtons onCSV={() => exportTransactionsCSV(data.recent_transactions)} onPDF={() => exportTransactionsPDF(data.recent_transactions)} />
+            <Link to="/admin/contributions" className="text-sm font-medium text-luma-700 hover:text-luma-800">View All →</Link>
+          </div>
         </div>
         <div className="mt-4 overflow-x-auto">
           {data.recent_transactions.length > 0 ? (
