@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
+import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -55,6 +56,13 @@ Deno.serve(async (req) => {
           body: notifMsg.body,
           status: 'queued',
         })
+
+        // Send email notification
+        const { data: member } = await adminClient.from('members').select('email').eq('id', data.member_id).single()
+        if (member?.email) {
+          const emailHtml = buildEmailTemplate(notifMsg.subject, notifMsg.body, 'View Dashboard', 'https://luma-welfare.vercel.app/member')
+          await sendEmail(member.email, notifMsg.subject, emailHtml)
+        }
       }
 
       return new Response(JSON.stringify({ contribution: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

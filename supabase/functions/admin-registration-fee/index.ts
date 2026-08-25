@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
+import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -117,13 +118,22 @@ Deno.serve(async (req) => {
       })
 
       // Notify member that registration fee is confirmed
+      const notifSubject = 'Membership Activated'
+      const notifBody = 'Your KSh 300 registration fee has been confirmed. You can now explore and join welfare packages.'
       await adminClient.from('notifications').insert({
         member_id: memberId,
         channel: 'in_app',
-        subject: 'Membership Activated',
-        body: 'Your KSh 300 registration fee has been confirmed. You can now explore and join welfare packages.',
+        subject: notifSubject,
+        body: notifBody,
         status: 'queued',
       })
+
+      // Send email notification
+      const { data: member } = await adminClient.from('members').select('email').eq('id', memberId).single()
+      if (member?.email) {
+        const emailHtml = buildEmailTemplate(notifSubject, notifBody, 'Explore Packages', 'https://luma-welfare.vercel.app/member/packages')
+        await sendEmail(member.email, notifSubject, emailHtml)
+      }
 
       return new Response(JSON.stringify({ message: 'Registration fee confirmed', status: 'paid' }), {
         status: 200,
