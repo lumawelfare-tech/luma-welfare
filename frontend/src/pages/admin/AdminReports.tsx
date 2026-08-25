@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useHead } from '../../lib/seo'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -82,6 +82,59 @@ export function AdminReports() {
   const [data, setData] = useState<ReportRow[]>([])
   const [error, setError] = useState('')
   const [generated, setGenerated] = useState(false)
+
+  // Bookmark state
+  type Bookmark = { id: string; name: string; report_type: string; filters: Record<string, string>; created_at: string }
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
+  const [showSaveBookmark, setShowSaveBookmark] = useState(false)
+  const [bookmarkName, setBookmarkName] = useState('')
+
+  const loadBookmarks = useCallback(() => {
+    api<{ bookmarks: Bookmark[] }>('/admin/reports?action=bookmarks', { auth: true })
+      .then(d => setBookmarks(d.bookmarks ?? []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => { loadBookmarks() }, [loadBookmarks])
+
+  function applyBookmark(b: Bookmark) {
+    setReportType(b.report_type as ReportType)
+    setStatus(b.filters.status ?? 'all')
+    setPackageId(b.filters.package ?? 'all')
+    setDateFrom(b.filters.dateFrom ?? '')
+    setDateTo(b.filters.dateTo ?? '')
+  }
+
+  async function saveBookmark() {
+    if (!bookmarkName.trim()) return
+    try {
+      const filters: Record<string, string> = {}
+      if (status !== 'all') filters.status = status
+      if (packageId !== 'all') filters.package = packageId
+      if (dateFrom) filters.dateFrom = dateFrom
+      if (dateTo) filters.dateTo = dateTo
+
+      await api('/admin/reports?action=bookmarks', {
+        method: 'POST',
+        auth: true,
+        body: { name: bookmarkName.trim(), report_type: reportType, filters },
+      })
+      setBookmarkName('')
+      setShowSaveBookmark(false)
+      loadBookmarks()
+    } catch (e: unknown) {
+      setError(e instanceof ApiError ? e.message : 'Failed to save bookmark')
+    }
+  }
+
+  async function deleteBookmark(id: string) {
+    try {
+      await api(`/admin/reports?action=bookmarks&bookmark_id=${id}`, { method: 'DELETE', auth: true })
+      loadBookmarks()
+    } catch (e: unknown) {
+      setError(e instanceof ApiError ? e.message : 'Failed to delete bookmark')
+    }
+  }
 
   // KPI state
   type KpiData = {
@@ -386,6 +439,27 @@ export function AdminReports() {
           </div>
         </div>
 
+        {/* Saved Bookmarks */}
+        {bookmarks.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-gray-500">Saved:</span>
+            {bookmarks.map((b) => (
+              <div key={b.id} className="group inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs transition-colors hover:border-luma-300 hover:bg-luma-50">
+                <button onClick={() => applyBookmark(b)} className="font-medium text-gray-700 hover:text-luma-700">
+                  {b.name}
+                </button>
+                <button
+                  onClick={() => deleteBookmark(b.id)}
+                  className="ml-0.5 text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"
+                  title="Remove bookmark"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             onClick={generateReport}
@@ -398,6 +472,14 @@ export function AdminReports() {
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
             )}
             Generate Report
+          </button>
+
+          <button
+            onClick={() => setShowSaveBookmark(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" /></svg>
+            Save Filter
           </button>
 
           {generated && data.length > 0 && (
@@ -517,6 +599,61 @@ export function AdminReports() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Save Bookmark Modal */}
+      {showSaveBookmark && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+            <div className="px-6 py-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-900">Save Filter Combination</h3>
+                <button onClick={() => setShowSaveBookmark(false)} className="text-gray-400 hover:text-gray-600">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-600">
+                <div className="font-medium text-gray-700">Current filters:</div>
+                <div className="mt-1 space-y-0.5">
+                  <div>Type: {reportTypes.find(r => r.value === reportType)?.label}</div>
+                  {status !== 'all' && <div>Status: {status}</div>}
+                  {packageId !== 'all' && <div>Package: {packages.find(p => p.id === packageId)?.name ?? packageId}</div>}
+                  {dateFrom && <div>From: {dateFrom}</div>}
+                  {dateTo && <div>To: {dateTo}</div>}
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bookmark Name</label>
+                <input
+                  value={bookmarkName}
+                  onChange={(e) => setBookmarkName(e.target.value)}
+                  placeholder="e.g. Monthly Active Subscriptions"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && saveBookmark()}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => { setShowSaveBookmark(false); setBookmarkName('') }}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveBookmark}
+                disabled={!bookmarkName.trim()}
+                className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-50 transition-colors"
+              >
+                Save Bookmark
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

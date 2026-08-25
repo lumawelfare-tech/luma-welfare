@@ -43,6 +43,65 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Saved Report Bookmarks — LIST
+    if (action === 'bookmarks' && req.method === 'GET') {
+      requirePermission(session, 'members', 'read')
+      const { data, error } = await adminClient
+        .from('saved_reports')
+        .select('*')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false })
+      if (error) throw new Error(error.message)
+      return new Response(JSON.stringify({ bookmarks: data ?? [] }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Saved Report Bookmarks — CREATE
+    if (action === 'bookmarks' && req.method === 'POST') {
+      requirePermission(session, 'members', 'read')
+      const body = await req.json()
+      if (!body.name || !body.report_type) {
+        return new Response(JSON.stringify({ message: 'name and report_type are required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const { data, error } = await adminClient
+        .from('saved_reports')
+        .insert({
+          name: body.name,
+          report_type: body.report_type,
+          filters: body.filters ?? {},
+          created_by: user.id,
+        })
+        .select()
+        .single()
+      if (error) throw new Error(error.message)
+      return new Response(JSON.stringify({ bookmark: data }), {
+        status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Saved Report Bookmarks — DELETE
+    if (action === 'bookmarks' && req.method === 'DELETE') {
+      requirePermission(session, 'members', 'read')
+      const bookmarkId = url.searchParams.get('bookmark_id')
+      if (!bookmarkId) {
+        return new Response(JSON.stringify({ message: 'bookmark_id required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const { error } = await adminClient
+        .from('saved_reports')
+        .delete()
+        .eq('id', bookmarkId)
+        .eq('created_by', user.id)
+      if (error) throw new Error(error.message)
+      return new Response(JSON.stringify({ message: 'Deleted' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // Registration Fees Report
     if (action === 'registration-fees') {
       requirePermission(session, 'members', 'read')
