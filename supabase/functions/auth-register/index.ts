@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createAdminClient, logAudit } from '../shared/supabase.ts'
+import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -93,6 +94,18 @@ Deno.serve(async (req) => {
       action: 'registered',
       resource: 'member',
       resource_id: userId,
+    })
+
+    // Send welcome email (non-blocking)
+    const welcomeHtml = buildEmailTemplate(
+      'Welcome to Luma Welfare!',
+      `Hello ${fullName},\n\nWelcome to Luma Welfare — your community welfare management platform.\n\nYour account has been created successfully. Here's what to do next:\n\n1. Check your email (${email}) to confirm your address\n2. Sign in to your account\n3. Pay the one-time KSh 300 activation fee\n4. Explore and join available welfare packages\n\nIf you have any questions, visit our FAQ page or contact support.\n\nBest regards,\nLuma Welfare Team`,
+      'Sign In',
+      'https://luma-welfare.vercel.app/login',
+    )
+    // Don't await — fire and forget so registration isn't delayed
+    sendEmail(email, 'Welcome to Luma Welfare!', welcomeHtml).catch((e) => {
+      console.error('Welcome email failed:', e instanceof Error ? e.message : e)
     })
 
     // Create registration fee record (KSh 300 one-time)
