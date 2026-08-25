@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     const action = url.searchParams.get('action')
 
     // ─── LIST ───────────────────────────────────────────
-    if (req.method === 'GET' && !id) {
+    if (req.method === 'GET' && !id && !action) {
       const { data, error } = await adminClient
         .from('scheduled_reports')
         .select('*')
@@ -75,6 +75,21 @@ Deno.serve(async (req) => {
       if (error) throw new Error(error.message)
 
       return new Response(JSON.stringify({ schedules: data ?? [] }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // ─── HISTORY ─────────────────────────────────────────
+    if (req.method === 'GET' && action === 'history') {
+      requirePermission(session, 'members', 'read')
+      const limit = parseInt(url.searchParams.get('limit') ?? '50')
+      const { data, error } = await adminClient
+        .from('report_history')
+        .select('*')
+        .order('generated_at', { ascending: false })
+        .limit(Math.min(limit, 200))
+      if (error) throw new Error(error.message)
+      return new Response(JSON.stringify({ history: data ?? [] }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

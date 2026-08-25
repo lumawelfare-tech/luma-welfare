@@ -63,6 +63,9 @@ export function AdminScheduledReports() {
   const [notice, setNotice] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [generating, setGenerating] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'schedules' | 'history'>('schedules')
+  const [history, setHistory] = useState<{ id: string; schedule_name: string; report_type: string; filename: string; record_count: number; status: string; error_message: string | null; generated_at: string }[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   // Create form state
   const [formName, setFormName] = useState('')
@@ -85,6 +88,22 @@ export function AdminScheduledReports() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true)
+    try {
+      const d = await api<{ history: typeof history }>('/admin/scheduled-reports?action=history', { auth: true })
+      setHistory(d.history ?? [])
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Failed to load history')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'history') loadHistory()
+  }, [activeTab, loadHistory])
 
   async function createSchedule() {
     if (!formName.trim()) return
@@ -193,7 +212,28 @@ export function AdminScheduledReports() {
       {error && <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
       {notice && <div className="mt-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">{notice}</div>}
 
-      {/* Schedules List */}
+      {/* Tabs */}
+      <div className="mt-6 flex gap-1 rounded-lg border border-gray-200 bg-white p-1 w-fit">
+        <button
+          onClick={() => setActiveTab('schedules')}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'schedules' ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          Schedules
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'history' ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          History {history.length > 0 && <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs">{history.length}</span>}
+        </button>
+      </div>
+
+      {/* Schedules Tab */}
+      {activeTab === 'schedules' && (
       <div className="mt-6 space-y-4">
         {loading ? (
           <div className="py-12 text-center text-gray-500">Loading…</div>
@@ -284,6 +324,83 @@ export function AdminScheduledReports() {
           ))
         )}
       </div>
+      )}
+
+      {/* History Tab */}
+      {activeTab === 'history' && (
+      <div className="mt-6">
+        {historyLoading ? (
+          <div className="py-12 text-center text-gray-500">Loading history…</div>
+        ) : history.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-300 bg-white py-16 text-center">
+            <svg className="mx-auto h-10 w-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="mt-3 text-sm text-gray-500">No report history yet.</p>
+            <p className="mt-1 text-xs text-gray-400">Generate a report from a schedule to see it here.</p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-5 py-3">Report</th>
+                  <th className="px-5 py-3">Type</th>
+                  <th className="px-5 py-3">Records</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Generated</th>
+                  <th className="px-5 py-3 text-right">File</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {history.map((h) => (
+                  <tr key={h.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3 font-medium text-gray-900">{h.schedule_name}</td>
+                    <td className="px-5 py-3">
+                      <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                        {h.report_type}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-gray-600">{h.record_count.toLocaleString()}</td>
+                    <td className="px-5 py-3">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        h.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {h.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-gray-500 text-xs">
+                      {new Date(h.generated_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const { data: blob, error } = await supabase.storage
+                              .from('report-files')
+                              .download(h.filename)
+                            if (!error && blob) {
+                              const url = URL.createObjectURL(blob)
+                              const a = document.createElement('a')
+                              a.href = url; a.download = h.filename; a.click()
+                              URL.revokeObjectURL(url)
+                            }
+                          } catch {}
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                        CSV
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      )}
 
       {/* Create Modal */}
       {showCreate && (
