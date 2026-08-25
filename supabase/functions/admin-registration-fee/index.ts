@@ -116,6 +116,15 @@ Deno.serve(async (req) => {
         meta: { mpesa_receipt: mpesaReceipt, by: session.display_name, notes },
       })
 
+      // Notify member that registration fee is confirmed
+      await adminClient.from('notifications').insert({
+        member_id: memberId,
+        channel: 'in_app',
+        subject: 'Membership Activated',
+        body: 'Your KSh 300 registration fee has been confirmed. You can now explore and join welfare packages.',
+        status: 'queued',
+      })
+
       return new Response(JSON.stringify({ message: 'Registration fee confirmed', status: 'paid' }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

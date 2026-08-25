@@ -36,9 +36,27 @@ Deno.serve(async (req) => {
       }
       const { data, error } = await adminClient
         .from('contributions').update({ status: action === 'verify' ? 'Verified' : 'Failed', payment_id: paymentId ?? null, notes })
-        .eq('id', contribId).select().single()
+        .eq('id', contribId).select('*, members(full_name), packages(name)').single()
       if (error) throw new Error('Contribution not found')
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: action === 'verify' ? 'verified_contribution' : 'rejected_contribution', resource: 'contribution', resource_id: contribId })
+
+      // Send notification to member
+      if (data.member_id) {
+        const pkgName = (data.packages as unknown as { name: string | null })?.name ?? 'your package'
+        const amount = Number(data.amount ?? 0)
+        const period = data.period ?? ''
+        const notifMsg = action === 'verify'
+          ? { subject: 'Contribution Verified', body: `Your KSh ${amount.toLocaleString('en-KE')} contribution for ${pkgName} (${period}) has been verified. Thank you!` }
+          : { subject: 'Contribution Rejected', body: `Your KSh ${amount.toLocaleString('en-KE')} contribution for ${pkgName} (${period}) was not verified.${notes ? ` Reason: ${notes}` : ''}` }
+        await adminClient.from('notifications').insert({
+          member_id: data.member_id,
+          channel: 'in_app',
+          subject: notifMsg.subject,
+          body: notifMsg.body,
+          status: 'queued',
+        })
+      }
+
       return new Response(JSON.stringify({ contribution: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 

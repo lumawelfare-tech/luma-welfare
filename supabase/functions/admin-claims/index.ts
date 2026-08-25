@@ -45,9 +45,29 @@ Deno.serve(async (req) => {
       if (decision === 'approve' || decision === 'reject') { updates.decided_at = new Date().toISOString(); updates.decided_by = session.id }
       if (amount) updates.amount_requested = amount
 
-      const { data, error } = await adminClient.from('claims').update(updates).eq('id', claimId).select().single()
+      const { data, error } = await adminClient.from('claims').update(updates).eq('id', claimId).select('*, members(full_name)').single()
       if (error) throw new Error('Claim not found')
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: `claim_${decision}`, resource: 'claim', resource_id: claimId })
+
+      // Send notification to member
+      const claimNum = data.claim_number ?? claimId
+      const memberName = (data.members as unknown as { full_name: string | null })?.full_name ?? 'Member'
+      const notifMessages: Record<string, { subject: string; body: string }> = {
+        approve: { subject: 'Claim Approved', body: `Your claim ${claimNum} has been approved${amount ? ` for KSh ${Number(amount).toLocaleString('en-KE')}` : ''}. The payout will be processed shortly.` },
+        reject: { subject: 'Claim Rejected', body: `Your claim ${claimNum} has been rejected.${adminNotes ? ` Reason: ${adminNotes}` : ''}` },
+        'request-info': { subject: 'More Information Needed', body: `We need more information for your claim ${claimNum}.${adminNotes ? ` ${adminNotes}` : ''}` },
+      }
+      const msg = notifMessages[decision]
+      if (msg && data.member_id) {
+        await adminClient.from('notifications').insert({
+          member_id: data.member_id,
+          channel: 'in_app',
+          subject: msg.subject,
+          body: msg.body,
+          status: 'queued',
+        })
+      }
+
       return new Response(JSON.stringify({ claim: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 

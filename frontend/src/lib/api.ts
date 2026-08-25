@@ -196,6 +196,7 @@ function pathToFunctionName(path: string): string | null {
   // Member routes (extended)
   if (cleanPath.startsWith('member/claims')) return 'member-claims'
   if (cleanPath.startsWith('member/receipts')) return 'member-receipts'
+  if (cleanPath.startsWith('member/notifications')) return 'member-notifications'
 
   // Payment routes
   if (cleanPath === 'payments/initiate') return 'payments-initiate'
