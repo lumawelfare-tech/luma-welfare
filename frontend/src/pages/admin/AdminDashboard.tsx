@@ -29,6 +29,8 @@ type DashboardData = {
   claims_by_status: Record<string, number>
   registration_fees: { total: number; paid: number; unpaid: number }
   recent_transactions: { id: string; amount: number; status: string; date: string; member_name: string; package_name: string }[]
+  drill_month: string | null
+  drill_transactions: { id: string; amount: number; status: string; period: string; date: string; member_name: string; member_phone: string; package_name: string }[]
 }
 
 type DatePreset = '3m' | '6m' | '12m' | 'ytd' | 'all' | 'custom'
@@ -97,11 +99,16 @@ function ClaimsPieChart({ data }: { data: Record<string, number> }) {
 
 const PIE_COLORS = ['#6D9B3A', '#2563EB', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899', '#14B8A6']
 
-function ContribChart({ data }: { data: DashboardData['monthly_contributions'] }) {
+function ContribChart({ data, onMonthClick }: { data: DashboardData['monthly_contributions']; onMonthClick: (month: string) => void }) {
   if (data.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No contribution data</div>
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+      <AreaChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }} onClick={(e: Record<string, unknown>) => {
+        const payload = e?.activePayload as { payload: { month: string } }[] | undefined
+        if (payload?.[0]?.payload?.month) {
+          onMonthClick(payload[0].payload.month)
+        }
+      }} style={{ cursor: 'pointer' }}>
         <defs>
           <linearGradient id="verifiedGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="#6D9B3A" stopOpacity={0.3} />
@@ -151,6 +158,8 @@ export function AdminDashboard() {
   const [flash, setFlash] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const mountedRef = useRef(true)
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
+  const [drillLoading, setDrillLoading] = useState(false)
 
   // Date range filter state
   const [datePreset, setDatePreset] = useState<DatePreset>('12m')
@@ -223,6 +232,28 @@ export function AdminDashboard() {
   useEffect(() => {
     fetchData(true)
   }, [datePreset, customFrom, customTo])
+
+  // Month drill-down handler
+  const handleMonthClick = useCallback(async (month: string) => {
+    // Toggle off if clicking same month
+    if (selectedMonth === month) {
+      setSelectedMonth(null)
+      return
+    }
+    setSelectedMonth(month)
+    setDrillLoading(true)
+    try {
+      const range = getDateRange()
+      const d = await api<DashboardData>(`/admin/dashboard?date_from=${range.from}&date_to=${range.to}&month=${month}`, { auth: true })
+      if (mountedRef.current) {
+        setData(d)
+      }
+    } catch (e) {
+      console.error('Drill-down failed:', e)
+    } finally {
+      if (mountedRef.current) setDrillLoading(false)
+    }
+  }, [selectedMonth, getDateRange])
 
   // Auto-refresh polling
   useEffect(() => {
@@ -462,8 +493,77 @@ export function AdminDashboard() {
             </div>
           </div>
           <div className="mt-4 h-64">
-            <ContribChart data={data.monthly_contributions} />
+            <ContribChart data={data.monthly_contributions} onMonthClick={handleMonthClick} />
           </div>
+          <p className="mt-2 text-center text-xs text-gray-400">Click a month to view individual transactions</p>
+
+          {/* Drill-down panel */}
+          {selectedMonth && (
+            <div className="mt-4 rounded-xl border border-luma-200 bg-luma-50/50">
+              <div className="flex items-center justify-between border-b border-luma-100 px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-gray-900">
+                    Transactions — {new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </h3>
+                  {!drillLoading && (
+                    <span className="rounded-full bg-luma-100 px-2 py-0.5 text-xs font-semibold text-luma-700">
+                      {data.drill_transactions.length}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setSelectedMonth(null)}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-white hover:text-gray-700 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  Close
+                </button>
+              </div>
+
+              {drillLoading ? (
+                <div className="flex items-center justify-center gap-2 py-8">
+                  <svg className="h-4 w-4 animate-spin text-luma-600" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  <span className="text-sm text-gray-500">Loading transactions…</span>
+                </div>
+              ) : data.drill_transactions.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-400">No transactions for this month.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+                      <tr className="border-b border-luma-100">
+                        <th className="px-5 py-2.5 font-medium">Member</th>
+                        <th className="px-5 py-2.5 font-medium">Package</th>
+                        <th className="px-5 py-2.5 font-medium">Period</th>
+                        <th className="px-5 py-2.5 font-medium">Amount</th>
+                        <th className="px-5 py-2.5 font-medium">Status</th>
+                        <th className="px-5 py-2.5 font-medium">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-luma-100/50">
+                      {data.drill_transactions.map((t) => (
+                        <tr key={t.id} className="hover:bg-white/60 transition-colors">
+                          <td className="px-5 py-2.5">
+                            <div className="font-medium text-gray-900">{t.member_name}</div>
+                            {t.member_phone && <div className="text-xs text-gray-400">{t.member_phone}</div>}
+                          </td>
+                          <td className="px-5 py-2.5 text-gray-600">{t.package_name}</td>
+                          <td className="px-5 py-2.5 text-gray-500 text-xs">{t.period ?? '—'}</td>
+                          <td className="px-5 py-2.5 font-semibold text-gray-900">{formatKes(t.amount)}</td>
+                          <td className="px-5 py-2.5">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusColor(t.status)}`}>{t.status}</span>
+                          </td>
+                          <td className="px-5 py-2.5 text-gray-500 text-xs">
+                            {new Date(t.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Claims Status Pie */}

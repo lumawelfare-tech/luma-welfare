@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const dateFrom = url.searchParams.get('date_from') // YYYY-MM-DD
     const dateTo = url.searchParams.get('date_to')     // YYYY-MM-DD
+    const drillMonth = url.searchParams.get('month')   // YYYY-MM for drill-down
 
     // Core counts
     const [members, subs, pendingContribs, pendingClaims, approvedClaims, paidClaims, settings] = await Promise.all([
@@ -153,6 +154,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Drill-down: individual transactions for a specific month
+    let drillTransactions: unknown[] = []
+    if (drillMonth) {
+      const monthStart = `${drillMonth}-01T00:00:00Z`
+      const d = new Date(`${drillMonth}-01T00:00:00Z`)
+      d.setMonth(d.getMonth() + 1)
+      const monthEnd = d.toISOString()
+
+      const { data: drillRows } = await adminClient
+        .from('contributions')
+        .select('id, amount, status, period, notes, created_at, member:members(full_name, phone, email), subscription:subscriptions(package_id, packages(name))')
+        .gte('created_at', monthStart)
+        .lt('created_at', monthEnd)
+        .order('created_at', { ascending: false })
+
+      drillTransactions = (drillRows ?? []).map((r: Record<string, unknown>) => {
+        const member = r.member as { full_name: string; phone: string; email: string } | null
+        const sub = r.subscription as { packages: { name: string } | null } | null
+        return {
+          id: r.id,
+          amount: r.amount,
+          status: r.status,
+          period: r.period,
+          date: r.created_at,
+          member_name: member?.full_name ?? 'Unknown',
+          member_phone: member?.phone ?? '',
+          package_name: sub?.packages?.name ?? 'Unknown',
+        }
+      })
+    }
+
     return new Response(JSON.stringify({
       // Core stats
       members: members.count ?? 0,
@@ -177,6 +209,10 @@ Deno.serve(async (req) => {
 
       // Recent activity
       recent_transactions: recentTransactions,
+
+      // Drill-down
+      drill_month: drillMonth || null,
+      drill_transactions: drillTransactions,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
