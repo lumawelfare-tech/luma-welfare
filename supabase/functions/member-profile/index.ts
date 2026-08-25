@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, createUserClient, logAudit } from '../shared/supabase.ts'
+import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
 
 /**
  * Member Profile — Update profile and upload avatar
@@ -175,6 +176,17 @@ Deno.serve(async (req) => {
         action: 'password_changed',
         resource: 'member',
         resource_id: user.id,
+      })
+
+      // Send password change confirmation email (non-blocking)
+      const confirmHtml = buildEmailTemplate(
+        'Password Changed Successfully',
+        `Hello,\n\nYour Luma Welfare account password has been changed successfully.\n\nIf you did NOT make this change, please contact support immediately at info@lumawelfare.or.ke or call 0798 635 024.\n\nFor your security:\n• Do not share your password with anyone\n• Use a unique password for your Luma Welfare account\n• Enable two-factor authentication if available\n\nBest regards,\nLuma Welfare Team`,
+        'Contact Support',
+        'https://luma-welfare.vercel.app/contact',
+      )
+      sendEmail(member.email, 'Password Changed — Luma Welfare', confirmHtml).catch((e) => {
+        console.error('Password change email failed:', e instanceof Error ? e.message : e)
       })
 
       return new Response(JSON.stringify({ message: 'Password changed successfully.' }), {
