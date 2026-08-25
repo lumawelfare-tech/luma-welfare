@@ -364,6 +364,38 @@ Deno.serve(async (req) => {
       })
     }
 
+    // ─── PROCESS ALL DUE (admin trigger) ──────────────
+    if (req.method === 'POST' && action === 'process-all') {
+      requirePermission(session, 'members', 'read')
+
+      const { data: dueSchedules } = await adminClient
+        .from('scheduled_reports')
+        .select('id, name')
+        .eq('enabled', true)
+        .lte('next_run_at', new Date().toISOString())
+
+      const results: { id: string; name: string; status: string }[] = []
+      for (const sched of dueSchedules ?? []) {
+        try {
+          // Call the SQL function via RPC
+          const { error } = await adminClient.rpc('generate_scheduled_report', { p_report_id: sched.id })
+          results.push({ id: sched.id, name: sched.name, status: error ? `Error: ${error.message}` : 'Generated' })
+        } catch (e) {
+          results.push({ id: sched.id, name: sched.name, status: `Error: ${e instanceof Error ? e.message : 'Unknown'}` })
+        }
+      }
+
+      await logAudit(adminClient, {
+        actor_id: session.id, actor_role: session.role_name,
+        action: 'scheduled_reports_processed', resource: 'scheduled_report',
+        meta: { processed: results.length, results },
+      })
+
+      return new Response(JSON.stringify({ processed: results.length, results }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     return new Response(JSON.stringify({ message: 'Not found' }), {
       status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
