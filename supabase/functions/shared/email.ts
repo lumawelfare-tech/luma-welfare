@@ -9,7 +9,7 @@
  *   Luma Welfare <noreply@YOURDOMAIN>
  */
 
-const SENDER = 'Luma Welfare <onboarding@resend.dev>'
+const SENDER = 'Luma Welfare <noreply@luma-welfare.vercel.app>'
 const TEST_RECIPIENT = 'delivered@resend.dev'
 const MAX_SUBJECT = 200
 const MAX_HTML = 100_000

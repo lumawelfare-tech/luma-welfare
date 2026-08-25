@@ -22,7 +22,7 @@ import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermi
 
 const MAX_SUBJECT_LENGTH = 200
 const MAX_HTML_LENGTH = 100_000
-const TEST_SENDER = 'Luma Welfare <onboarding@resend.dev>'
+const TEST_SENDER = 'Luma Welfare <noreply@luma-welfare.vercel.app>'
 const ALLOWED_RECIPIENT = 'delivered@resend.dev'
 
 // ─── Helpers ────────────────────────────────────────────────
