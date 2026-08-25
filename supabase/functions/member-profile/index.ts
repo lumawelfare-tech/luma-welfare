@@ -1,5 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, createUserClient, logAudit } from '../shared/supabase.ts'
 
 /**
  * Member Profile — Update profile and upload avatar
@@ -105,6 +105,79 @@ Deno.serve(async (req) => {
       })
 
       return new Response(JSON.stringify({ photo_url: avatarUrl }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // POST — change password
+    if (req.method === 'POST' && url.searchParams.get('action') === 'password') {
+      const body = await req.json()
+      const { currentPassword, newPassword } = body
+
+      if (!currentPassword || !newPassword) {
+        return new Response(JSON.stringify({ message: 'Current password and new password are required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (newPassword.length < 8) {
+        return new Response(JSON.stringify({ message: 'New password must be at least 8 characters.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (!/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+        return new Response(JSON.stringify({ message: 'New password must contain at least one letter and one number.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (currentPassword === newPassword) {
+        return new Response(JSON.stringify({ message: 'New password must be different from current password.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Verify current password by attempting sign-in
+      const userClient = createUserClient(req)
+      const { data: member } = await adminClient
+        .from('members')
+        .select('email')
+        .eq('id', user.id)
+        .single()
+
+      if (!member?.email) {
+        return new Response(JSON.stringify({ message: 'Account not found' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Verify current password
+      const { error: verifyErr } = await userClient.auth.signInWithPassword({
+        email: member.email,
+        password: currentPassword,
+      })
+
+      if (verifyErr) {
+        return new Response(JSON.stringify({ message: 'Current password is incorrect.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Update password
+      const { error: updateErr } = await userClient.auth.updateUser({ password: newPassword })
+      if (updateErr) {
+        throw new Error(updateErr.message)
+      }
+
+      await logAudit(adminClient, {
+        actor_id: user.id,
+        action: 'password_changed',
+        resource: 'member',
+        resource_id: user.id,
+      })
+
+      return new Response(JSON.stringify({ message: 'Password changed successfully.' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

@@ -12,6 +12,14 @@ export function Profile() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Password change
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
+
   useEffect(() => {
     if (member) {
       setForm({
@@ -184,6 +192,75 @@ export function Profile() {
 
         <button disabled={saving} className="mt-5 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-60 transition-all">
           {saving ? 'Saving…' : 'Save Profile'}
+        </button>
+      </form>
+
+      {/* Change Password */}
+      <form onSubmit={async (e) => {
+        e.preventDefault()
+        setPasswordError('')
+        setPasswordSuccess(false)
+
+        if (!currentPassword) { setPasswordError('Current password is required.'); return }
+        if (!newPassword) { setPasswordError('New password is required.'); return }
+        if (newPassword.length < 8) { setPasswordError('New password must be at least 8 characters.'); return }
+        if (!/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) { setPasswordError('New password must contain at least one letter and one number.'); return }
+        if (newPassword !== confirmPassword) { setPasswordError('New passwords do not match.'); return }
+        if (currentPassword === newPassword) { setPasswordError('New password must be different from current password.'); return }
+
+        setChangingPassword(true)
+        try {
+          await api('/member/profile?action=password', {
+            method: 'POST',
+            auth: true,
+            body: { currentPassword, newPassword },
+          })
+          setPasswordSuccess(true)
+          setCurrentPassword('')
+          setNewPassword('')
+          setConfirmPassword('')
+        } catch (err) {
+          setPasswordError(err instanceof ApiError ? err.message : 'Could not change password.')
+        } finally {
+          setChangingPassword(false)
+        }
+      }} className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">Change Password</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Current password</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => { setCurrentPassword(e.target.value); setPasswordError(''); setPasswordSuccess(false) }}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white"
+            />
+          </div>
+          <div />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">New password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); setPasswordSuccess(false) }}
+              placeholder="At least 8 characters"
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Confirm new password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(''); setPasswordSuccess(false) }}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white"
+            />
+          </div>
+        </div>
+        {passwordError && <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{passwordError}</div>}
+        {passwordSuccess && <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">Password changed successfully.</div>}
+        <button disabled={changingPassword} className="mt-5 rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition-all">
+          {changingPassword ? 'Changing…' : 'Change Password'}
         </button>
       </form>
     </div>
