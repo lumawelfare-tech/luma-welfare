@@ -323,9 +323,9 @@ export function Dashboard() {
                     <Link to="/contributions" className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-center text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                       Contributions
                     </Link>
-                    <button disabled className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-400 cursor-not-allowed">
+                    <Link to="/claims" className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-center text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                       Claim
-                    </button>
+                    </Link>
                   </div>
                 </div>
               )

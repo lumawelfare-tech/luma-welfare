@@ -30,6 +30,7 @@ const JoinPackages = lazy(() => import('./pages/member/JoinPackages').then(m => 
 const Profile = lazy(() => import('./pages/member/Profile').then(m => ({ default: m.Profile })))
 const Family = lazy(() => import('./pages/member/Family').then(m => ({ default: m.Family })))
 const ReceiptsStatements = lazy(() => import('./pages/member/ReceiptsStatements').then(m => ({ default: m.ReceiptsStatements })))
+const Claims = lazy(() => import('./pages/member/Claims').then(m => ({ default: m.Claims })))
 
 // Admin pages — lazy loaded (largest, least frequently used)
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })))
@@ -86,6 +87,7 @@ export default function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/family" element={<Family />} />
                 <Route path="/receipts-statements" element={<ReceiptsStatements />} />
+                <Route path="/claims" element={<Claims />} />
               </Route>
             </Route>
 
