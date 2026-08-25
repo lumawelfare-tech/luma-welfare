@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useHead } from '../../lib/seo'
 import {
@@ -30,7 +31,7 @@ type DashboardData = {
   recent_transactions: { id: string; amount: number; status: string; date: string; member_name: string; package_name: string }[]
 }
 
-const PIE_COLORS = ['#6D9B3A', '#2563EB', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899', '#14B8A6']
+const REFRESH_INTERVAL = 30_000 // 30 seconds
 
 function ExportButtons({ onCSV, onPDF }: { onCSV: () => void; onPDF: () => void }) {
   return (
@@ -65,6 +66,16 @@ function formatKes(amount: number) {
   return 'KSh ' + amount.toLocaleString()
 }
 
+function timeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seconds < 10) return 'just now'
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}h ago`
+}
+
 function ClaimsPieChart({ data }: { data: Record<string, number> }) {
   const entries = Object.entries(data).filter(([, v]) => v > 0)
   if (entries.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No claims data</div>
@@ -81,6 +92,8 @@ function ClaimsPieChart({ data }: { data: Record<string, number> }) {
     </ResponsiveContainer>
   )
 }
+
+const PIE_COLORS = ['#6D9B3A', '#2563EB', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899', '#14B8A6']
 
 function ContribChart({ data }: { data: DashboardData['monthly_contributions'] }) {
   if (data.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No contribution data</div>
@@ -130,15 +143,92 @@ export function AdminDashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+  const [refreshing, setRefreshing] = useState(false)
+  const [isLive, setIsLive] = useState(true)
+  const [flash, setFlash] = useState(false)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const mountedRef = useRef(true)
 
-  useEffect(() => {
-    api<DashboardData>('/admin/dashboard', { auth: true })
-      .then(setData)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
+  const fetchData = useCallback(async (silent = false) => {
+    if (!mountedRef.current) return
+    if (silent) setRefreshing(true)
+    try {
+      const d = await api<DashboardData>('/admin/dashboard', { auth: true })
+      if (!mountedRef.current) return
+      setData(d)
+      setError(null)
+      setLastRefresh(new Date())
+      // Flash the live indicator on update
+      if (silent) {
+        setFlash(true)
+        setTimeout(() => setFlash(false), 1000)
+      }
+    } catch (e) {
+      if (!mountedRef.current) return
+      setError(e instanceof Error ? e.message : 'Could not load dashboard.')
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    }
   }, [])
 
-  if (error) {
+  // Initial load
+  useEffect(() => {
+    mountedRef.current = true
+    fetchData()
+    return () => { mountedRef.current = false }
+  }, [fetchData])
+
+  // Auto-refresh polling
+  useEffect(() => {
+    if (!isLive) {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      return
+    }
+
+    intervalRef.current = setInterval(() => {
+      if (document.hidden) return // Skip if tab is hidden
+      fetchData(true)
+    }, REFRESH_INTERVAL)
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [isLive, fetchData])
+
+  // Resume polling when tab becomes visible again
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (!document.hidden && isLive) {
+        fetchData(true)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [isLive, fetchData])
+
+  // Supabase Realtime subscriptions for instant updates
+  useEffect(() => {
+    if (!isLive) return
+
+    const channel = supabase
+      .channel('admin-dashboard-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contributions' }, () => fetchData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => fetchData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'claims' }, () => fetchData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => fetchData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'registration_fees' }, () => fetchData(true))
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [isLive, fetchData])
+
+  if (error && !data) {
     return (
       <div className="container-luma py-16 text-center">
         <div className="mx-auto max-w-md rounded-3xl border border-red-200 bg-red-50 p-8">
@@ -214,6 +304,38 @@ export function AdminDashboard() {
           <p className="mt-1 text-sm text-gray-500">Signed in as {member?.full_name}. Figures are live from the database.</p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Live indicator */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsLive(!isLive)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                isLive
+                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+              title={isLive ? 'Click to pause auto-refresh' : 'Click to resume auto-refresh'}
+            >
+              <span className={`h-2 w-2 rounded-full ${isLive ? (flash ? 'bg-emerald-500 animate-ping' : 'bg-emerald-500') : 'bg-gray-400'}`} />
+              {isLive ? 'Live' : 'Paused'}
+            </button>
+            <span className="text-xs text-gray-400" title={lastRefresh.toLocaleString()}>
+              {timeAgo(lastRefresh)}
+            </span>
+          </div>
+
+          {/* Manual refresh */}
+          <button
+            onClick={() => fetchData(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            title="Refresh now"
+          >
+            <svg className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+            </svg>
+            Refresh
+          </button>
+
           <Link to="/admin/reports" className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">Reports</Link>
           <Link to="/admin/members" className="rounded-xl bg-luma-700 px-4 py-2 text-sm font-bold text-white hover:bg-luma-800 shadow-sm transition-all">Members</Link>
         </div>
@@ -244,10 +366,12 @@ export function AdminDashboard() {
               <h2 className="text-base font-bold text-gray-900">Monthly Contributions</h2>
               <p className="mt-1 text-xs text-gray-500">Last 12 months — verified vs pending</p>
             </div>
-            <ExportButtons onCSV={() => exportContributionsCSV(data.monthly_contributions)} onPDF={() => exportContributionsPDF(data.monthly_contributions)} />
-            <div className="text-right">
-              <div className="text-lg font-bold text-luma-700">{formatKes(totalContributions)}</div>
-              <div className="text-xs text-gray-500">Total (12 months)</div>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="text-lg font-bold text-luma-700">{formatKes(totalContributions)}</div>
+                <div className="text-xs text-gray-500">Total (12 months)</div>
+              </div>
+              <ExportButtons onCSV={() => exportContributionsCSV(data.monthly_contributions)} onPDF={() => exportContributionsPDF(data.monthly_contributions)} />
             </div>
           </div>
           <div className="mt-4 h-64">
