@@ -121,6 +121,9 @@ verify_jwt = false
 [functions.admin-scheduled-reports]
 verify_jwt = true
 
+[functions.admin-notifications]
+verify_jwt = true
+
 [functions.send-email]
 verify_jwt = true
 

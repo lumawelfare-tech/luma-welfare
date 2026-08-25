@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useHead } from '../lib/seo'
+import { AdminNotificationBell } from './AdminNotificationBell'
 
 const navSections = [
   {
@@ -112,6 +113,9 @@ export function AdminLayout() {
           <div className="flex-1">
             <h1 className="text-lg font-semibold text-gray-900">{pageTitle}</h1>
           </div>
+
+          {/* Admin notification bell */}
+          <AdminNotificationBell />
 
           {/* User menu */}
           <div className="relative">
