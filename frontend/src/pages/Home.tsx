@@ -216,7 +216,7 @@ export function Home() {
               to="/register"
               className="rounded-xl bg-white px-8 py-3.5 text-sm font-bold text-luma-800 shadow-lg hover:bg-gray-100 transition-all"
             >
-              Join Now — It's Free to Register
+              Join Now — KSh 300 Activation Fee
             </Link>
             <Link
               to="/contact"

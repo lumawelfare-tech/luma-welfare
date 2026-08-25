@@ -59,7 +59,73 @@ Deno.serve(async (req) => {
 
     const adminClient = createAdminClient()
 
-    // Find the payment by checkout_request_id
+    // Check if this is a registration fee payment (account reference starts with LUMA-REG-)
+    const accountRef = stkCallback.AccountReference ?? ''
+    const isRegistrationFee = accountRef.startsWith('LUMA-REG-')
+
+    if (isRegistrationFee) {
+      // Handle registration fee callback
+      const memberIds = accountRef.replace('LUMA-REG-', '')
+      let mpesaReceipt = ''
+      let transactionDate = ''
+      let phoneNumber = ''
+
+      if (CallbackMetadata?.Item) {
+        for (const item of CallbackMetadata.Item) {
+          if (item.Name === 'MpesaReceiptNumber') mpesaReceipt = String(item.Value)
+          if (item.Name === 'TransactionDate') transactionDate = String(item.Value)
+          if (item.Name === 'PhoneNumber') phoneNumber = String(item.Value)
+        }
+      }
+
+      if (ResultCode === 0) {
+        // Find the registration fee record by checkout_request_id
+        const { data: regFee } = await adminClient
+          .from('registration_fees')
+          .select('id, member_id, status')
+          .eq('transaction_reference', CheckoutRequestID)
+          .eq('fee_type', 'registration')
+          .maybeSingle()
+
+        if (regFee && regFee.status !== 'paid') {
+          await adminClient
+            .from('registration_fees')
+            .update({
+              status: 'paid',
+              mpesa_receipt: mpesaReceipt,
+              paid_at: new Date().toISOString(),
+            })
+            .eq('id', regFee.id)
+
+          // Notify member
+          await adminClient.from('notifications').insert({
+            member_id: regFee.member_id,
+            channel: 'in_app',
+            subject: 'Membership Activated',
+            body: 'Your KSh 300 activation payment was successful. Your Luma Welfare membership is now active. You can explore and join welfare packages.',
+            status: 'queued',
+          })
+
+          await logAudit(adminClient, {
+            actor_id: regFee.member_id,
+            action: 'registration_fee_paid',
+            resource: 'registration_fee',
+            resource_id: regFee.id,
+            meta: { mpesaReceipt, resultDesc: ResultDesc },
+          })
+
+          console.log('Registration fee paid:', regFee.id, 'Receipt:', mpesaReceipt)
+        }
+      } else {
+        console.log('Registration fee callback failed:', CheckoutRequestID, 'Code:', ResultCode)
+      }
+
+      return new Response(JSON.stringify({ message: 'Callback processed' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Find the payment by checkout_request_id (regular package payment)
     const { data: payment, error: findError } = await adminClient
       .from('payments')
       .select('id, member_id, subscription_id, package_id, amount, status')

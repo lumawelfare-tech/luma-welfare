@@ -100,6 +100,12 @@ export function Dashboard() {
   const [payingFee, setPayingFee] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
+  // Activation payment flow
+  const [showPayModal, setShowPayModal] = useState(false)
+  const [payPhone, setPayPhone] = useState(member?.phone ?? '')
+  const [payStep, setPayStep] = useState<'phone' | 'waiting' | 'success' | 'failed'>('phone')
+  const [payError, setPayError] = useState('')
+
   // Quick-claim modal
   const [quickClaimOpen, setQuickClaimOpen] = useState(false)
   const [claimSubId, setClaimSubId] = useState('')
@@ -123,16 +129,66 @@ export function Dashboard() {
       })
   }, [])
 
-  async function handlePayRegistrationFee() {
+  async function handleSendStkPush() {
+    setPayError('')
     setPayingFee(true)
     try {
-      await api('/member/registration-fee/initiate', { method: 'POST', auth: true })
-      setNotice('Payment initiated. Please complete the M-Pesa payment on your phone. An admin will verify your payment shortly.')
-    } catch {
-      setError('Could not initiate registration fee. Please try again.')
+      const d = await api<{ status: string; checkout_request_id?: string; payments_enabled?: boolean; message?: string }>(
+        '/member/registration-fee',
+        { method: 'POST', auth: true, body: { phone: payPhone } },
+      )
+      if (d.status === 'paid') {
+        setRegistrationFeePaid(true)
+        setPayStep('success')
+        return
+      }
+      if (d.payments_enabled === false) {
+        setNotice(d.message ?? 'Payment recorded. M-Pesa is not yet enabled — an admin will verify your payment.')
+        setShowPayModal(false)
+        return
+      }
+      setPayStep('waiting')
+      // Start polling for payment confirmation
+      startPolling()
+    } catch (e: any) {
+      setPayError(e.message || 'Could not initiate payment. Please try again.')
     } finally {
       setPayingFee(false)
     }
+  }
+
+  function startPolling() {
+    let attempts = 0
+    const interval = setInterval(async () => {
+      attempts++
+      if (attempts > 60) { // 5 minutes max
+        clearInterval(interval)
+        setPayStep('failed')
+        setPayError('Payment timed out. Please try again.')
+        return
+      }
+      try {
+        const d = await api<{ status: string }>('/member/registration-fee?action=check-status', { auth: true })
+        if (d.status === 'paid') {
+          clearInterval(interval)
+          setRegistrationFeePaid(true)
+          setPayStep('success')
+        } else if (d.status === 'failed') {
+          clearInterval(interval)
+          setPayStep('failed')
+          setPayError('Payment was not completed. Please try again.')
+        }
+      } catch {
+        // Continue polling
+      }
+    }, 5000) // Poll every 5 seconds
+  }
+
+  function openPayModal() {
+    setShowPayModal(true)
+    setPayStep('phone')
+    setPayError('')
+    setPayPhone(member?.phone ?? '')
   }
 
   async function submitQuickClaim(e: React.FormEvent) {
@@ -195,9 +251,9 @@ export function Dashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
             </svg>
           </div>
-          <h2 className="mt-4 text-xl font-bold text-gray-900">Complete Your Membership</h2>
+          <h2 className="mt-4 text-xl font-bold text-gray-900">Activate Your Luma Welfare Membership</h2>
           <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
-            Pay the one-time KSh 300 registration fee to activate your Luma Welfare membership and access available welfare packages.
+            Pay the one-time KSh 300 activation fee to activate your membership and access available welfare packages.
           </p>
           {notice ? (
             <div className="mt-6 rounded-lg bg-amber-50 border border-amber-200 px-6 py-4">
@@ -205,30 +261,120 @@ export function Dashboard() {
                 <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="text-sm font-medium text-amber-800">Payment pending — waiting for admin verification.</span>
+                <span className="text-sm font-medium text-amber-800">{notice}</span>
               </div>
-              <p className="mt-1 text-xs text-amber-600">You will have access to packages once your payment is confirmed.</p>
             </div>
           ) : (
             <button
-              onClick={handlePayRegistrationFee}
-              disabled={payingFee}
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-luma-700 px-6 py-3 text-sm font-semibold text-white hover:bg-luma-800 transition-all disabled:opacity-50"
+              onClick={openPayModal}
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-luma-700 px-6 py-3 text-sm font-semibold text-white hover:bg-luma-800 transition-all"
             >
-              {payingFee ? (
-                <>Processing…</>
-              ) : (
-                <>
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
-                  Pay KSh 300
-                </>
-              )}
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
+              Pay KSh 300
             </button>
           )}
           <p className="mt-3 text-xs text-gray-500">
             This is a one-time fee. You will not be charged again.
           </p>
         </div>
+
+        {/* Payment Modal */}
+        {showPayModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+              {/* Step: Phone Input */}
+              {payStep === 'phone' && (
+                <>
+                  <div className="px-6 py-5 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">Pay KSh 300</h3>
+                      <button onClick={() => setShowPayModal(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">Enter the M-Pesa phone number you want to use for payment.</p>
+                  </div>
+                  <div className="px-6 py-4 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                      <input
+                        type="tel"
+                        value={payPhone}
+                        onChange={(e) => { setPayPhone(e.target.value); setPayError('') }}
+                        placeholder="07XXXXXXXX or 2547XXXXXXXX"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+                      />
+                    </div>
+                    {payError && (
+                      <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{payError}</div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 justify-end border-t border-gray-200 px-6 py-4">
+                    <button onClick={() => setShowPayModal(false)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button
+                      onClick={handleSendStkPush}
+                      disabled={payingFee || !payPhone.trim()}
+                      className="rounded-lg bg-luma-700 px-5 py-2 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-50 transition-colors"
+                    >
+                      {payingFee ? 'Sending…' : 'Send STK Push'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step: Waiting for payment */}
+              {payStep === 'waiting' && (
+                <div className="px-6 py-10 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
+                    <svg className="h-6 w-6 text-amber-600 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </div>
+                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Check Your Phone</h3>
+                  <p className="mt-1 text-sm text-gray-500">An M-Pesa payment request has been sent to your phone. Enter your M-Pesa PIN to complete the KSh 300 activation payment.</p>
+                  <p className="mt-3 text-xs text-gray-400">Waiting for payment confirmation…</p>
+                  {payError && (
+                    <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{payError}</div>
+                  )}
+                  <button onClick={() => { setPayStep('phone'); setPayError('') }} className="mt-4 text-xs font-medium text-gray-500 hover:text-gray-700">
+                    Use a different number
+                  </button>
+                </div>
+              )}
+
+              {/* Step: Success */}
+              {payStep === 'success' && (
+                <div className="px-6 py-10 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+                    <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                  </div>
+                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Membership Activated!</h3>
+                  <p className="mt-1 text-sm text-gray-500">Your KSh 300 activation payment was successful. Your Luma Welfare membership is now active.</p>
+                  <button onClick={() => setShowPayModal(false)} className="mt-5 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-colors">
+                    Explore Packages
+                  </button>
+                </div>
+              )}
+
+              {/* Step: Failed */}
+              {payStep === 'failed' && (
+                <div className="px-6 py-10 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </div>
+                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Payment Not Completed</h3>
+                  <p className="mt-1 text-sm text-gray-500">{payError || 'The payment was not completed.'}</p>
+                  <div className="mt-5 flex gap-2 justify-center">
+                    <button onClick={() => { setPayStep('phone'); setPayError('') }} className="rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-colors">
+                      Try Again
+                    </button>
+                    <button onClick={() => setShowPayModal(false)} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     )
   }

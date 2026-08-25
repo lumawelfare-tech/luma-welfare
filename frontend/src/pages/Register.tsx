@@ -67,8 +67,7 @@ export function Register() {
             </div>
             <h1 className="mt-4 text-xl font-bold text-gray-900">Account Created!</h1>
             <p className="mt-3 text-sm leading-relaxed text-gray-600">
-              Check your email to confirm your address. Once your email is confirmed, you can sign in,
-              explore available packages, and choose the package that best suits you.
+              Check your email to confirm your address. Once your email is confirmed, you can sign in and complete your KSh 300 one-time activation fee to access available welfare packages.
             </p>
             <Link to="/login" className="mt-6 inline-block rounded-xl bg-luma-700 px-6 py-3 text-sm font-bold text-white hover:bg-luma-800 transition-all">
               Go to Sign In
