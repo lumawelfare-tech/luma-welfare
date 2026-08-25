@@ -43,6 +43,144 @@ function frequencyColor(f: string) {
   }
 }
 
+function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }: {
+  schedules: Schedule[]; calMonth: number; calYear: number
+  setCalMonth: (m: number) => void; setCalYear: (y: number) => void
+}) {
+  const today = new Date()
+  const firstDay = new Date(calYear, calMonth, 1).getDay()
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
+  const monthName = new Date(calYear, calMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+  // Build map of schedule runs for this month
+  const runMap: Record<number, { name: string; frequency: string; nextRun: Date | null }[]> = {}
+  for (const s of schedules) {
+    if (!s.enabled || !s.next_run_at) continue
+    const nr = new Date(s.next_run_at)
+    // Mark the next run date
+    if (nr.getMonth() === calMonth && nr.getFullYear() === calYear) {
+      const day = nr.getDate()
+      if (!runMap[day]) runMap[day] = []
+      runMap[day].push({ name: s.name, frequency: s.frequency, nextRun: nr })
+    }
+    // Also project future runs based on frequency
+    let projected = new Date(nr)
+    for (let i = 0; i < 5; i++) {
+      if (s.frequency === 'daily') projected.setDate(projected.getDate() + 1)
+      else if (s.frequency === 'weekly') projected.setDate(projected.getDate() + 7)
+      else if (s.frequency === 'monthly') projected.setMonth(projected.getMonth() + 1)
+      else if (s.frequency === 'quarterly') projected.setMonth(projected.getMonth() + 3)
+      if (projected.getMonth() === calMonth && projected.getFullYear() === calYear) {
+        const day = projected.getDate()
+        if (!runMap[day]) runMap[day] = []
+        if (!runMap[day].find(r => r.name === s.name)) {
+          runMap[day].push({ name: s.name, frequency: s.frequency, nextRun: projected })
+        }
+      }
+      if (projected > new Date(calYear, calMonth + 1, 0)) break
+    }
+  }
+
+  // Also mark history dates
+  const histDates = new Set<string>()
+  // We don't have history loaded here, so mark based on last_generated_at
+  for (const s of schedules) {
+    if (s.last_generated_at) {
+      const lg = new Date(s.last_generated_at)
+      if (lg.getMonth() === calMonth && lg.getFullYear() === calYear) {
+        histDates.add(String(lg.getDate()))
+      }
+    }
+  }
+
+  const days = []
+  for (let i = 0; i < firstDay; i++) days.push(null)
+  for (let d = 1; d <= daysInMonth; d++) days.push(d)
+
+  function prevMonth() {
+    if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1) }
+    else setCalMonth(calMonth - 1)
+  }
+  function nextMonth() {
+    if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1) }
+    else setCalMonth(calMonth + 1)
+  }
+
+  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <button onClick={prevMonth} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">← Prev</button>
+        <h2 className="text-lg font-bold text-gray-900">{monthName}</h2>
+        <button onClick={nextMonth} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">Next →</button>
+      </div>
+
+      {/* Legend */}
+      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-luma-500" /> Scheduled run</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Report generated</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Today</span>
+      </div>
+
+      {/* Calendar Grid */}
+      <div className="mt-4 grid grid-cols-7 gap-px rounded-lg border border-gray-200 bg-gray-200">
+        {weekDays.map(d => (
+          <div key={d} className="bg-gray-50 px-2 py-2 text-center text-xs font-semibold text-gray-500 uppercase">{d}</div>
+        ))}
+        {days.map((day, i) => {
+          if (day === null) return <div key={`empty-${i}`} className="bg-white min-h-[80px]" />
+          const isToday = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear()
+          const runs = runMap[day] ?? []
+          const hasHistory = histDates.has(String(day))
+          return (
+            <div key={day} className={`bg-white min-h-[80px] p-1.5 ${isToday ? 'ring-2 ring-inset ring-blue-400' : ''}`}>
+              <div className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{day}</div>
+              <div className="mt-1 space-y-0.5">
+                {hasHistory && (
+                  <div className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] text-emerald-600 truncate">generated</span>
+                  </div>
+                )}
+                {runs.slice(0, 3).map((r, j) => (
+                  <div key={j} className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-luma-500" />
+                    <span className="text-[10px] text-gray-600 truncate" title={r.name}>{r.name}</span>
+                  </div>
+                ))}
+                {runs.length > 3 && <span className="text-[10px] text-gray-400">+{runs.length - 3} more</span>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Upcoming runs list */}
+      <div className="mt-6">
+        <h3 className="text-sm font-bold text-gray-900">Upcoming Scheduled Runs</h3>
+        <div className="mt-3 space-y-2">
+          {schedules.filter(s => s.enabled && s.next_run_at).sort((a, b) => new Date(a.next_run_at!).getTime() - new Date(b.next_run_at!).getTime()).slice(0, 5).map(s => (
+            <div key={s.id} className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-2.5">
+              <div className="flex items-center gap-3">
+                <div className={`rounded-full px-2 py-0.5 text-xs font-semibold ${frequencyColor(s.frequency)}`}>{s.frequency}</div>
+                <span className="text-sm font-medium text-gray-900">{s.name}</span>
+              </div>
+              <span className="text-xs text-gray-500">
+                {new Date(s.next_run_at!).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          ))}
+          {schedules.filter(s => s.enabled && s.next_run_at).length === 0 && (
+            <p className="text-sm text-gray-400">No upcoming scheduled runs.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function AdminScheduledReports() {
   useHead('Scheduled Reports', undefined, { noindex: true })
 
@@ -52,7 +190,9 @@ export function AdminScheduledReports() {
   const [notice, setNotice] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [generating, setGenerating] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'schedules' | 'history'>('schedules')
+  const [activeTab, setActiveTab] = useState<'schedules' | 'history' | 'calendar'>('schedules')
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return d.getMonth() })
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear())
 
   // Create form
   const [formName, setFormName] = useState('')
@@ -225,6 +365,7 @@ export function AdminScheduledReports() {
         <button onClick={() => setActiveTab('history')} className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'history' ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'}`}>
           History {historyTotal > 0 && <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs">{historyTotal}</span>}
         </button>
+        <button onClick={() => setActiveTab('calendar')} className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'calendar' ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'}`}>📅 Calendar</button>
       </div>
 
       {/* Schedules Tab */}
@@ -353,6 +494,13 @@ export function AdminScheduledReports() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Calendar Tab */}
+      {activeTab === 'calendar' && (
+        <div className="mt-6">
+          <CalendarView schedules={schedules} calMonth={calMonth} calYear={calYear} setCalMonth={setCalMonth} setCalYear={setCalYear} />
         </div>
       )}
 
