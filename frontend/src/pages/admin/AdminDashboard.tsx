@@ -399,8 +399,53 @@ export function AdminDashboard() {
         <Link to="/admin/subscriptions" className="rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-luma-800 shadow-sm transition-all">Subscriptions</Link>
       </div>
 
+      {/* Global Date Range Filter */}
+      <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3">
+        <span className="text-sm font-medium text-gray-700">Date Range:</span>
+        <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+          {([
+            { value: '3m' as DatePreset, label: '3M' },
+            { value: '6m' as DatePreset, label: '6M' },
+            { value: '12m' as DatePreset, label: '12M' },
+            { value: 'ytd' as DatePreset, label: 'YTD' },
+            { value: 'all' as DatePreset, label: 'All' },
+            { value: 'custom' as DatePreset, label: 'Custom' },
+          ]).map((p) => (
+            <button
+              key={p.value}
+              onClick={() => setDatePreset(p.value)}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                datePreset === p.value ? 'bg-luma-600 text-white shadow-sm' : 'text-gray-500 hover:bg-white hover:text-gray-700'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {datePreset === 'custom' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 outline-none focus:border-luma-500"
+            />
+            <span className="text-xs text-gray-400">to</span>
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 outline-none focus:border-luma-500"
+            />
+          </div>
+        )}
+        <span className="ml-auto text-xs text-gray-400">
+          Applied to contributions, claims, and transactions
+        </span>
+      </div>
+
       {/* Charts Row 1 */}
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* Monthly Contributions Chart */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6 lg:col-span-2">
           <div className="flex items-center justify-between">
@@ -416,47 +461,6 @@ export function AdminDashboard() {
               <ExportButtons onCSV={() => exportContributionsCSV(data.monthly_contributions)} onPDF={() => exportContributionsPDF(data.monthly_contributions)} />
             </div>
           </div>
-          {/* Date Range Filter */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
-              {([
-                { value: '3m' as DatePreset, label: '3M' },
-                { value: '6m' as DatePreset, label: '6M' },
-                { value: '12m' as DatePreset, label: '12M' },
-                { value: 'ytd' as DatePreset, label: 'YTD' },
-                { value: 'all' as DatePreset, label: 'All' },
-                { value: 'custom' as DatePreset, label: 'Custom' },
-              ]).map((p) => (
-                <button
-                  key={p.value}
-                  onClick={() => setDatePreset(p.value)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                    datePreset === p.value ? 'bg-luma-600 text-white shadow-sm' : 'text-gray-500 hover:bg-white hover:text-gray-700'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            {datePreset === 'custom' && (
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={customFrom}
-                  onChange={(e) => setCustomFrom(e.target.value)}
-                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 outline-none focus:border-luma-500"
-                />
-                <span className="text-xs text-gray-400">to</span>
-                <input
-                  type="date"
-                  value={customTo}
-                  onChange={(e) => setCustomTo(e.target.value)}
-                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 outline-none focus:border-luma-500"
-                />
-              </div>
-            )}
-          </div>
-
           <div className="mt-4 h-64">
             <ContribChart data={data.monthly_contributions} />
           </div>
@@ -467,7 +471,7 @@ export function AdminDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Claims by Status</h2>
-              <p className="mt-1 text-xs text-gray-500">All-time claims breakdown</p>
+              <p className="mt-1 text-xs text-gray-500">Claims within selected date range</p>
             </div>
             <ExportButtons onCSV={() => exportClaimsStatusCSV(data.claims_by_status)} onPDF={() => exportClaimsStatusPDF(data.claims_by_status)} />
           </div>
@@ -540,7 +544,7 @@ export function AdminDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-gray-900">Recent Transactions</h2>
-            <p className="mt-1 text-xs text-gray-500">Latest 10 contribution records</p>
+            <p className="mt-1 text-xs text-gray-500">Latest 10 contributions within date range</p>
           </div>
           <div className="flex items-center gap-3">
             <ExportButtons onCSV={() => exportTransactionsCSV(data.recent_transactions)} onPDF={() => exportTransactionsPDF(data.recent_transactions)} />

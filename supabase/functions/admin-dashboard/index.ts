@@ -117,10 +117,12 @@ Deno.serve(async (req) => {
       adminClient.from('registration_fees').select('id', { count: 'exact', head: true }).eq('status', 'unpaid'),
     ])
 
-    // Recent transactions (last 10)
+    // Recent transactions (last 10, filtered by date range)
     const { data: recentContribs } = await adminClient
       .from('contributions')
       .select('id, amount, status, created_at, member:members(full_name), subscription:subscriptions(package_id, packages(name))')
+      .gte('created_at', rangeStartStr)
+      .lte('created_at', rangeEnd.toISOString())
       .order('created_at', { ascending: false })
       .limit(10)
 
@@ -137,10 +139,12 @@ Deno.serve(async (req) => {
       }
     })
 
-    // Claims breakdown
+    // Claims breakdown (filtered by date range)
     const { data: claimRows } = await adminClient
       .from('claims')
-      .select('status')
+      .select('status, created_at')
+      .gte('created_at', rangeStartStr)
+      .lte('created_at', rangeEnd.toISOString())
 
     const claimsByStatus: Record<string, number> = {}
     if (claimRows) {
