@@ -61,6 +61,7 @@ function SidebarLink({ to, label, icon }: { to: string; label: string; icon: str
 export function AdminLayout() {
   const { member, adminRole, logout } = useAuth()
   const location = useLocation()
+  const avatarUrl = (member as any)?.photo_url
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
@@ -117,8 +118,8 @@ export function AdminLayout() {
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-luma-700 text-xs font-bold">
-                {member?.full_name?.charAt(0) ?? adminRole?.charAt(0)?.toUpperCase() ?? 'A'}
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-luma-700 text-xs font-bold overflow-hidden">
+                {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : (member?.full_name?.charAt(0) ?? adminRole?.charAt(0)?.toUpperCase() ?? 'A')}
               </div>
               <span className="hidden md:block">{member?.full_name ?? 'Administrator'}</span>
               <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -169,7 +170,8 @@ export function AdminLayout() {
 }
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
-  const { logout, adminRole } = useAuth()
+  const { logout, adminRole, member } = useAuth()
+  const avatarUrl = (member as any)?.photo_url
 
   return (
     <div className="flex h-full flex-col bg-white border-r border-gray-200">
@@ -210,8 +212,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       {/* Footer */}
       <div className="border-t border-gray-200 p-3">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-luma-700 text-xs font-bold">
-            A
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-luma-700 text-xs font-bold overflow-hidden">
+            {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : 'A'}
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-gray-900 truncate">Administrator</div>

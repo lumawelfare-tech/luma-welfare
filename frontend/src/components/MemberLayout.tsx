@@ -42,6 +42,7 @@ export function MemberLayout() {
 
   const memberName = member?.full_name ?? 'Member'
   const initials = memberName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+  const avatarUrl = (member as any)?.photo_url
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -81,8 +82,8 @@ export function MemberLayout() {
         {/* User section */}
         <div className="border-t border-gray-100 px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-luma-100 text-sm font-bold text-luma-700">
-              {initials}
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-luma-100 text-sm font-bold text-luma-700 overflow-hidden">
+              {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-gray-900 truncate">{memberName}</div>
@@ -117,8 +118,8 @@ export function MemberLayout() {
           </div>
           <div className="flex items-center gap-1">
             <NotificationBell />
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-xs font-bold text-luma-700">
-              {initials}
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-xs font-bold text-luma-700 overflow-hidden">
+              {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
             </div>
           </div>
         </div>
