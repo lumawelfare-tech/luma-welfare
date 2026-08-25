@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
+import { createUserClient } from '../shared/supabase.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -26,6 +27,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     // Use query params for sub-resource operations (Supabase Edge Functions don't support path params)
     const resourceId = url.searchParams.get('resource_id')
+    const action = url.searchParams.get('action')
 
     // GET /admin-members — list members
     if (req.method === 'GET' && !resourceId) {
@@ -163,11 +165,127 @@ Deno.serve(async (req) => {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }    // POST /admin-members?action=import — bulk import members from CSV
+    if (req.method === 'POST' && (action === 'import' || resourceId === 'import')) {
+      requirePermission(session, 'members', 'create')
+      const body = await req.json()
+      const { members: importMembers } = body
+
+      if (!Array.isArray(importMembers) || importMembers.length === 0) {
+        return new Response(JSON.stringify({ message: 'No members to import.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (importMembers.length > 100) {
+        return new Response(JSON.stringify({ message: 'Maximum 100 members per import.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const results: Array<{ row: number; email: string; status: 'success' | 'error'; message: string; member_id?: string }> = []
+
+      for (let i = 0; i < importMembers.length; i++) {
+        const row = importMembers[i]
+        const rowNum = i + 2 // +2 for header row + 0-index
+        const email = (row.email ?? '').trim().toLowerCase()
+        const fullName = (row.full_name ?? row.fullName ?? '').trim()
+        const phone = (row.phone ?? '').trim()
+        const idNumber = (row.id_number ?? row.idNumber ?? '').trim()
+
+        if (!email || !fullName || !phone) {
+          results.push({ row: rowNum, email, status: 'error', message: 'Missing required fields (email, full_name, phone).' })
+          continue
+        }
+
+        // Check for existing member with this email
+        const { data: existing } = await adminClient
+          .from('members')
+          .select('id, email')
+          .eq('email', email)
+          .maybeSingle()
+
+        if (existing) {
+          results.push({ row: rowNum, email, status: 'error', message: 'Member with this email already exists.' })
+          continue
+        }
+
+        // Generate a temporary password
+        const tempPassword = `Luma${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+
+        try {
+          // Create auth user
+          const { data: authUser, error: authErr } = await adminClient.auth.admin.createUser({
+            email,
+            password: tempPassword,
+            email_confirm: true,
+            user_metadata: { full_name: fullName },
+          })
+
+          if (authErr || !authUser?.user) {
+            results.push({ row: rowNum, email, status: 'error', message: authErr?.message ?? 'Failed to create auth user.' })
+            continue
+          }
+
+          // Create member record
+          const { error: memberErr } = await adminClient
+            .from('members')
+            .insert({
+              id: authUser.user.id,
+              email,
+              full_name: fullName,
+              phone,
+              id_number: idNumber || null,
+              status: 'active',
+              joined_at: new Date().toISOString(),
+            })
+
+          if (memberErr) {
+            // Cleanup: delete the auth user if member creation fails
+            await adminClient.auth.admin.deleteUser(authUser.user.id)
+            results.push({ row: rowNum, email, status: 'error', message: memberErr.message })
+            continue
+          }
+
+          // Create registration fee record
+          await adminClient
+            .from('registration_fees')
+            .insert({
+              member_id: authUser.user.id,
+              fee_type: 'registration',
+              amount: 300,
+              currency: 'KES',
+              status: 'unpaid',
+            })
+
+          results.push({ row: rowNum, email, status: 'success', message: 'Member created.', member_id: authUser.user.id })
+        } catch (err) {
+          results.push({ row: rowNum, email, status: 'error', message: err instanceof Error ? err.message : 'Unknown error.' })
+        }
+      }
+
+      const successCount = results.filter(r => r.status === 'success').length
+      const errorCount = results.filter(r => r.status === 'error').length
+
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: 'members_bulk_import',
+        resource: 'member',
+        meta: { total: importMembers.length, success: successCount, errors: errorCount },
+      })
+
+      return new Response(JSON.stringify({
+        message: `Import complete: ${successCount} created, ${errorCount} failed.`,
+        results,
+        summary: { total: importMembers.length, success: successCount, errors: errorCount },
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     return new Response(JSON.stringify({ message: 'Not found' }), {
-      status: 404,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error'

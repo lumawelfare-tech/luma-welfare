@@ -21,6 +21,12 @@ export function AdminMembers() {
   const [deleteTarget, setDeleteTarget] = useState<Member | null>(null)
   const [confirmText, setConfirmText] = useState('')
 
+  // CSV Import state
+  const [showImport, setShowImport] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [importResults, setImportResults] = useState<{ row: number; email: string; status: string; message: string }[] | null>(null)
+
   const load = useCallback(async () => {
     setError(null)
     try {
@@ -67,6 +73,53 @@ export function AdminMembers() {
       setConfirmText('')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  function parseCSV(text: string): Record<string, string>[] {
+    const lines = text.split('\n').filter(l => l.trim())
+    if (lines.length < 2) return []
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_'))
+    return lines.slice(1).map(line => {
+      const values: string[] = []
+      let current = ''
+      let inQuotes = false
+      for (const char of line) {
+        if (char === '"') { inQuotes = !inQuotes; continue }
+        if (char === ',' && !inQuotes) { values.push(current.trim()); current = ''; continue }
+        current += char
+      }
+      values.push(current.trim())
+      const row: Record<string, string> = {}
+      headers.forEach((h, i) => { row[h] = values[i] ?? '' })
+      return row
+    })
+  }
+
+  async function handleImport() {
+    if (!importFile) return
+    setImporting(true)
+    setImportResults(null)
+    try {
+      const text = await importFile.text()
+      const rows = parseCSV(text)
+      if (rows.length === 0) {
+        setImportResults([{ row: 0, email: '', status: 'error', message: 'No data rows found in CSV.' }])
+        return
+      }
+      const d = await api<{ results: { row: number; email: string; status: string; message: string }[]; summary: { total: number; success: number; errors: number } }>(
+        '/admin/members?action=import',
+        { method: 'POST', auth: true, body: { members: rows } },
+      )
+      setImportResults(d.results ?? [])
+      if (d.summary.errors === 0) {
+        setNotice(`Successfully imported ${d.summary.success} members.`)
+        await load()
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Import failed.')
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -124,6 +177,9 @@ export function AdminMembers() {
         </div>
         <button onClick={load} className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors">
           Search
+        </button>
+        <button onClick={() => { setShowImport(true); setImportFile(null); setImportResults(null) }} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 transition-colors">
+          Import CSV
         </button>
       </div>
 
@@ -218,6 +274,91 @@ export function AdminMembers() {
           </div>
         )}
       </div>
+
+      {/* Import CSV Modal */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
+            <div className="px-6 py-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Import Members from CSV</h3>
+                <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                <p className="font-medium">Required CSV columns:</p>
+                <p className="mt-1 font-mono text-xs">full_name, phone, email (optional)</p>
+                <p className="mt-2 text-xs text-blue-600">Members are imported with <strong>active</strong> status and a registration fee record is created automatically.</p>
+              </div>
+
+              {!importResults ? (
+                <>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">Select CSV File</label>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-luma-100 file:px-3 file:py-1 file:text-sm file:font-medium file:text-luma-700 hover:file:bg-luma-200"
+                    />
+                  </div>
+
+                  <div className="mt-4">
+                    <button
+                      onClick={handleImport}
+                      disabled={!importFile || importing}
+                      className="w-full rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {importing ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                          Importing...
+                        </span>
+                      ) : 'Import Members'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-700">Import Results</h4>
+                  <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-gray-200">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 text-left uppercase tracking-wide text-gray-500">
+                        <tr><th className="px-3 py-2">Row</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Message</th></tr>
+                      </thead>
+                      <tbody>
+                        {importResults.map((r, i) => (
+                          <tr key={i} className="border-t border-gray-100">
+                            <td className="px-3 py-2 text-gray-500">{r.row || '—'}</td>
+                            <td className="px-3 py-2 text-gray-600">{r.email || '—'}</td>
+                            <td className="px-3 py-2">
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                r.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                              }`}>{r.status}</span>
+                            </td>
+                            <td className="px-3 py-2 text-gray-600">{r.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => { setShowImport(false); setImportFile(null); setImportResults(null) }}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                {importResults ? 'Close' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       {deleteTarget && (
