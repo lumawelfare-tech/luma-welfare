@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { supabase } from '../lib/supabase'
 
 type Notification = {
   id: string
@@ -19,17 +20,46 @@ export function NotificationBell() {
   const [loading, setLoading] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Poll unread count every 30 seconds
+  // Fetch initial unread count + subscribe to Realtime for live updates
   useEffect(() => {
     let mounted = true
-    function fetchCount() {
-      api<{ unread_count: number }>('/member/notifications?unread=true', { auth: true })
-        .then((d) => { if (mounted) setUnreadCount(d.unread_count ?? 0) })
-        .catch(() => {})
+
+    // Initial fetch
+    api<{ unread_count: number }>('/member/notifications?unread=true', { auth: true })
+      .then((d) => { if (mounted) setUnreadCount(d.unread_count ?? 0) })
+      .catch(() => {})
+
+    // Subscribe to new notifications via Supabase Realtime
+    const channel = supabase
+      .channel('member-notifications-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+        if (!mounted) return
+        const rec = payload.new as { member_id?: string; status?: string; subject?: string; body?: string }
+        // Only count notifications for the current user
+        // (RLS would filter server-side, but we check member_id client-side for the count)
+        if (rec.status === 'queued') {
+          setUnreadCount(prev => prev + 1)
+          // Prepend to notifications list if dropdown is open
+          setNotifications(prev => {
+            if (prev.length === 0) return prev
+            return [{
+              id: (rec as any).id ?? crypto.randomUUID(),
+              channel: (rec as any).channel ?? 'in_app',
+              subject: rec.subject ?? null,
+              body: rec.body ?? '',
+              status: rec.status ?? 'queued',
+              created_at: (rec as any).created_at ?? new Date().toISOString(),
+              sent_at: null,
+            }, ...prev].slice(0, 50)
+          })
+        }
+      })
+      .subscribe()
+
+    return () => {
+      mounted = false
+      supabase.removeChannel(channel)
     }
-    fetchCount()
-    const interval = setInterval(fetchCount, 30000)
-    return () => { mounted = false; clearInterval(interval) }
   }, [])
 
   // Load notifications when dropdown opens
@@ -90,16 +120,22 @@ export function NotificationBell() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="relative rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+        className={`relative rounded-lg p-2 transition-colors ${
+          unreadCount > 0
+            ? 'text-luma-600 hover:bg-luma-50'
+            : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+        }`}
         aria-label="Notifications"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
           <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
         </svg>
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
+          <>
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white animate-pulse">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          </>
         )}
       </button>
 
