@@ -31,6 +31,8 @@ type DashboardData = {
   recent_transactions: { id: string; amount: number; status: string; date: string; member_name: string; package_name: string }[]
 }
 
+type DatePreset = '3m' | '6m' | '12m' | 'ytd' | 'all' | 'custom'
+
 const REFRESH_INTERVAL = 30_000 // 30 seconds
 
 function ExportButtons({ onCSV, onPDF }: { onCSV: () => void; onPDF: () => void }) {
@@ -150,11 +152,46 @@ export function AdminDashboard() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const mountedRef = useRef(true)
 
+  // Date range filter state
+  const [datePreset, setDatePreset] = useState<DatePreset>('12m')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+
+  const getDateRange = useCallback((): { from: string; to: string } => {
+    const now = new Date()
+    const to = now.toISOString().split('T')[0]
+    let from: string
+    switch (datePreset) {
+      case '3m': {
+        const d = new Date(); d.setMonth(d.getMonth() - 3); from = d.toISOString().split('T')[0]; break
+      }
+      case '6m': {
+        const d = new Date(); d.setMonth(d.getMonth() - 6); from = d.toISOString().split('T')[0]; break
+      }
+      case '12m': {
+        const d = new Date(); d.setMonth(d.getMonth() - 12); from = d.toISOString().split('T')[0]; break
+      }
+      case 'ytd': {
+        from = `${now.getFullYear()}-01-01`; break
+      }
+      case 'all': {
+        from = '2024-01-01'; break
+      }
+      case 'custom': {
+        from = customFrom || to
+        break
+      }
+    }
+    return { from, to: customTo || to }
+  }, [datePreset, customFrom, customTo])
+
   const fetchData = useCallback(async (silent = false) => {
     if (!mountedRef.current) return
     if (silent) setRefreshing(true)
     try {
-      const d = await api<DashboardData>('/admin/dashboard', { auth: true })
+      const range = getDateRange()
+      const qs = `?date_from=${range.from}&date_to=${range.to}`
+      const d = await api<DashboardData>(`/admin/dashboard${qs}`, { auth: true })
       if (!mountedRef.current) return
       setData(d)
       setError(null)
@@ -173,14 +210,19 @@ export function AdminDashboard() {
         setRefreshing(false)
       }
     }
-  }, [])
+  }, [getDateRange])
 
-  // Initial load
+  // Initial load + refetch on date range change
   useEffect(() => {
     mountedRef.current = true
     fetchData()
     return () => { mountedRef.current = false }
   }, [fetchData])
+
+  // Refetch when date range changes
+  useEffect(() => {
+    fetchData(true)
+  }, [datePreset, customFrom, customTo])
 
   // Auto-refresh polling
   useEffect(() => {
@@ -364,16 +406,57 @@ export function AdminDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Monthly Contributions</h2>
-              <p className="mt-1 text-xs text-gray-500">Last 12 months — verified vs pending</p>
+              <p className="mt-1 text-xs text-gray-500">Verified vs pending contributions</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <div className="text-lg font-bold text-luma-700">{formatKes(totalContributions)}</div>
-                <div className="text-xs text-gray-500">Total (12 months)</div>
+                <div className="text-xs text-gray-500">Total ({data.monthly_contributions.length} months)</div>
               </div>
               <ExportButtons onCSV={() => exportContributionsCSV(data.monthly_contributions)} onPDF={() => exportContributionsPDF(data.monthly_contributions)} />
             </div>
           </div>
+          {/* Date Range Filter */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+              {([
+                { value: '3m' as DatePreset, label: '3M' },
+                { value: '6m' as DatePreset, label: '6M' },
+                { value: '12m' as DatePreset, label: '12M' },
+                { value: 'ytd' as DatePreset, label: 'YTD' },
+                { value: 'all' as DatePreset, label: 'All' },
+                { value: 'custom' as DatePreset, label: 'Custom' },
+              ]).map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setDatePreset(p.value)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    datePreset === p.value ? 'bg-luma-600 text-white shadow-sm' : 'text-gray-500 hover:bg-white hover:text-gray-700'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {datePreset === 'custom' && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 outline-none focus:border-luma-500"
+                />
+                <span className="text-xs text-gray-400">to</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 outline-none focus:border-luma-500"
+                />
+              </div>
+            )}
+          </div>
+
           <div className="mt-4 h-64">
             <ContribChart data={data.monthly_contributions} />
           </div>

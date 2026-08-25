@@ -32,6 +32,11 @@ Deno.serve(async (req) => {
 
     requirePermission(session, 'members', 'read')
 
+    // Optional date range for contributions chart
+    const url = new URL(req.url)
+    const dateFrom = url.searchParams.get('date_from') // YYYY-MM-DD
+    const dateTo = url.searchParams.get('date_to')     // YYYY-MM-DD
+
     // Core counts
     const [members, subs, pendingContribs, pendingClaims, approvedClaims, paidClaims, settings] = await Promise.all([
       adminClient.from('members').select('id', { count: 'exact', head: true }),
@@ -43,24 +48,27 @@ Deno.serve(async (req) => {
       adminClient.from('platform_settings').select('key, value').eq('key', 'stats'),
     ])
 
-    // Financial data — contributions by month (last 12 months)
-    const twelveMonthsAgo = new Date()
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
-    const twelveMonthsAgoStr = twelveMonthsAgo.toISOString()
+    // Financial data — contributions by month
+    // Determine date range: use provided range or default to last 12 months
+    const rangeStart = dateFrom ? new Date(dateFrom) : (() => { const d = new Date(); d.setMonth(d.getMonth() - 12); return d })()
+    const rangeEnd = dateTo ? new Date(dateTo + 'T23:59:59Z') : new Date()
+    const rangeStartStr = rangeStart.toISOString()
 
     const { data: contribRows } = await adminClient
       .from('contributions')
       .select('amount, created_at, status')
-      .gte('created_at', twelveMonthsAgoStr)
+      .gte('created_at', rangeStartStr)
+      .lte('created_at', rangeEnd.toISOString())
       .order('created_at', { ascending: true })
 
-    // Aggregate contributions by month
+    // Generate month keys for the selected range
     const monthlyContributions: Record<string, { total: number; verified: number; pending: number }> = {}
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date()
-      d.setMonth(d.getMonth() - i)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const tempDate = new Date(rangeStart)
+    tempDate.setDate(1) // Start from the 1st of the month
+    while (tempDate <= rangeEnd) {
+      const key = `${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}`
       monthlyContributions[key] = { total: 0, verified: 0, pending: 0 }
+      tempDate.setMonth(tempDate.getMonth() + 1)
     }
 
     if (contribRows) {
