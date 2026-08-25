@@ -46,6 +46,7 @@ const AdminSettings = lazy(() => import('./pages/admin/AdminSettings').then(m =>
 const AdminAuditLogs = lazy(() => import('./pages/admin/AdminAuditLogs').then(m => ({ default: m.AdminAuditLogs })))
 const AdminRegistrationFees = lazy(() => import('./pages/admin/AdminRegistrationFees').then(m => ({ default: m.AdminRegistrationFees })))
 const AdminReports = lazy(() => import('./pages/admin/AdminReports').then(m => ({ default: m.AdminReports })))
+const AdminScheduledReports = lazy(() => import('./pages/admin/AdminScheduledReports').then(m => ({ default: m.AdminScheduledReports })))
 
 function PageLoader() {
   return (
@@ -107,6 +108,7 @@ export default function App() {
                 <Route path="news" element={<AdminNews />} />
                 <Route path="gallery" element={<AdminGallery />} />
                 <Route path="reports" element={<AdminReports />} />
+                <Route path="scheduled-reports" element={<AdminScheduledReports />} />
                 <Route path="settings" element={<AdminSettings />} />
                 <Route path="audit-logs" element={<AdminAuditLogs />} />
               </Route>

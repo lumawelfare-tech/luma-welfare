@@ -117,3 +117,6 @@ verify_jwt = true
 # Payment callback — called by M-Pesa Daraja API (no user JWT)
 [functions.payments-callback]
 verify_jwt = false
+
+[functions.admin-scheduled-reports]
+verify_jwt = true
