@@ -1,17 +1,15 @@
 /**
- * send-report-email — Send scheduled report notification emails
+ * send-report-email — Send scheduled report notification emails with Excel attachment
  *
  * POST /send-report-email
- * Body: { schedule_name, report_type, record_count, filename, recipient_email, recipient_name }
+ * Body: { schedule_name, report_type, record_count, filename, recipient_email, recipient_name, schedule_id }
  *
+ * Downloads the Excel report from Supabase Storage and attaches it to the email.
  * Called by pg_net from the SQL cron function after report generation.
- * Uses the shared email helper with Resend API.
- *
- * Test mode: all emails go to delivered@resend.dev
  */
 
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
+import { sendEmail, buildEmailTemplate, readFileAsAttachment } from '../shared/email.ts'
 import { createAdminClient } from '../shared/supabase.ts'
 
 Deno.serve(async (req) => {
@@ -25,12 +23,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify this is called from a trusted source (pg_net or internal)
-    const authHeader = req.headers.get('Authorization')
     const apiKey = Deno.env.get('RESEND_API_KEY')
-
     if (!apiKey) {
-      console.error('send-report-email: RESEND_API_KEY not configured')
       return new Response(JSON.stringify({ message: 'Email service not configured' }), {
         status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -54,14 +48,10 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Build report type label
     const typeLabels: Record<string, string> = {
-      'contributions': 'Contributions',
-      'subscriptions': 'Subscriptions',
-      'claims': 'Claims',
-      'registration-fees': 'Registration Fees',
-      'members': 'Members',
-      'financial': 'Financial Summary',
+      'contributions': 'Contributions', 'subscriptions': 'Subscriptions',
+      'claims': 'Claims', 'registration-fees': 'Registration Fees',
+      'members': 'Members', 'financial': 'Financial Summary',
     }
     const typeLabel = typeLabels[report_type] ?? report_type
 
@@ -70,7 +60,7 @@ Deno.serve(async (req) => {
     const bodyText = [
       `Hello ${recipient_name || 'there'},`,
       '',
-      `Your scheduled report "${schedule_name}" has been generated.`,
+      `Your scheduled report "${schedule_name}" has been generated and is attached to this email.`,
       '',
       `Report Details:`,
       `• Type: ${typeLabel}`,
@@ -78,7 +68,7 @@ Deno.serve(async (req) => {
       `• File: ${filename ?? 'N/A'}`,
       `• Generated: ${new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
       '',
-      `You can download this report from the Scheduled Reports section of your admin dashboard.`,
+      `You can also download this report from the Scheduled Reports section of your admin dashboard.`,
       '',
       `Best regards,`,
       `Luma Welfare Team`,
@@ -86,13 +76,28 @@ Deno.serve(async (req) => {
 
     const html = buildEmailTemplate(
       `Report Ready: ${schedule_name}`,
-      `Hello ${recipient_name || 'there'},\n\nYour scheduled report "${schedule_name}" has been generated.\n\nReport Details:\n• Type: ${typeLabel}\n• Records: ${(record_count ?? 0).toLocaleString()}\n• File: ${filename ?? 'N/A'}\n• Generated: ${new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\nYou can download this report from the Scheduled Reports section of your admin dashboard.`,
+      `Hello ${recipient_name || 'there'},\n\nYour scheduled report "${schedule_name}" has been generated and is attached to this email.\n\nReport Details:\n• Type: ${typeLabel}\n• Records: ${(record_count ?? 0).toLocaleString()}\n• File: ${filename ?? 'N/A'}\n• Generated: ${new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\nYou can also download this report from the Scheduled Reports section of your admin dashboard.`,
       'View Reports',
       'https://luma-welfare.vercel.app/admin/scheduled-reports',
     )
 
-    // Send email
-    const result = await sendEmail(recipient_email, subject, html)
+    // Try to read the report file from Storage for attachment
+    const adminClient = createAdminClient()
+    let attachments: Awaited<ReturnType<typeof readFileAsAttachment>>[] = []
+
+    if (filename) {
+      // Search for the file in any user folder
+      const { data: files } = await adminClient.storage.from('report-files').list('', { search: filename })
+      if (files && files.length > 0) {
+        const attachment = await readFileAsAttachment(adminClient, 'report-files', files[0].name)
+        if (attachment) {
+          attachments = [attachment]
+        }
+      }
+    }
+
+    // Send email with attachment
+    const result = await sendEmail(recipient_email, subject, html, attachments.length > 0 ? attachments as NonNullable<Awaited<ReturnType<typeof readFileAsAttachment>>[]> : undefined)
 
     if (!result.success) {
       console.error('send-report-email: Failed to send:', result.error)
@@ -101,24 +106,21 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Log to audit
-    const adminClient = createAdminClient()
+    // Audit log
     await adminClient.from('audit_logs').insert({
       action: 'report_email_sent',
       resource: 'email',
       meta: {
-        schedule_name,
-        report_type,
-        record_count: record_count ?? 0,
-        filename,
-        recipient_email,
-        resend_id: result.id,
+        schedule_name, report_type, record_count: record_count ?? 0,
+        filename, recipient_email, resend_id: result.id,
+        attachment_attached: attachments.length > 0,
       },
     })
 
     return new Response(JSON.stringify({
       message: 'Email sent successfully',
       id: result.id,
+      attachment_attached: attachments.length > 0,
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
