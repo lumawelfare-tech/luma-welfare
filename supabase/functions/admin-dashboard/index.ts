@@ -227,6 +227,79 @@ Deno.serve(async (req) => {
         total: (await adminClient.from('scheduled_reports').select('id', { count: 'exact', head: true })).count ?? 0,
         enabled: (await adminClient.from('scheduled_reports').select('id', { count: 'exact', head: true }).eq('enabled', true)).count ?? 0,
       },
+
+      // Report generation analytics
+      report_analytics: await (async () => {
+        const { data: allReports } = await adminClient
+          .from('report_history')
+          .select('id, schedule_name, report_type, record_count, status, generated_at')
+          .gte('generated_at', rangeStartStr)
+          .lte('generated_at', rangeEnd.toISOString())
+          .order('generated_at', { ascending: true })
+
+        if (!allReports || allReports.length === 0) {
+          return {
+            total_reports: 0, successful: 0, failed: 0, success_rate: 0,
+            avg_records: 0, total_records: 0,
+            by_type: [], by_month: [], by_schedule: [],
+          }
+        }
+
+        const successful = allReports.filter(r => r.status === 'success').length
+        const failed = allReports.filter(r => r.status === 'error').length
+        const totalRecords = allReports.reduce((s, r) => s + (r.record_count || 0), 0)
+        const avgRecords = Math.round(totalRecords / allReports.length)
+        const successRate = allReports.length > 0 ? Math.round((successful / allReports.length) * 100) : 0
+
+        // Reports by type
+        const typeMap: Record<string, { total: number; success: number; error: number; records: number }> = {}
+        for (const r of allReports) {
+          const t = r.report_type || 'unknown'
+          if (!typeMap[t]) typeMap[t] = { total: 0, success: 0, error: 0, records: 0 }
+          typeMap[t].total++
+          if (r.status === 'success') typeMap[t].success++
+          else typeMap[t].error++
+          typeMap[t].records += r.record_count || 0
+        }
+        const byType = Object.entries(typeMap).map(([type, v]) => ({
+          type, total: v.total, success: v.success, error: v.error, records: v.records,
+        })).sort((a, b) => b.total - a.total)
+
+        // Reports by month
+        const monthMap: Record<string, { total: number; success: number; error: number; records: number }> = {}
+        for (const r of allReports) {
+          const key = r.generated_at.substring(0, 7)
+          if (!monthMap[key]) monthMap[key] = { total: 0, success: 0, error: 0, records: 0 }
+          monthMap[key].total++
+          if (r.status === 'success') monthMap[key].success++
+          else monthMap[key].error++
+          monthMap[key].records += r.record_count || 0
+        }
+        const byMonth = Object.entries(monthMap).map(([month, v]) => ({
+          month, label: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+          total: v.total, success: v.success, error: v.error, records: v.records,
+        }))
+
+        // Reports by schedule
+        const schedMap: Record<string, { total: number; success: number; error: number; lastRun: string }> = {}
+        for (const r of allReports) {
+          const s = r.schedule_name || 'Unknown'
+          if (!schedMap[s]) schedMap[s] = { total: 0, success: 0, error: 0, lastRun: r.generated_at }
+          schedMap[s].total++
+          if (r.status === 'success') schedMap[s].success++
+          else schedMap[s].error++
+          if (r.generated_at > schedMap[s].lastRun) schedMap[s].lastRun = r.generated_at
+        }
+        const bySchedule = Object.entries(schedMap).map(([name, v]) => ({
+          name, total: v.total, success: v.success, error: v.error, lastRun: v.lastRun,
+        })).sort((a, b) => b.total - a.total)
+
+        return {
+          total_reports: allReports.length, successful, failed, success_rate: successRate,
+          avg_records: avgRecords, total_records: totalRecords,
+          by_type: byType, by_month: byMonth, by_schedule: bySchedule,
+        }
+      })(),
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

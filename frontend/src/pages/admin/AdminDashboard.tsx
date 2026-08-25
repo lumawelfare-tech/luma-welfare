@@ -33,6 +33,13 @@ type DashboardData = {
   drill_transactions: { id: string; amount: number; status: string; period: string; date: string; member_name: string; member_phone: string; package_name: string }[]
   recent_reports: { id: string; schedule_name: string; report_type: string; filename: string; record_count: number; status: string; generated_at: string }[]
   scheduled_report_stats: { total: number; enabled: number }
+  report_analytics: {
+    total_reports: number; successful: number; failed: number; success_rate: number
+    avg_records: number; total_records: number
+    by_type: { type: string; total: number; success: number; error: number; records: number }[]
+    by_month: { month: string; label: string; total: number; success: number; error: number; records: number }[]
+    by_schedule: { name: string; total: number; success: number; error: number; lastRun: string }[]
+  }
 }
 
 type DatePreset = '3m' | '6m' | '12m' | 'ytd' | 'all' | 'custom'
@@ -688,6 +695,132 @@ export function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* Report Generation Analytics */}
+      {data.report_analytics && data.report_analytics.total_reports > 0 && (
+        <div className="mt-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gray-900">Report Generation Analytics</h2>
+            <Link to="/admin/scheduled-reports" className="text-sm font-medium text-luma-700 hover:text-luma-800">Manage Schedules →</Link>
+          </div>
+
+          {/* Analytics KPIs */}
+          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="rounded-2xl border border-gray-100 bg-white p-5">
+              <div className="text-2xl font-extrabold text-gray-900">{data.report_analytics.total_reports}</div>
+              <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Total Reports</div>
+            </div>
+            <div className="rounded-2xl border border-gray-100 bg-emerald-50 p-5">
+              <div className="text-2xl font-extrabold text-emerald-700">{data.report_analytics.success_rate}%</div>
+              <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-600">Success Rate</div>
+              <div className="mt-0.5 text-[10px] text-emerald-500">{data.report_analytics.successful} succeeded</div>
+            </div>
+            <div className="rounded-2xl border border-gray-100 bg-blue-50 p-5">
+              <div className="text-2xl font-extrabold text-blue-700">{data.report_analytics.total_records.toLocaleString()}</div>
+              <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-blue-600">Total Records</div>
+              <div className="mt-0.5 text-[10px] text-blue-500">avg {data.report_analytics.avg_records}/report</div>
+            </div>
+            <div className="rounded-2xl border border-gray-100 bg-red-50 p-5">
+              <div className="text-2xl font-extrabold text-red-700">{data.report_analytics.failed}</div>
+              <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-red-600">Failed</div>
+            </div>
+          </div>
+
+          {/* Charts Row */}
+          <div className="mt-4 grid gap-6 lg:grid-cols-2">
+            {/* Report Generation Trend */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+              <h3 className="text-sm font-bold text-gray-900">Generation Trend</h3>
+              <p className="mt-0.5 text-xs text-gray-500">Reports generated per month</p>
+              <div className="mt-4 h-48">
+                {data.report_analytics.by_month.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.report_analytics.by_month} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="#9CA3AF" />
+                      <YAxis tick={{ fontSize: 10 }} stroke="#9CA3AF" />
+                      <Tooltip />
+                      <Bar dataKey="success" stackId="a" fill="#6D9B3A" name="Success" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="error" stackId="a" fill="#EF4444" name="Failed" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-gray-400">No data</div>
+                )}
+              </div>
+            </div>
+
+            {/* Reports by Type */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+              <h3 className="text-sm font-bold text-gray-900">Reports by Type</h3>
+              <p className="mt-0.5 text-xs text-gray-500">Generation count per report type</p>
+              <div className="mt-4 space-y-2.5">
+                {data.report_analytics.by_type.map((t) => {
+                  const pct = data.report_analytics.total_reports > 0 ? (t.total / data.report_analytics.total_reports) * 100 : 0
+                  return (
+                    <div key={t.type}>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-gray-700 capitalize">{t.type.replace(/-/g, ' ')}</span>
+                        <span className="text-gray-500">{t.total} reports · {t.records.toLocaleString()} records</span>
+                      </div>
+                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-gray-100">
+                        <div className="h-full rounded-full bg-luma-500 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+                {data.report_analytics.by_type.length === 0 && (
+                  <div className="py-4 text-center text-sm text-gray-400">No report data</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Schedule Performance */}
+          <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-6">
+            <h3 className="text-sm font-bold text-gray-900">Schedule Performance</h3>
+            <p className="mt-0.5 text-xs text-gray-500">Success rate per scheduled report</p>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="pb-2 pr-4 font-medium">Schedule</th>
+                    <th className="pb-2 pr-4 font-medium">Generated</th>
+                    <th className="pb-2 pr-4 font-medium">Success</th>
+                    <th className="pb-2 pr-4 font-medium">Failed</th>
+                    <th className="pb-2 pr-4 font-medium">Rate</th>
+                    <th className="pb-2 font-medium">Last Run</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {data.report_analytics.by_schedule.map((s) => {
+                    const rate = s.total > 0 ? Math.round((s.success / s.total) * 100) : 0
+                    return (
+                      <tr key={s.name} className="hover:bg-gray-50 transition-colors">
+                        <td className="py-2.5 pr-4 font-medium text-gray-900">{s.name}</td>
+                        <td className="py-2.5 pr-4 text-gray-600">{s.total}</td>
+                        <td className="py-2.5 pr-4 text-emerald-600 font-medium">{s.success}</td>
+                        <td className="py-2.5 pr-4">
+                          {s.error > 0 ? <span className="text-red-600 font-medium">{s.error}</span> : <span className="text-gray-400">0</span>}
+                        </td>
+                        <td className="py-2.5 pr-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-100">
+                              <div className={`h-full rounded-full ${rate >= 90 ? 'bg-emerald-500' : rate >= 70 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${rate}%` }} />
+                            </div>
+                            <span className="text-xs text-gray-500">{rate}%</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 text-xs text-gray-400">{timeAgo(new Date(s.lastRun))}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Recent Reports Widget */}
       {data.recent_reports && data.recent_reports.length > 0 && (
