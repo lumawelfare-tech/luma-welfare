@@ -4,40 +4,266 @@ import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermi
 /**
  * Admin Scheduled Reports
  *
- * GET    /admin-scheduled-reports              — list all schedules
- * POST   /admin-scheduled-reports              — create a schedule
- * PATCH  /admin-scheduled-reports?id=xxx       — update a schedule
- * DELETE /admin-scheduled-reports?id=xxx       — delete a schedule
- * POST   /admin-scheduled-reports?id=xxx&action=generate  — generate report now
- * GET    /admin-scheduled-reports?id=xxx&action=download   — download generated report
+ * GET    /admin-scheduled-reports                          — list schedules
+ * POST   /admin-scheduled-reports                          — create schedule
+ * PATCH  /admin-scheduled-reports?id=xxx                   — update schedule
+ * DELETE /admin-scheduled-reports?id=xxx                   — delete schedule
+ * POST   /admin-scheduled-reports?id=xxx&action=generate   — generate now
+ * GET    /admin-scheduled-reports?action=history           — search/filter history
+ * POST   /admin-scheduled-reports?action=bulk-download     — bulk download as ZIP
+ * POST   /admin-scheduled-reports?action=cleanup           — delete history + storage
+ * POST   /admin-scheduled-reports?action=process-all       — process all due
  */
 
-function computeNextRun(frequency: string, from?: Date): Date {
-  const d = from ?? new Date()
-  switch (frequency) {
-    case 'daily': d.setDate(d.getDate() + 1); break
-    case 'weekly': d.setDate(d.getDate() + 7); break
-    case 'monthly': d.setMonth(d.getMonth() + 1); break
-    case 'quarterly': d.setMonth(d.getMonth() + 3); break
-  }
-  // Set to 6:00 AM UTC
-  d.setHours(6, 0, 0, 0)
-  return d
+// ─── Excel XML Generation (no external deps) ───────────────
+
+function escapeXml(val: string): string {
+  return val.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function buildReportFilename(name: string, type: string): string {
-  const slug = name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 40)
-  const date = new Date().toISOString().split('T')[0]
-  return `${slug}_${type}_${date}.csv`
+function buildExcelXml(title: string, headers: string[], rows: (string | number | null)[][]): string {
+  const colCount = headers.length
+  const colWidths = headers.map((h, i) => {
+    const maxLen = Math.max(h.length, ...rows.map(r => String(r[i] ?? '').length))
+    return Math.min(Math.max(maxLen + 2, 10), 50)
+  })
+
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Styles>
+    <Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#6D9B3A" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style>
+    <Style ss:ID="currency"><NumberFormat ss:Format="#,##0"/></Style>
+    <Style ss:ID="date"><NumberFormat ss:Format="yyyy-mm-dd hh:mm"/></Style>
+  </Styles>
+  <Worksheet ss:Name="${escapeXml(title.substring(0, 31))}">
+    <Table ss:DefaultColumnWidth="80">`
+
+  // Column widths
+  for (const w of colWidths) {
+    xml += `\n      <Column ss:Width="${w * 7}"/>`
+  }
+
+  // Header row
+  xml += `\n      <Row ss:StyleID="header">`
+  for (const h of headers) {
+    xml += `<Cell ss:StyleID="header"><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`
+  }
+  xml += `</Row>`
+
+  // Data rows
+  for (const row of rows) {
+    xml += `\n      <Row>`
+    for (let i = 0; i < colCount; i++) {
+      const val = row[i]
+      if (val == null || val === '') {
+        xml += `<Cell><Data ss:Type="String"></Data></Cell>`
+      } else if (typeof val === 'number') {
+        xml += `<Cell ss:StyleID="currency"><Data ss:Type="Number">${val}</Data></Cell>`
+      } else {
+        const s = String(val)
+        const num = Number(s)
+        if (!isNaN(num) && s !== '' && s.match(/^-?\d+(\.\d+)?$/)) {
+          xml += `<Cell><Data ss:Type="Number">${num}</Data></Cell>`
+        } else {
+          xml += `<Cell><Data ss:Type="String">${escapeXml(s)}</Data></Cell>`
+        }
+      }
+    }
+    xml += `</Row>`
+  }
+
+  xml += `\n    </Table>\n  </Worksheet>\n</Workbook>`
+  return xml
 }
 
-function escapeCSV(val: string): string {
-  if (/^[=+\-@\t\r]/.test(val)) return `'${val}`
-  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-    return `"${val.replace(/"/g, '""')}"`
+// ─── ZIP Creation (minimal ZIP64-compatible) ────────────────
+
+function crc32(data: Uint8Array): number {
+  let crc = 0xFFFFFFFF
+  const table = new Uint32Array(256)
+  for (let i = 0; i < 256; i++) {
+    let c = i
+    for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1)
+    table[i] = c
   }
-  return val
+  for (let i = 0; i < data.length; i++) {
+    crc = table[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8)
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0
 }
+
+function createZip(files: { name: string; data: Uint8Array }[]): Uint8Array {
+  const encoder = new TextEncoder()
+  const localHeaders: Uint8Array[] = []
+  const centralHeaders: Uint8Array[] = []
+  const fileDataParts: Uint8Array[] = []
+  let offset = 0
+
+  for (const file of files) {
+    const nameBytes = encoder.encode(file.name)
+    const crc = crc32(file.data)
+    const size = file.data.length
+
+    // Local file header
+    const local = new Uint8Array(30 + nameBytes.length)
+    const lv = new DataView(local.buffer)
+    lv.setUint32(0, 0x04034b50, true) // signature
+    lv.setUint16(4, 20, true) // version needed
+    lv.setUint16(6, 0, true) // flags
+    lv.setUint16(8, 0, true) // compression (stored)
+    lv.setUint16(10, 0, true) // mod time
+    lv.setUint16(12, 0, true) // mod date
+    lv.setUint32(14, crc, true) // crc32
+    lv.setUint32(18, size, true) // compressed size
+    lv.setUint32(22, size, true) // uncompressed size
+    lv.setUint16(26, nameBytes.length, true) // name length
+    lv.setUint16(28, 0, true) // extra length
+    local.set(nameBytes, 30)
+
+    // Central directory header
+    const central = new Uint8Array(46 + nameBytes.length)
+    const cv = new DataView(central.buffer)
+    cv.setUint32(0, 0x02014b50, true) // signature
+    cv.setUint16(4, 20, true) // version made by
+    cv.setUint16(6, 20, true) // version needed
+    cv.setUint16(8, 0, true) // flags
+    cv.setUint16(10, 0, true) // compression
+    cv.setUint16(12, 0, true) // mod time
+    cv.setUint16(14, 0, true) // mod date
+    cv.setUint32(16, crc, true) // crc32
+    cv.setUint32(20, size, true) // compressed size
+    cv.setUint32(24, size, true) // uncompressed size
+    cv.setUint16(28, nameBytes.length, true) // name length
+    cv.setUint16(30, 0, true) // extra length
+    cv.setUint16(32, 0, true) // comment length
+    cv.setUint16(34, 0, true) // disk number start
+    cv.setUint16(36, 0, true) // internal attrs
+    cv.setUint32(38, 0, true) // external attrs
+    cv.setUint32(42, offset, true) // offset
+    central.set(nameBytes, 46)
+
+    localHeaders.push(local)
+    centralHeaders.push(central)
+    fileDataParts.push(file.data)
+    offset += local.length + file.data.length
+  }
+
+  const centralDirOffset = offset
+  let centralDirSize = 0
+  for (const ch of centralHeaders) centralDirSize += ch.length
+
+  const endRecord = new Uint8Array(22)
+  const ev = new DataView(endRecord.buffer)
+  ev.setUint32(0, 0x06054b50, true) // signature
+  ev.setUint16(4, 0, true) // disk number
+  ev.setUint16(6, 0, true) // central dir disk
+  ev.setUint16(8, files.length, true) // entries on disk
+  ev.setUint16(10, files.length, true) // total entries
+  ev.setUint32(12, centralDirSize, true) // central dir size
+  ev.setUint32(16, centralDirOffset, true) // central dir offset
+  ev.setUint16(20, 0, true) // comment length
+
+  const totalSize = offset + centralDirSize + 22
+  const result = new Uint8Array(totalSize)
+  let pos = 0
+  for (let i = 0; i < files.length; i++) {
+    result.set(localHeaders[i], pos); pos += localHeaders[i].length
+    result.set(fileDataParts[i], pos); pos += fileDataParts[i].length
+  }
+  for (const ch of centralHeaders) { result.set(ch, pos); pos += ch.length }
+  result.set(endRecord, pos)
+
+  return result
+}
+
+// ─── Data Query Helpers ─────────────────────────────────────
+
+async function queryReportData(
+  adminClient: ReturnType<typeof createAdminClient>,
+  reportType: string,
+  filters: Record<string, string>,
+): Promise<{ headers: string[]; rows: (string | number | null)[][] }> {
+  let query: ReturnType<typeof adminClient.from>
+  let headers: string[] = []
+
+  switch (reportType) {
+    case 'members': {
+      query = adminClient.from('members').select('membership_number, full_name, phone, email, status, joined_at, created_at')
+      headers = ['membership_number', 'full_name', 'phone', 'email', 'status', 'joined_at', 'created_at']
+      break
+    }
+    case 'contributions': {
+      query = adminClient.from('contributions').select('status, amount, period, notes, created_at, members(full_name), packages(name)')
+      headers = ['status', 'amount', 'period', 'notes', 'created_at', 'member_name', 'package_name']
+      break
+    }
+    case 'claims': {
+      query = adminClient.from('claims').select('claim_number, claim_type, amount_requested, status, created_at, submitted_at, decided_at, members(full_name), packages(name)')
+      headers = ['claim_number', 'claim_type', 'amount_requested', 'status', 'created_at', 'submitted_at', 'decided_at', 'member_name', 'package_name']
+      break
+    }
+    case 'registration-fees': {
+      query = adminClient.from('registration_fees').select('amount, currency, status, payment_method, mpesa_receipt, paid_at, created_at, members(full_name, email)')
+        .eq('fee_type', 'registration')
+      headers = ['amount', 'currency', 'status', 'payment_method', 'mpesa_receipt', 'paid_at', 'created_at', 'member_name', 'email']
+      break
+    }
+    case 'subscriptions': {
+      query = adminClient.from('subscriptions').select('status, started_at, next_due_date, cancelled_at, created_at, members(full_name, email), packages(name), package_tiers(name, amount)')
+      headers = ['status', 'started_at', 'next_due_date', 'cancelled_at', 'created_at', 'member_name', 'email', 'package_name', 'tier_name', 'tier_amount']
+      break
+    }
+    default:
+      return { headers: [], rows: [] }
+  }
+
+  if (filters.status) query = query.eq('status', filters.status)
+  if (filters.dateFrom) query = query.gte('created_at', filters.dateFrom)
+  if (filters.dateTo) query = query.lte('created_at', filters.dateTo + 'T23:59:59')
+
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(1000)
+  if (error) throw new Error(error.message)
+
+  // Flatten nested objects
+  const rows = (data ?? []).map((row: Record<string, unknown>) => {
+    return headers.map(h => {
+      // Handle nested objects like members(full_name), packages(name)
+      if (h === 'member_name') {
+        const m = row.members as { full_name?: string } | null
+        return m?.full_name ?? null
+      }
+      if (h === 'email' && row.members) {
+        const m = row.members as { email?: string } | null
+        return m?.email ?? null
+      }
+      if (h === 'package_name') {
+        const p = row.packages as { name?: string } | null
+        return p?.name ?? null
+      }
+      if (h === 'tier_name') {
+        const t = row.package_tiers as { name?: string } | null
+        return t?.name ?? null
+      }
+      if (h === 'tier_amount') {
+        const t = row.package_tiers as { amount?: number } | null
+        return t?.amount ?? null
+      }
+      const val = row[h]
+      return val as string | number | null
+    })
+  })
+
+  return { headers, rows }
+}
+
+function buildExcelBuffer(title: string, headers: string[], rows: (string | number | null)[][]): Uint8Array {
+  const xml = buildExcelXml(title, headers, rows)
+  return new TextEncoder().encode(xml)
+}
+
+// ─── Main Handler ───────────────────────────────────────────
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -65,359 +291,260 @@ Deno.serve(async (req) => {
     const id = url.searchParams.get('id')
     const action = url.searchParams.get('action')
 
-    // ─── LIST ───────────────────────────────────────────
+    // ─── LIST SCHEDULES ──────────────────────────────────
     if (req.method === 'GET' && !id && !action) {
       const { data, error } = await adminClient
-        .from('scheduled_reports')
-        .select('*')
-        .order('created_at', { ascending: false })
-
+        .from('scheduled_reports').select('*').order('created_at', { ascending: false })
       if (error) throw new Error(error.message)
-
       return new Response(JSON.stringify({ schedules: data ?? [] }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // ─── HISTORY ─────────────────────────────────────────
+    // ─── HISTORY (search/filter/paginate) ────────────────
     if (req.method === 'GET' && action === 'history') {
       requirePermission(session, 'members', 'read')
-      const limit = parseInt(url.searchParams.get('limit') ?? '50')
-      const { data, error } = await adminClient
-        .from('report_history')
-        .select('*')
+      const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1'))
+      const perPage = Math.min(100, Math.max(1, parseInt(url.searchParams.get('per_page') ?? '20')))
+      const search = url.searchParams.get('search') ?? ''
+      const typeFilter = url.searchParams.get('type') ?? ''
+      const statusFilter = url.searchParams.get('status') ?? ''
+      const dateFrom = url.searchParams.get('date_from') ?? ''
+      const dateTo = url.searchParams.get('date_to') ?? ''
+
+      let query = adminClient.from('report_history').select('*', { count: 'exact' })
+
+      if (search) {
+        query = query.or(`schedule_name.ilike.%${search}%,filename.ilike.%${search}%`)
+      }
+      if (typeFilter) query = query.eq('report_type', typeFilter)
+      if (statusFilter) query = query.eq('status', statusFilter)
+      if (dateFrom) query = query.gte('generated_at', dateFrom)
+      if (dateTo) query = query.lte('generated_at', dateTo + 'T23:59:59')
+
+      const offset = (page - 1) * perPage
+      const { data, error, count } = await query
         .order('generated_at', { ascending: false })
-        .limit(Math.min(limit, 200))
+        .range(offset, offset + perPage - 1)
+
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ history: data ?? [] }), {
+
+      return new Response(JSON.stringify({
+        history: data ?? [],
+        total: count ?? 0,
+        page,
+        per_page: perPage,
+        total_pages: Math.ceil((count ?? 0) / perPage),
+      }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // ─── CREATE ─────────────────────────────────────────
-    if (req.method === 'POST' && !id) {
+    // ─── BULK DOWNLOAD (ZIP) ─────────────────────────────
+    if (req.method === 'POST' && action === 'bulk-download') {
+      requirePermission(session, 'members', 'read')
+      const body = await req.json() as { ids?: string[] }
+      if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+        return new Response(JSON.stringify({ message: 'ids array is required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Limit to 20 files
+      const ids = body.ids.slice(0, 20)
+
+      const { data: records, error } = await adminClient
+        .from('report_history').select('*').in('id', ids)
+      if (error) throw new Error(error.message)
+
+      const files: { name: string; data: Uint8Array }[] = []
+      for (const rec of records ?? []) {
+        try {
+          const { data: blob } = await adminClient.storage.from('report-files').download(rec.filename)
+          if (blob) {
+            const buffer = await blob.arrayBuffer()
+            const xlsxName = rec.filename.replace(/\.(csv|xlsx)$/, '.xlsx')
+            files.push({ name: xlsxName, data: new Uint8Array(buffer) })
+          }
+        } catch {
+          // Skip missing files
+        }
+      }
+
+      if (files.length === 0) {
+        return new Response(JSON.stringify({ message: 'No files found to download' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const zipData = createZip(files)
+
+      await logAudit(adminClient, {
+        actor_id: session.id, actor_role: session.role_name,
+        action: 'bulk_download', resource: 'report_history',
+        meta: { count: files.length, ids },
+      })
+
+      return new Response(zipData, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename="luma-reports-${new Date().toISOString().split('T')[0]}.zip"`,
+        },
+      })
+    }
+
+    // ─── CLEANUP (delete history + storage) ──────────────
+    if (req.method === 'POST' && action === 'cleanup') {
+      requirePermission(session, 'members', 'read')
+      const body = await req.json() as { ids?: string[] }
+      if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+        return new Response(JSON.stringify({ message: 'ids array is required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: records, error } = await adminClient
+        .from('report_history').select('id, filename').in('id', body.ids)
+      if (error) throw new Error(error.message)
+
+      let deleted = 0
+      let storageErrors = 0
+
+      for (const rec of records ?? []) {
+        // Delete from storage
+        try {
+          await adminClient.storage.from('report-files').remove([rec.filename])
+        } catch {
+          storageErrors++
+        }
+        // Delete history record
+        await adminClient.from('report_history').delete().eq('id', rec.id)
+        deleted++
+      }
+
+      await logAudit(adminClient, {
+        actor_id: session.id, actor_role: session.role_name,
+        action: 'report_history_cleanup', resource: 'report_history',
+        meta: { deleted, storage_errors: storageErrors, ids: body.ids },
+      })
+
+      return new Response(JSON.stringify({ deleted, storage_errors: storageErrors }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // ─── CREATE SCHEDULE ─────────────────────────────────
+    if (req.method === 'POST' && !id && !action) {
       const body = await req.json()
       const { name, report_type, filters, frequency, recipients } = body
-
       if (!name || !report_type || !frequency) {
         return new Response(JSON.stringify({ message: 'name, report_type, and frequency are required' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
-
       const nextRun = computeNextRun(frequency)
-
-      const { data, error } = await adminClient
-        .from('scheduled_reports')
-        .insert({
-          name,
-          report_type,
-          filters: filters ?? {},
-          frequency,
-          recipients: recipients ?? [],
-          enabled: true,
-          next_run_at: nextRun.toISOString(),
-          created_by: user.id,
-        })
-        .select()
-        .single()
-
+      const { data, error } = await adminClient.from('scheduled_reports').insert({
+        name, report_type, filters: filters ?? {}, frequency,
+        recipients: recipients ?? [], enabled: true,
+        next_run_at: nextRun.toISOString(), created_by: user.id,
+      }).select().single()
       if (error) throw new Error(error.message)
-
-      await logAudit(adminClient, {
-        actor_id: session.id, actor_role: session.role_name,
-        action: 'scheduled_report_created', resource: 'scheduled_report',
-        meta: { id: data.id, name, report_type, frequency },
-      })
-
-      return new Response(JSON.stringify({ schedule: data }), {
-        status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'scheduled_report_created', resource: 'scheduled_report', meta: { id: data.id, name, report_type, frequency } })
+      return new Response(JSON.stringify({ schedule: data }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // ─── UPDATE ─────────────────────────────────────────
+    // ─── UPDATE SCHEDULE ─────────────────────────────────
     if (req.method === 'PATCH' && id) {
       const body = await req.json()
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-
       if (body.name !== undefined) updates.name = body.name
       if (body.report_type !== undefined) updates.report_type = body.report_type
       if (body.filters !== undefined) updates.filters = body.filters
-      if (body.frequency !== undefined) {
-        updates.frequency = body.frequency
-        updates.next_run_at = computeNextRun(body.frequency).toISOString()
-      }
+      if (body.frequency !== undefined) { updates.frequency = body.frequency; updates.next_run_at = computeNextRun(body.frequency).toISOString() }
       if (body.recipients !== undefined) updates.recipients = body.recipients
       if (body.enabled !== undefined) updates.enabled = body.enabled
-
-      const { data, error } = await adminClient
-        .from('scheduled_reports')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
-
+      const { data, error } = await adminClient.from('scheduled_reports').update(updates).eq('id', id).select().single()
       if (error) throw new Error(error.message)
-
-      await logAudit(adminClient, {
-        actor_id: session.id, actor_role: session.role_name,
-        action: 'scheduled_report_updated', resource: 'scheduled_report',
-        meta: { id, updates: Object.keys(updates) },
-      })
-
-      return new Response(JSON.stringify({ schedule: data }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return new Response(JSON.stringify({ schedule: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // ─── DELETE ─────────────────────────────────────────
+    // ─── DELETE SCHEDULE ─────────────────────────────────
     if (req.method === 'DELETE' && id) {
-      const { error } = await adminClient
-        .from('scheduled_reports')
-        .delete()
-        .eq('id', id)
-
+      const { error } = await adminClient.from('scheduled_reports').delete().eq('id', id)
       if (error) throw new Error(error.message)
-
-      await logAudit(adminClient, {
-        actor_id: session.id, actor_role: session.role_name,
-        action: 'scheduled_report_deleted', resource: 'scheduled_report',
-        meta: { id },
-      })
-
-      return new Response(JSON.stringify({ message: 'Deleted' }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return new Response(JSON.stringify({ message: 'Deleted' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // ─── GENERATE NOW ───────────────────────────────────
+    // ─── GENERATE NOW ────────────────────────────────────
     if (req.method === 'POST' && id && action === 'generate') {
-      // Fetch the schedule
-      const { data: schedule, error: schedErr } = await adminClient
-        .from('scheduled_reports')
-        .select('*')
-        .eq('id', id)
-        .single()
+      const { data: schedule, error: schedErr } = await adminClient.from('scheduled_reports').select('*').eq('id', id).single()
+      if (schedErr || !schedule) return new Response(JSON.stringify({ message: 'Schedule not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
-      if (schedErr || !schedule) {
-        return new Response(JSON.stringify({ message: 'Schedule not found' }), {
-          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+      const filters = (schedule.filters ?? {}) as Record<string, string>
+      const { headers, rows } = await queryReportData(adminClient, schedule.report_type, filters)
+
+      if (rows.length === 0) {
+        return new Response(JSON.stringify({ message: 'No data to report', records: 0 }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 
-      // Generate report data based on type
-      const filters = schedule.filters as Record<string, string>
-      let reportData: unknown[] = []
-      const reportType = schedule.report_type
+      const xlsxBuffer = buildExcelBuffer(schedule.name, headers, rows)
+      const filename = `${schedule.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 40)}_${schedule.report_type}_${new Date().toISOString().split('T')[0]}.xlsx`
 
-      if (reportType === 'contributions') {
-        let q = adminClient.from('contributions')
-          .select('id, period, amount, status, notes, created_at, members(full_name, phone, membership_number), packages(code, name)')
-          .order('created_at', { ascending: false })
-        if (filters.status) q = q.eq('status', filters.status)
-        if (filters.dateFrom) q = q.gte('created_at', filters.dateFrom)
-        if (filters.dateTo) q = q.lte('created_at', filters.dateTo + 'T23:59:59')
-        const { data } = await q.limit(1000)
-        reportData = data ?? []
-      } else if (reportType === 'subscriptions') {
-        let q = adminClient.from('subscriptions')
-          .select('id, status, started_at, next_due_date, cancelled_at, created_at, members(full_name, phone, email), packages(code, name), package_tiers(name, amount)')
-          .order('created_at', { ascending: false })
-        if (filters.status) q = q.eq('status', filters.status)
-        if (filters.dateFrom) q = q.gte('created_at', filters.dateFrom)
-        if (filters.dateTo) q = q.lte('created_at', filters.dateTo + 'T23:59:59')
-        const { data } = await q.limit(1000)
-        reportData = data ?? []
-      } else if (reportType === 'claims') {
-        let q = adminClient.from('claims')
-          .select('id, claim_number, claim_type, amount_requested, status, created_at, submitted_at, decided_at, members(full_name, phone, email), packages(code, name)')
-          .order('created_at', { ascending: false })
-        if (filters.status) q = q.eq('status', filters.status)
-        if (filters.dateFrom) q = q.gte('created_at', filters.dateFrom)
-        if (filters.dateTo) q = q.lte('created_at', filters.dateTo + 'T23:59:59')
-        const { data } = await q.limit(1000)
-        reportData = data ?? []
-      } else if (reportType === 'registration-fees') {
-        let q = adminClient.from('registration_fees')
-          .select('id, amount, currency, status, payment_method, mpesa_receipt, paid_at, created_at, members(full_name, phone, email, membership_number)')
-          .eq('fee_type', 'registration')
-          .order('created_at', { ascending: false })
-        if (filters.status) q = q.eq('status', filters.status)
-        if (filters.dateFrom) q = q.gte('created_at', filters.dateFrom)
-        if (filters.dateTo) q = q.lte('created_at', filters.dateTo + 'T23:59:59')
-        const { data } = await q.limit(1000)
-        reportData = data ?? []
-      } else if (reportType === 'members') {
-        let q = adminClient.from('members')
-          .select('id, membership_number, full_name, phone, email, status, joined_at, created_at')
-          .order('created_at', { ascending: false })
-        if (filters.status) q = q.eq('status', filters.status)
-        if (filters.dateFrom) q = q.gte('created_at', filters.dateFrom)
-        if (filters.dateTo) q = q.lte('created_at', filters.dateTo + 'T23:59:59')
-        const { data } = await q.limit(1000)
-        reportData = data ?? []
-      } else if (reportType === 'financial') {
-        const [regFees, contribs, claims] = await Promise.all([
-          adminClient.from('registration_fees').select('status, amount').eq('fee_type', 'registration'),
-          adminClient.from('contributions').select('status, amount'),
-          adminClient.from('claims').select('status, amount_requested'),
-        ])
-        const totalRegFees = (regFees.data ?? []).filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
-        const totalContribs = (contribs.data ?? []).filter(c => c.status === 'Verified' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount), 0)
-        const totalClaims = (claims.data ?? []).filter(c => c.status === 'Approved' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount_requested ?? 0), 0)
-        reportData = [
-          { metric: 'Registration Fees Collected', value: totalRegFees },
-          { metric: 'Total Contributions', value: totalContribs },
-          { metric: 'Total Claims Approved', value: totalClaims },
-          { metric: 'Registration Fees Paid', value: (regFees.data ?? []).filter(f => f.status === 'paid').length },
-          { metric: 'Contributions Verified', value: (contribs.data ?? []).filter(c => c.status === 'Verified' || c.status === 'Paid').length },
-          { metric: 'Claims Approved', value: (claims.data ?? []).filter(c => c.status === 'Approved' || c.status === 'Paid').length },
-        ]
-      }
+      const { error: uploadErr } = await adminClient.storage.from('report-files').upload(`${user.id}/${filename}`, xlsxBuffer, { contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', upsert: true })
+      if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`)
 
-      // Flatten nested objects for CSV
-      const flatData = reportData.map((row: Record<string, unknown>) => {
-        const flat: Record<string, string | number | null> = {}
-        for (const [key, val] of Object.entries(row)) {
-          if (val && typeof val === 'object' && !Array.isArray(val)) {
-            for (const [subKey, subVal] of Object.entries(val as Record<string, unknown>)) {
-              if (subKey === 'id') continue
-              flat[`${key}_${subKey}`] = subVal as string | number | null
-            }
-          } else {
-            flat[key] = val as string | number | null
-          }
-        }
-        return flat
+      await adminClient.from('report_history').insert({
+        schedule_id: id, schedule_name: schedule.name, report_type: schedule.report_type,
+        filename, record_count: rows.length, status: 'success', generated_by: user.id,
       })
 
-      // Build CSV
-      if (flatData.length > 0) {
-        const headers = Object.keys(flatData[0])
-        const csv = [
-          `Luma Welfare — ${schedule.name}`,
-          `Report Type: ${schedule.report_type}`,
-          `Generated: ${new Date().toLocaleDateString('en-KE', { year: 'numeric', month: 'long', day: 'numeric' })}`,
-          '',
-          headers.map(escapeCSV).join(','),
-          ...flatData.map(row => headers.map(h => escapeCSV(String(row[h] ?? ''))).join(',')),
-        ].join('\n')
+      const nextRun = computeNextRun(schedule.frequency)
+      await adminClient.from('scheduled_reports').update({ last_generated_at: new Date().toISOString(), next_run_at: nextRun.toISOString(), updated_at: new Date().toISOString() }).eq('id', id)
 
-        const filename = buildReportFilename(schedule.name, schedule.report_type)
+      // Generate signed URL for download
+      const { data: signedUrl } = await adminClient.storage.from('report-files').createSignedUrl(`${user.id}/${filename}`, 3600)
 
-        // Upload to storage
-        const { error: uploadErr } = await adminClient.storage
-          .from('report-files')
-          .upload(`${user.id}/${filename}`, csv, {
-            contentType: 'text/csv',
-            upsert: true,
-          })
+      await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'report_generated', resource: 'scheduled_report', meta: { id, name: schedule.name, records: rows.length, filename } })
 
-        if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`)
-
-        // Update schedule
-        const nextRun = computeNextRun(schedule.frequency)
-        await adminClient
-          .from('scheduled_reports')
-          .update({
-            last_generated_at: new Date().toISOString(),
-            next_run_at: nextRun.toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', id)
-
-        await logAudit(adminClient, {
-          actor_id: session.id, actor_role: session.role_name,
-          action: 'report_generated', resource: 'scheduled_report',
-          meta: { id, name: schedule.name, type: schedule.report_type, records: flatData.length, filename },
-        })
-
-        return new Response(JSON.stringify({
-          message: 'Report generated',
-          filename,
-          records: flatData.length,
-          storage_path: `${user.id}/${filename}`,
-        }), {
-          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-
-      return new Response(JSON.stringify({ message: 'No data to report', records: 0 }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return new Response(JSON.stringify({
+        message: 'Report generated', filename, records: rows.length,
+        signed_url: signedUrl?.signedUrl ?? null,
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // ─── DOWNLOAD ───────────────────────────────────────
-    if (req.method === 'GET' && id && action === 'download') {
-      const filename = url.searchParams.get('file')
-      if (!filename) {
-        return new Response(JSON.stringify({ message: 'filename query param required' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-
-      // Sanitize path - prevent directory traversal
-      const safePath = `${user.id}/${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-
-      const { data, error } = await adminClient.storage
-        .from('report-files')
-        .download(safePath)
-
-      if (error || !data) {
-        return new Response(JSON.stringify({ message: 'File not found' }), {
-          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-
-      return new Response(data, {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/csv',
-          'Content-Disposition': `attachment; filename="${filename}"`,
-        },
-      })
-    }
-
-    // ─── PROCESS ALL DUE (admin trigger) ──────────────
+    // ─── PROCESS ALL DUE ─────────────────────────────────
     if (req.method === 'POST' && action === 'process-all') {
       requirePermission(session, 'members', 'read')
-
-      const { data: dueSchedules } = await adminClient
-        .from('scheduled_reports')
-        .select('id, name')
-        .eq('enabled', true)
-        .lte('next_run_at', new Date().toISOString())
-
+      const { data: dueSchedules } = await adminClient.from('scheduled_reports').select('id, name').eq('enabled', true).lte('next_run_at', new Date().toISOString())
       const results: { id: string; name: string; status: string }[] = []
       for (const sched of dueSchedules ?? []) {
         try {
-          // Call the SQL function via RPC
           const { error } = await adminClient.rpc('generate_scheduled_report', { p_report_id: sched.id })
           results.push({ id: sched.id, name: sched.name, status: error ? `Error: ${error.message}` : 'Generated' })
         } catch (e) {
           results.push({ id: sched.id, name: sched.name, status: `Error: ${e instanceof Error ? e.message : 'Unknown'}` })
         }
       }
-
-      await logAudit(adminClient, {
-        actor_id: session.id, actor_role: session.role_name,
-        action: 'scheduled_reports_processed', resource: 'scheduled_report',
-        meta: { processed: results.length, results },
-      })
-
-      return new Response(JSON.stringify({ processed: results.length, results }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return new Response(JSON.stringify({ processed: results.length, results }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    return new Response(JSON.stringify({ message: 'Not found' }), {
-      status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error'
-    return new Response(JSON.stringify({ message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return new Response(JSON.stringify({ message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })
+
+function computeNextRun(frequency: string): Date {
+  const d = new Date()
+  switch (frequency) {
+    case 'daily': d.setDate(d.getDate() + 1); break
+    case 'weekly': d.setDate(d.getDate() + 7); break
+    case 'monthly': d.setMonth(d.getMonth() + 1); break
+    case 'quarterly': d.setMonth(d.getMonth() + 3); break
+  }
+  d.setHours(6, 0, 0, 0)
+  return d
+}
