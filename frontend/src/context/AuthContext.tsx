@@ -46,24 +46,19 @@ type AuthState = {
 const AuthContext = createContext<AuthState | null>(null)
 
 /**
- * After OAuth login, ensure the user has a member record.
- * Uses a dedicated Edge Function that creates the member directly
- * from the authenticated user's Supabase Auth identity — no phone required.
+ * Server-side Google OAuth authorization check.
+ * Verifies that the Google-authenticated user is an existing Luma Welfare member.
+ * NEVER creates member records — Google is a login method, not a registration method.
  */
-async function ensureMemberRecord() {
+async function authorizeGoogleLogin(): Promise<{ authorized: boolean; message?: string; code?: string }> {
   try {
-    // Try to fetch existing member first
-    const data = await api<{ member: Member | null }>('/auth/me', { auth: true })
-    if (data.member) return
+    const data = await api<{ authorized: boolean; message?: string; code?: string }>(
+      '/auth/google-authorize',
+      { method: 'POST', auth: true },
+    )
+    return data
   } catch {
-    // No member record — create one via the OAuth provisioning endpoint
-  }
-
-  try {
-    await api('/auth/oauth-provision', { method: 'POST', auth: true })
-  } catch {
-    // Provisioning may fail if there's a race condition — that's okay
-    // The auth-me check above will handle it on next request
+    return { authorized: false, message: 'Authorization check failed. Please try again.', code: 'INTERNAL' }
   }
 }
 
@@ -95,10 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      setSession(session.access_token, session.expires_at)        // Ensure OAuth users have a member record
-        if (session.user.app_metadata?.provider !== 'email') {
-          await ensureMemberRecord()
-        }
+      setSession(session.access_token, session.expires_at)
 
       const profile = await loadProfile()
       if (!cancelled) {
@@ -128,9 +120,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession(session.access_token, session.expires_at)
         }
 
-        // For OAuth sign-ins, ensure member record exists
+        // For OAuth sign-ins, perform server-side authorization check
         if (session?.user && session.user.app_metadata?.provider !== 'email') {
-          await ensureMemberRecord()
+          const authResult = await authorizeGoogleLogin()
+          if (!authResult.authorized) {
+            // Unauthorized — sign out and store error for display
+            setMember(null)
+            setIsAdmin(false)
+            setAdminRole(null)
+            setRegistrationFeePaid(false)
+            clearSession()
+            supabase.auth.signOut()
+            // Store the authorization error so the login page can display it
+            sessionStorage.setItem('google_auth_error', authResult.message ?? 'Google login not authorized.')
+            window.location.href = '/login'
+            return
+          }
         }
 
         const profile = await loadProfile()

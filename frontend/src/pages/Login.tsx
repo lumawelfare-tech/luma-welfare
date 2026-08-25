@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../lib/api'
@@ -16,6 +16,15 @@ export function Login() {
   const [googleBusy, setGoogleBusy] = useState(false)
   const [searchParams] = useSearchParams()
   const passwordReset = searchParams.get('passwordReset') === 'true' || (location.state as Record<string, unknown>)?.passwordReset === true
+
+  // Check for Google OAuth authorization error (set by AuthContext)
+  useEffect(() => {
+    const googleError = sessionStorage.getItem('google_auth_error')
+    if (googleError) {
+      setError(googleError)
+      sessionStorage.removeItem('google_auth_error')
+    }
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
