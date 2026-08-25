@@ -100,12 +100,158 @@ function getHistMap(liveHistory: { id: string; schedule_name: string; generated_
   return histMap
 }
 
+function DayDetailPanel({ day, schedules, liveHistory, onClose }: {
+  day: Date; schedules: Schedule[]
+  liveHistory: { id: string; schedule_name: string; generated_at: string; status: string; record_count: number }[]
+  onClose: () => void
+}) {
+  const dayStr = day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+  const isToday = day.toDateString() === new Date().toDateString()
+
+  // Find all scheduled runs that would fire on this day
+  const scheduledRuns: { name: string; frequency: string; report_type: string; nextRun: Date | null; recipients: string[]; id: string; enabled: boolean }[] = []
+  for (const s of schedules) {
+    if (!s.enabled || !s.next_run_at) continue
+    const nr = new Date(s.next_run_at)
+    // Check if this schedule would run on this day
+    const runDates = new Set<string>()
+    runDates.add(nr.toDateString())
+    // Project future runs
+    let projected = new Date(nr)
+    for (let i = 0; i < 365; i++) {
+      if (s.frequency === 'daily') projected.setDate(projected.getDate() + 1)
+      else if (s.frequency === 'weekly') projected.setDate(projected.getDate() + 7)
+      else if (s.frequency === 'monthly') projected.setMonth(projected.getMonth() + 1)
+      else if (s.frequency === 'quarterly') projected.setMonth(projected.getMonth() + 3)
+      runDates.add(projected.toDateString())
+      if (projected > day && i > 31) break
+    }
+    if (runDates.has(day.toDateString())) {
+      scheduledRuns.push({ name: s.name, frequency: s.frequency, report_type: s.report_type, nextRun: nr, recipients: s.recipients, id: s.id, enabled: s.enabled })
+    }
+  }
+
+  // Find generated reports for this day
+  const generatedReports = liveHistory.filter(r => new Date(r.generated_at).toDateString() === day.toDateString())
+
+  const totalEvents = scheduledRuns.length + generatedReports.length
+
+  return (
+    <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-6 animate-in slide-in-from-top-2 fade-in duration-200">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-luma-100 text-lg">📅</div>
+          <div>
+            <h3 className="text-base font-bold text-gray-900">{dayStr}</h3>
+            <p className="text-xs text-gray-500">
+              {isToday ? 'Today' : ''}
+              {totalEvents > 0 ? ` · ${totalEvents} event${totalEvents !== 1 ? 's' : ''}` : ' · No events'}
+            </p>
+          </div>
+        </div>
+        <button onClick={onClose} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors" title="Close">
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      {totalEvents === 0 ? (
+        <div className="mt-6 rounded-lg border border-dashed border-gray-200 bg-gray-50 py-10 text-center">
+          <p className="text-sm text-gray-400">No scheduled runs or generated reports for this day.</p>
+        </div>
+      ) : (
+        <div className="mt-5 space-y-4">
+          {/* Scheduled Runs */}
+          {scheduledRuns.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-luma-500" />
+                <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Scheduled Runs ({scheduledRuns.length})</h4>
+              </div>
+              <div className="space-y-2">
+                {scheduledRuns.map((run, i) => {
+                  // Check if it was actually generated
+                  const wasGenerated = generatedReports.some(r => r.schedule_name === run.name)
+                  const histRecord = generatedReports.find(r => r.schedule_name === run.name)
+                  return (
+                    <div key={i} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${wasGenerated ? 'bg-emerald-100' : 'bg-luma-100'}`}>
+                          {wasGenerated ? (
+                            <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                          ) : (
+                            <svg className="h-4 w-4 text-luma-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-gray-900">{run.name}</span>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${frequencyColor(run.frequency)}`}>{run.frequency}</span>
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+                            <span>{reportTypes.find(r => r.value === run.report_type)?.label ?? run.report_type}</span>
+                            {run.recipients.length > 0 && <span>· {run.recipients.length} recipient{run.recipients.length !== 1 ? 's' : ''}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {wasGenerated && histRecord ? (
+                          <div>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${histRecord.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{histRecord.status}</span>
+                            <p className="mt-0.5 text-[10px] text-gray-400">{histRecord.record_count.toLocaleString()} records</p>
+                            <p className="text-[10px] text-gray-400">{new Date(histRecord.generated_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">Pending</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Generated Reports (from other schedules not in scheduledRuns) */}
+          {generatedReports.filter(r => !scheduledRuns.some(s => s.name === r.schedule_name)).length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Generated Reports</h4>
+              </div>
+              <div className="space-y-2">
+                {generatedReports.filter(r => !scheduledRuns.some(s => s.name === r.schedule_name)).map((rec, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100">
+                        <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      </div>
+                      <div>
+                        <span className="text-sm font-semibold text-gray-900">{rec.schedule_name}</span>
+                        <div className="mt-0.5 text-xs text-gray-500">
+                          {rec.record_count.toLocaleString()} records · {new Date(rec.generated_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${rec.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{rec.status}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }: {
   schedules: Schedule[]; calMonth: number; calYear: number
   setCalMonth: (m: number) => void; setCalYear: (y: number) => void
 }) {
   const today = new Date()
   const [calView, setCalView] = useState<'month' | 'week'>('month')
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
   const [weekStart, setWeekStart] = useState(() => {
     const d = new Date(calYear, calMonth, today.getDate())
     d.setDate(d.getDate() - d.getDay())
@@ -287,11 +433,11 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
             const histEntries = histMap[day] ?? []
             const isGenerating = generating.size > 0 && isToday && day === today.getDate()
             return (
-              <div key={day} className={`bg-white min-h-[80px] p-1.5 ${isToday ? 'ring-2 ring-inset ring-blue-400' : ''}`}>
-                <div className="flex items-center justify-between">
-                  <div className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{day}</div>
-                  {isGenerating && <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" title="Generating..." />}
-                </div>
+            <div key={day} onClick={() => setSelectedDay(new Date(calYear, calMonth, day))} className={`bg-white min-h-[80px] p-1.5 cursor-pointer transition-colors ${isToday ? 'ring-2 ring-inset ring-blue-400' : ''} hover:bg-gray-50`}>
+              <div className="flex items-center justify-between">
+                <div className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{day}</div>
+                {isGenerating && <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" title="Generating..." />}
+              </div>
                 <div className="mt-1 space-y-0.5">
                   {histEntries.slice(0, 2).map((h, j) => (
                     <div key={`h-${j}`} className="flex items-center gap-1">
@@ -322,7 +468,7 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
             {weekDays.map((d, i) => {
               const isToday = d.toDateString() === today.toDateString()
               return (
-                <div key={i} className={`px-2 py-3 text-center ${isToday ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                <div key={i} onClick={() => setSelectedDay(new Date(d))} className={`px-2 py-3 text-center cursor-pointer transition-colors ${isToday ? 'bg-blue-50' : 'bg-gray-50'} hover:bg-gray-100`}>
                   <div className="text-xs font-semibold text-gray-500 uppercase">{weekDayNames[d.getDay()]}</div>
                   <div className={`mt-0.5 text-lg font-bold ${isToday ? 'text-blue-600' : 'text-gray-900'}`}>{d.getDate()}</div>
                 </div>
@@ -390,6 +536,11 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
             })}
           </div>
         </div>
+      )}
+
+      {/* Day Detail Panel */}
+      {selectedDay && (
+        <DayDetailPanel day={selectedDay} schedules={schedules} liveHistory={liveHistory} onClose={() => setSelectedDay(null)} />
       )}
 
       {/* Upcoming runs list */}
