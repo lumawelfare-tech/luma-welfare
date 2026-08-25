@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useHead } from '../../lib/seo'
 
@@ -27,6 +27,22 @@ type Card = {
   welfare_cover_at_risk: boolean
   next_due_date: string | null
 }
+
+const claimTypes = [
+  'Burial Support',
+  'Hospital Insurance',
+  'Education Support',
+  'Business Support',
+  'Building Support',
+  'Land Purchase Support',
+  'Farming Support',
+  'Wedding Support',
+  'Dowry/Ruracio Support',
+  'Disaster Relief',
+  'Youth Empowerment',
+  'Senior Citizen Support',
+  'Other',
+]
 
 function money(n: number | null | undefined): string {
   if (n == null || n === 0) return '—'
@@ -84,6 +100,16 @@ export function Dashboard() {
   const [payingFee, setPayingFee] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
+  // Quick-claim modal
+  const [quickClaimOpen, setQuickClaimOpen] = useState(false)
+  const [claimSubId, setClaimSubId] = useState('')
+  const [claimType, setClaimType] = useState('')
+  const [claimDesc, setClaimDesc] = useState('')
+  const [claimAmount, setClaimAmount] = useState('')
+  const [claimError, setClaimError] = useState('')
+  const [claimSubmitting, setClaimSubmitting] = useState(false)
+  const [claimSuccess, setClaimSuccess] = useState(false)
+
   useEffect(() => {
     api<{ cards: Card[]; registration_fee_paid: boolean }>('/member/dashboard', { auth: true })
       .then((d) => {
@@ -109,10 +135,55 @@ export function Dashboard() {
     }
   }
 
+  async function submitQuickClaim(e: React.FormEvent) {
+    e.preventDefault()
+    setClaimError('')
+    if (!claimSubId) { setClaimError('Select a package.'); return }
+    if (!claimType) { setClaimError('Select a claim type.'); return }
+    if (!claimDesc.trim()) { setClaimError('Describe your claim.'); return }
+
+    setClaimSubmitting(true)
+    try {
+      await api('/member/claims', {
+        method: 'POST',
+        auth: true,
+        body: {
+          subscriptionId: claimSubId,
+          claimType,
+          description: claimDesc.trim(),
+          amountRequested: claimAmount ? Number(claimAmount) : undefined,
+          submit: true,
+        },
+      })
+      setClaimSuccess(true)
+    } catch (e) {
+      setClaimError(e instanceof ApiError ? e.message : 'Could not submit claim.')
+    } finally {
+      setClaimSubmitting(false)
+    }
+  }
+
+  function closeQuickClaim() {
+    setQuickClaimOpen(false)
+    setClaimSubId('')
+    setClaimType('')
+    setClaimDesc('')
+    setClaimAmount('')
+    setClaimError('')
+    setClaimSuccess(false)
+  }
+
+  function openQuickClaim() {
+    setClaimSuccess(false)
+    setClaimError('')
+    setQuickClaimOpen(true)
+  }
+
   const memberName = member?.full_name?.split(' ')[0] ?? 'there'
   const activeCount = cards.filter((c) => c.status === 'active').length
   const totalMonthly = cards.reduce((sum, c) => sum + (c.monthly_amount ?? 0), 0)
   const qualifiedCount = cards.filter((c) => c.qualification.status === 'eligible').length
+  const activeCards = cards.filter(c => c.status === 'active')
 
   // Show registration fee prompt if not paid
   if (!loading && !registrationFeeLoading && registrationFeePaid === false) {
@@ -336,6 +407,15 @@ export function Dashboard() {
           <div className="mt-8 rounded-xl border border-gray-200 bg-white p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h3>
             <div className="flex flex-wrap gap-2">
+              {qualifiedCount > 0 && (
+                <button
+                  onClick={openQuickClaim}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                  File a Claim
+                </button>
+              )}
               <Link to="/join" className="inline-flex items-center gap-1.5 rounded-lg bg-luma-50 px-3 py-2 text-xs font-medium text-luma-700 hover:bg-luma-100 transition-colors">
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                 Browse Packages
@@ -351,6 +431,111 @@ export function Dashboard() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Quick Claim Modal */}
+      {quickClaimOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeQuickClaim}>
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {claimSuccess ? (
+              <div className="px-6 py-10 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                </div>
+                <h3 className="mt-3 text-lg font-semibold text-gray-900">Claim Submitted</h3>
+                <p className="mt-1 text-sm text-gray-500">Your claim has been submitted for review. You can track it on the Claims page.</p>
+                <div className="mt-5 flex gap-2 justify-center">
+                  <Link to="/claims" onClick={closeQuickClaim} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-medium text-white hover:bg-luma-800 transition-colors">
+                    View Claims
+                  </Link>
+                  <button onClick={closeQuickClaim} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="px-6 py-5 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">File a Claim</h3>
+                    <button onClick={closeQuickClaim} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500">Submit a welfare claim for admin review.</p>
+                </div>
+                <form onSubmit={submitQuickClaim} className="px-6 py-4 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Package *</label>
+                    <select
+                      value={claimSubId}
+                      onChange={(e) => { setClaimSubId(e.target.value); setClaimError('') }}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+                    >
+                      <option value="">Select package</option>
+                      {activeCards.map(c => (
+                        <option key={c.subscription_id} value={c.subscription_id}>{c.package?.name ?? 'Package'}{c.qualification.status === 'eligible' ? ' ✓' : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Claim Type *</label>
+                    <select
+                      value={claimType}
+                      onChange={(e) => { setClaimType(e.target.value); setClaimError('') }}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+                    >
+                      <option value="">Select type</option>
+                      {claimTypes.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount Requested (KSh, optional)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={claimAmount}
+                      onChange={(e) => setClaimAmount(e.target.value)}
+                      placeholder="e.g. 50000"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                    <textarea
+                      value={claimDesc}
+                      onChange={(e) => { setClaimDesc(e.target.value); setClaimError('') }}
+                      rows={3}
+                      placeholder="Describe your claim…"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500 resize-none"
+                    />
+                  </div>
+                  {claimError && (
+                    <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{claimError}</div>
+                  )}
+                  <div className="flex gap-2 pt-1 pb-1">
+                    <button
+                      type="submit"
+                      disabled={claimSubmitting}
+                      className="flex-1 rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-50 transition-colors"
+                    >
+                      {claimSubmitting ? 'Submitting…' : 'Submit Claim'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeQuickClaim}
+                      className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
