@@ -33,6 +33,16 @@ Deno.serve(async (req) => {
     const status = url.searchParams.get('status')
     const packageFilter = url.searchParams.get('package')
 
+    // Packages list for filter dropdown
+    if (action === 'packages') {
+      requirePermission(session, 'members', 'read')
+      const { data, error } = await adminClient.from('packages').select('id, name, code').order('name')
+      if (error) throw new Error(error.message)
+      return new Response(JSON.stringify({ packages: data ?? [] }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // Registration Fees Report
     if (action === 'registration-fees') {
       requirePermission(session, 'members', 'read')
