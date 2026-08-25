@@ -189,6 +189,64 @@ Deno.serve(async (req) => {
       })
     }
 
+    // KPI Overview
+    if (action === 'kpi') {
+      requirePermission(session, 'members', 'read')
+
+      const [members, subs, contribs, claims, regFees, pendingContribs, pendingClaims] = await Promise.all([
+        adminClient.from('members').select('id', { count: 'exact', head: true }),
+        adminClient.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        adminClient.from('contributions').select('amount, status, created_at'),
+        adminClient.from('claims').select('status, amount_requested, created_at'),
+        adminClient.from('registration_fees').select('status, amount, created_at').eq('fee_type', 'registration'),
+        adminClient.from('contributions').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
+        adminClient.from('claims').select('id', { count: 'exact', head: true }).in('status', ['Submitted', 'Under Review', 'Additional Information Required']),
+      ])
+
+      const contribRows = contribs.data ?? []
+      const claimRows = claims.data ?? []
+      const regFeeRows = regFees.data ?? []
+
+      // Totals
+      const totalContributions = contribRows.filter(c => c.status === 'Verified' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount), 0)
+      const totalClaimsApproved = claimRows.filter(c => c.status === 'Approved' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount_requested ?? 0), 0)
+      const totalRegFeesCollected = regFeeRows.filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
+
+      // This month
+      const now = new Date()
+      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      const thisMonthContribs = contribRows.filter(c => c.created_at >= thisMonthStart)
+      const thisMonthVerified = thisMonthContribs.filter(c => c.status === 'Verified' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount), 0)
+      const thisMonthClaims = claimRows.filter(c => c.created_at >= thisMonthStart)
+
+      // This month vs last month comparison
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      const lastMonthContribs = contribRows.filter(c => c.created_at >= lastMonthStart && c.created_at < lastMonthEnd)
+      const lastMonthVerified = lastMonthContribs.filter(c => c.status === 'Verified' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount), 0)
+      const contribGrowth = lastMonthVerified > 0 ? ((thisMonthVerified - lastMonthVerified) / lastMonthVerified * 100) : 0
+
+      return new Response(JSON.stringify({
+        kpi: {
+          total_members: members.count ?? 0,
+          active_subscriptions: subs.count ?? 0,
+          total_contributions: totalContributions,
+          total_claims_approved: totalClaimsApproved,
+          registration_fees_collected: totalRegFeesCollected,
+          pending_contributions: pendingContribs.count ?? 0,
+          pending_claims: pendingClaims.count ?? 0,
+          this_month_contributions: thisMonthVerified,
+          this_month_claims: thisMonthClaims.length,
+          contributions_growth_pct: Math.round(contribGrowth * 10) / 10,
+          paid_registration_fees: regFeeRows.filter(f => f.status === 'paid').length,
+          unpaid_registration_fees: regFeeRows.filter(f => f.status !== 'paid').length,
+        },
+        generated_at: new Date().toISOString(),
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     return new Response(JSON.stringify({ message: 'Unknown action' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

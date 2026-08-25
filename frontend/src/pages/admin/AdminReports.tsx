@@ -83,8 +83,28 @@ export function AdminReports() {
   const [error, setError] = useState('')
   const [generated, setGenerated] = useState(false)
 
-  // Load packages for filter dropdown
+  // KPI state
+  type KpiData = {
+    total_members: number
+    active_subscriptions: number
+    total_contributions: number
+    total_claims_approved: number
+    registration_fees_collected: number
+    pending_contributions: number
+    pending_claims: number
+    this_month_contributions: number
+    this_month_claims: number
+    contributions_growth_pct: number
+    paid_registration_fees: number
+    unpaid_registration_fees: number
+  }
+  const [kpi, setKpi] = useState<KpiData | null>(null)
+
+  // Load KPI + packages on mount
   useEffect(() => {
+    api<{ kpi: KpiData }>('/admin/reports?type=kpi', { auth: true })
+      .then(d => setKpi(d.kpi))
+      .catch(() => {})
     api<{ packages: Package[] }>('/admin/reports?type=packages', { auth: true })
       .then(d => setPackages(d.packages ?? []))
       .catch(() => {})
@@ -248,6 +268,51 @@ export function AdminReports() {
           <p className="mt-1 text-sm text-gray-500">Generate and export financial, membership, and claims reports.</p>
         </div>
       </div>
+
+      {/* KPI Overview */}
+      {kpi && (
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="rounded-2xl border border-gray-100 bg-white p-5 transition-all hover:shadow-md">
+            <div className="text-2xl font-extrabold text-gray-900">{kpi.total_members.toLocaleString()}</div>
+            <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Total Members</div>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-blue-50 p-5 transition-all hover:shadow-md">
+            <div className="text-2xl font-extrabold text-blue-700">{kpi.active_subscriptions.toLocaleString()}</div>
+            <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-blue-600">Active Subscriptions</div>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-luma-50 p-5 transition-all hover:shadow-md">
+            <div className="text-2xl font-extrabold text-luma-700">KSh {kpi.total_contributions.toLocaleString()}</div>
+            <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-luma-600">Total Contributions</div>
+            <div className="mt-0.5 text-xs text-gray-400">
+              This month: KSh {kpi.this_month_contributions.toLocaleString()}
+              {kpi.contributions_growth_pct !== 0 && (
+                <span className={`ml-1 font-semibold ${kpi.contributions_growth_pct > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {kpi.contributions_growth_pct > 0 ? '↑' : '↓'}{Math.abs(kpi.contributions_growth_pct)}%
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-amber-50 p-5 transition-all hover:shadow-md">
+            <div className="text-2xl font-extrabold text-amber-700">KSh {kpi.registration_fees_collected.toLocaleString()}</div>
+            <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-600">Registration Fees</div>
+            <div className="mt-0.5 text-xs text-gray-400">{kpi.paid_registration_fees} paid · {kpi.unpaid_registration_fees} unpaid</div>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-emerald-50 p-5 transition-all hover:shadow-md">
+            <div className="text-2xl font-extrabold text-emerald-700">KSh {kpi.total_claims_approved.toLocaleString()}</div>
+            <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-600">Claims Approved</div>
+            <div className="mt-0.5 text-xs text-gray-400">{kpi.this_month_claims} this month</div>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-purple-50 p-5 transition-all hover:shadow-md">
+            <div className="flex items-baseline gap-2">
+              <div className="text-2xl font-extrabold text-purple-700">{kpi.pending_contributions}</div>
+              <div className="text-sm text-purple-400">/</div>
+              <div className="text-lg font-bold text-purple-500">{kpi.pending_claims}</div>
+            </div>
+            <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-purple-600">Pending</div>
+            <div className="mt-0.5 text-xs text-gray-400">Contributions / Claims</div>
+          </div>
+        </div>
+      )}
 
       {/* Report Type Selector */}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
