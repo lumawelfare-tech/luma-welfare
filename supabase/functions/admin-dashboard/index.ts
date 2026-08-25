@@ -213,6 +213,20 @@ Deno.serve(async (req) => {
       // Drill-down
       drill_month: drillMonth || null,
       drill_transactions: drillTransactions,
+
+      // Recent report activity
+      recent_reports: (await adminClient
+        .from('report_history')
+        .select('id, schedule_name, report_type, filename, record_count, status, generated_at')
+        .order('generated_at', { ascending: false })
+        .limit(5)
+      ).data ?? [],
+
+      // Scheduled report stats
+      scheduled_report_stats: {
+        total: (await adminClient.from('scheduled_reports').select('id', { count: 'exact', head: true })).count ?? 0,
+        enabled: (await adminClient.from('scheduled_reports').select('id', { count: 'exact', head: true }).eq('enabled', true)).count ?? 0,
+      },
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

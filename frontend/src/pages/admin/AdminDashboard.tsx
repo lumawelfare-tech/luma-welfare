@@ -31,6 +31,8 @@ type DashboardData = {
   recent_transactions: { id: string; amount: number; status: string; date: string; member_name: string; package_name: string }[]
   drill_month: string | null
   drill_transactions: { id: string; amount: number; status: string; period: string; date: string; member_name: string; member_phone: string; package_name: string }[]
+  recent_reports: { id: string; schedule_name: string; report_type: string; filename: string; record_count: number; status: string; generated_at: string }[]
+  scheduled_report_stats: { total: number; enabled: number }
 }
 
 type DatePreset = '3m' | '6m' | '12m' | 'ytd' | 'all' | 'custom'
@@ -686,6 +688,36 @@ export function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* Recent Reports Widget */}
+      {data.recent_reports && data.recent_reports.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Recent Reports</h2>
+              <p className="mt-1 text-xs text-gray-500">{data.scheduled_report_stats?.enabled ?? 0} active schedules</p>
+            </div>
+            <Link to="/admin/scheduled-reports" className="text-sm font-medium text-luma-700 hover:text-luma-800">View All →</Link>
+          </div>
+          <div className="mt-4 space-y-2">
+            {data.recent_reports.map((r) => (
+              <div key={r.id} className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-3 hover:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-luma-50 text-sm">📊</div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{r.schedule_name}</div>
+                    <div className="text-xs text-gray-500">{r.record_count.toLocaleString()} records · {r.filename.split('.').pop()?.toUpperCase()}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${r.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{r.status}</span>
+                  <span className="text-xs text-gray-400">{timeAgo(new Date(r.generated_at))}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
