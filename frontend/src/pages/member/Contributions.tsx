@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
+import { MobileCardTable } from '../../components/MobileCardTable'
 
 type Subscription = { id: string; status: string; packages: { code: string; name: string }[]; package_tiers: { name: string; amount: number }[] }
 type Contribution = { id: string; subscription_id: string; period: string; amount: number; status: string; packages: { code: string; name: string }[]; created_at: string; notes?: string | null }
@@ -276,33 +277,45 @@ export function Contributions() {
       )}
 
       {!loading && !error && rows.length > 0 && (
-        <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-4 py-3">Package</th>
-                <th className="px-4 py-3">Period</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((c) => (
-                <tr key={c.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">{c.packages?.[0]?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.period}</td>
-                  <td className="px-4 py-3 text-gray-900 font-medium">KSh {c.amount.toLocaleString('en-KE')}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusStyle[c.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{new Date(c.created_at).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-6">
+          <MobileCardTable
+            data={rows}
+            keyFn={c => c.id}
+            emptyMessage="No contributions yet."
+            columns={[
+              {
+                key: 'package',
+                header: 'Package',
+                render: (c) => <span className="font-medium text-gray-900">{c.packages?.[0]?.name ?? '—'}</span>,
+              },
+              {
+                key: 'period',
+                header: 'Period',
+                render: (c) => <span className="text-gray-600">{c.period}</span>,
+                mobileLabel: 'Period',
+              },
+              {
+                key: 'amount',
+                header: 'Amount',
+                render: (c) => <span className="font-medium text-gray-900">KSh {c.amount.toLocaleString('en-KE')}</span>,
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (c) => (
+                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusStyle[c.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                    {c.status}
+                  </span>
+                ),
+              },
+              {
+                key: 'date',
+                header: 'Date',
+                render: (c) => <span className="text-gray-500 text-xs">{new Date(c.created_at).toLocaleDateString()}</span>,
+                hideOnMobile: true,
+              },
+            ]}
+          />
         </div>
       )}
     </div>

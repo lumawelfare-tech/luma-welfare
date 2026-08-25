@@ -1,7 +1,5 @@
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
-
 // ─── CSV Helpers ────────────────────────────────────────────
+// PDF imports are lazy-loaded to reduce initial bundle size
 
 function sanitizeCell(val: string | number | null | undefined): string {
   const str = String(val ?? '')
@@ -27,11 +25,19 @@ function downloadCSV(filename: string, headers: string[], rows: (string | number
   URL.revokeObjectURL(url)
 }
 
-// ─── PDF Helpers ────────────────────────────────────────────
+// ─── PDF Helpers (lazy-loaded) ─────────────────────────────
 
-function createPDF(title: string): jsPDF {
+async function loadPDFLib() {
+  const [jsPDFModule, autoTableModule] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ])
+  return { jsPDF: jsPDFModule.default, autoTable: autoTableModule.default }
+}
+
+async function createPDF(title: string) {
+  const { jsPDF } = await loadPDFLib()
   const doc = new jsPDF()
-  // Header
   doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
   doc.text('Luma Welfare', 14, 18)
@@ -39,12 +45,10 @@ function createPDF(title: string): jsPDF {
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(100)
   doc.text('Community Welfare Management System', 14, 25)
-  // Title
   doc.setTextColor(0)
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
   doc.text(title, 14, 37)
-  // Date
   doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(130)
@@ -52,7 +56,7 @@ function createPDF(title: string): jsPDF {
   return doc
 }
 
-function downloadPDF(doc: jsPDF, filename: string) {
+async function downloadPDF(doc: Awaited<ReturnType<typeof createPDF>>, filename: string) {
   doc.save(filename)
 }
 
@@ -70,8 +74,9 @@ export function exportContributionsCSV(data: { label: string; total: number; ver
   )
 }
 
-export function exportContributionsPDF(data: { label: string; total: number; verified: number; pending: number }[]) {
-  const doc = createPDF('Monthly Contributions Report')
+export async function exportContributionsPDF(data: { label: string; total: number; verified: number; pending: number }[]) {
+  const { autoTable } = await loadPDFLib()
+  const doc = await createPDF('Monthly Contributions Report')
   const totalAll = data.reduce((s, d) => s + d.total, 0)
   const verifiedAll = data.reduce((s, d) => s + d.verified, 0)
   const pendingAll = data.reduce((s, d) => s + d.pending, 0)
@@ -99,8 +104,9 @@ export function exportPackageBreakdownCSV(data: { name: string; count: number }[
   )
 }
 
-export function exportPackageBreakdownPDF(data: { name: string; count: number }[]) {
-  const doc = createPDF('Active Subscriptions by Package')
+export async function exportPackageBreakdownPDF(data: { name: string; count: number }[]) {
+  const { autoTable } = await loadPDFLib()
+  const doc = await createPDF('Active Subscriptions by Package')
 
   autoTable(doc, {
     startY: 50,
@@ -126,8 +132,9 @@ export function exportClaimsStatusCSV(data: Record<string, number>) {
   )
 }
 
-export function exportClaimsStatusPDF(data: Record<string, number>) {
-  const doc = createPDF('Claims by Status')
+export async function exportClaimsStatusPDF(data: Record<string, number>) {
+  const { autoTable } = await loadPDFLib()
+  const doc = await createPDF('Claims by Status')
   const entries = Object.entries(data).filter(([, v]) => v > 0)
   const total = entries.reduce((s, [, v]) => s + v, 0)
 
@@ -159,8 +166,9 @@ export function exportRegistrationFeesCSV(data: { total: number; paid: number; u
   )
 }
 
-export function exportRegistrationFeesPDF(data: { total: number; paid: number; unpaid: number }) {
-  const doc = createPDF('Registration Fees Report')
+export async function exportRegistrationFeesPDF(data: { total: number; paid: number; unpaid: number }) {
+  const { autoTable } = await loadPDFLib()
+  const doc = await createPDF('Registration Fees Report')
 
   autoTable(doc, {
     startY: 50,
@@ -194,8 +202,9 @@ export function exportTransactionsCSV(data: { member_name: string; package_name:
   )
 }
 
-export function exportTransactionsPDF(data: { member_name: string; package_name: string; amount: number; status: string; date: string }[]) {
-  const doc = createPDF('Recent Transactions')
+export async function exportTransactionsPDF(data: { member_name: string; package_name: string; amount: number; status: string; date: string }[]) {
+  const { autoTable } = await loadPDFLib()
+  const doc = await createPDF('Recent Transactions')
 
   autoTable(doc, {
     startY: 50,
