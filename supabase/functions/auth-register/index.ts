@@ -1,10 +1,15 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createAdminClient, logAudit } from '../shared/supabase.ts'
 import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
+import { rateLimit } from '../shared/rate-limit.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
+
+  // Rate limit: 5 registration attempts per minute per IP
+  const limit = rateLimit(req, 'register', { windowMs: 60_000, max: 5 })
+  if (!limit.ok) return limit.response!
 
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ message: 'Method not allowed' }), {

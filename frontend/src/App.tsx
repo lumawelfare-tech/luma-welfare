@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Layout } from './components/Layout'
 import { AdminLayout } from './components/AdminLayout'
 import { RequireMember } from './components/RequireMember'
@@ -60,66 +61,66 @@ function PageLoader() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            {/* ===== PUBLIC WEBSITE ===== */}
-            <Route element={<Layout />}>
-              <Route path="/" element={<Home />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/packages" element={<PackagesPage />} />
-              <Route path="/how-it-works" element={<HowItWorks />} />
-              <Route path="/faq" element={<FAQ />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/terms" element={<Terms />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/news" element={<News />} />
-              <Route path="/gallery" element={<Gallery />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-
-
-            </Route>
-
-            {/* ===== MEMBER PORTAL ===== */}
-            <Route element={<RequireMember />}>
-              <Route element={<MemberLayout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/contributions" element={<Contributions />} />
-                <Route path="/join" element={<JoinPackages />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/family" element={<Family />} />
-                <Route path="/receipts-statements" element={<ReceiptsStatements />} />
-                <Route path="/claims" element={<Claims />} />
-                <Route path="/notifications" element={<Notifications />} />
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* ===== PUBLIC WEBSITE ===== */}
+              <Route element={<Layout />}>
+                <Route path="/" element={<Home />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/packages" element={<PackagesPage />} />
+                <Route path="/how-it-works" element={<HowItWorks />} />
+                <Route path="/faq" element={<FAQ />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/news" element={<News />} />
+                <Route path="/gallery" element={<Gallery />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
               </Route>
-            </Route>
 
-            {/* ===== ADMIN PORTAL ===== */}
-            <Route path="/admin" element={<RequireAdmin />}>
-              <Route element={<AdminLayout />}>
-                <Route index element={<Navigate to="dashboard" replace />} />
-                <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="members" element={<AdminMembers />} />
-                <Route path="registration-fees" element={<AdminRegistrationFees />} />
-                <Route path="packages" element={<AdminPackages />} />
-                <Route path="contributions" element={<AdminContributions />} />
-                <Route path="claims" element={<AdminClaims />} />
-                <Route path="subscriptions" element={<AdminSubscriptions />} />
-                <Route path="news" element={<AdminNews />} />
-                <Route path="gallery" element={<AdminGallery />} />
-                <Route path="reports" element={<AdminReports />} />
-                <Route path="scheduled-reports" element={<AdminScheduledReports />} />
-                <Route path="settings" element={<AdminSettings />} />
-                <Route path="audit-logs" element={<AdminAuditLogs />} />
+              {/* ===== MEMBER PORTAL ===== */}
+              <Route element={<RequireMember />}>
+                <Route element={<MemberLayout />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/contributions" element={<Contributions />} />
+                  <Route path="/join" element={<JoinPackages />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/family" element={<Family />} />
+                  <Route path="/receipts-statements" element={<ReceiptsStatements />} />
+                  <Route path="/claims" element={<Claims />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                </Route>
               </Route>
-            </Route>
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </AuthProvider>
+
+              {/* ===== ADMIN PORTAL ===== */}
+              <Route path="/admin" element={<RequireAdmin />}>
+                <Route element={<AdminLayout />}>
+                  <Route index element={<Navigate to="dashboard" replace />} />
+                  <Route path="dashboard" element={<AdminDashboard />} />
+                  <Route path="members" element={<AdminMembers />} />
+                  <Route path="registration-fees" element={<AdminRegistrationFees />} />
+                  <Route path="packages" element={<AdminPackages />} />
+                  <Route path="contributions" element={<AdminContributions />} />
+                  <Route path="claims" element={<AdminClaims />} />
+                  <Route path="subscriptions" element={<AdminSubscriptions />} />
+                  <Route path="news" element={<AdminNews />} />
+                  <Route path="gallery" element={<AdminGallery />} />
+                  <Route path="reports" element={<AdminReports />} />
+                  <Route path="scheduled-reports" element={<AdminScheduledReports />} />
+                  <Route path="settings" element={<AdminSettings />} />
+                  <Route path="audit-logs" element={<AdminAuditLogs />} />
+                </Route>
+              </Route>
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }

@@ -314,17 +314,52 @@ export function AdminDashboard() {
     return (
       <div className="container-luma py-16 text-center">
         <div className="mx-auto max-w-md rounded-3xl border border-red-200 bg-red-50 p-8">
-          <p className="text-lg font-bold text-red-700">No admin access</p>
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+            <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          </div>
+          <p className="mt-4 text-lg font-bold text-red-700">Unable to load dashboard</p>
           <p className="mt-2 text-sm text-gray-600">
             {error}. If you are an admin, make sure your account is in the admins table.
           </p>
+          <button onClick={() => fetchData()} className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors">
+            Try Again
+          </button>
         </div>
       </div>
     )
   }
 
   if (loading || !data) {
-    return <div className="container-luma py-16 text-center text-gray-500">Loading admin…</div>
+    return (
+      <div className="container-luma py-10">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-48 animate-pulse rounded bg-gray-200" />
+            <div className="mt-2 h-4 w-64 animate-pulse rounded bg-gray-200" />
+          </div>
+        </div>
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-gray-100 bg-white p-5 space-y-2">
+              <div className="h-8 w-16 animate-pulse rounded bg-gray-200" />
+              <div className="h-3 w-24 animate-pulse rounded bg-gray-200" />
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 lg:col-span-2">
+            <div className="h-5 w-40 animate-pulse rounded bg-gray-200" />
+            <div className="mt-4 h-64 animate-pulse rounded bg-gray-100" />
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6">
+            <div className="h-5 w-32 animate-pulse rounded bg-gray-200" />
+            <div className="mt-4 h-64 animate-pulse rounded bg-gray-100" />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const totalContributions = data.monthly_contributions.reduce((s, m) => s + m.total, 0)

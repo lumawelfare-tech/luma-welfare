@@ -1,5 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api, ApiError } from '../../lib/api'
+import { useToast } from '../../components/Toast'
+import { DataTable, type Column } from '../../components/DataTable'
+import { BulkActionBar } from '../../components/BulkActionBar'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 
 type Member = {
   id: string
@@ -12,47 +17,60 @@ type Member = {
 }
 
 export function AdminMembers() {
+  const { addToast } = useToast()
   const [members, setMembers] = useState<Member[]>([])
   const [filter, setFilter] = useState('')
   const [query, setQuery] = useState('')
+  const debouncedQuery = useDebouncedValue(query, 300)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+
+  // Delete dialog
   const [deleteTarget, setDeleteTarget] = useState<Member | null>(null)
   const [confirmText, setConfirmText] = useState('')
+  const [deleteBusy, setDeleteBusy] = useState(false)
 
-  // CSV Import state
+  // CSV Import
   const [showImport, setShowImport] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
   const [importResults, setImportResults] = useState<{ row: number; email: string; status: string; message: string }[] | null>(null)
 
+  // Bulk dialogs
+  const [bulkAction, setBulkAction] = useState<'active' | 'suspended' | 'closed' | null>(null)
+
   const load = useCallback(async () => {
     setError(null)
+    setLoading(true)
     try {
       const qs = new URLSearchParams()
       if (filter) qs.set('status', filter)
-      if (query.trim()) qs.set('q', query.trim())
+      if (debouncedQuery.trim()) qs.set('q', debouncedQuery.trim())
       const qsStr = qs.toString()
       const d = await api<{ members: Member[] }>(`/admin/members${qsStr ? '?' + qsStr : ''}`, { auth: true })
       setMembers(d.members ?? [])
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load members.')
+    } finally {
+      setLoading(false)
     }
-  }, [filter, query])
+  }, [filter, debouncedQuery])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useEffect(() => { load() }, [load])
 
   async function setStatus(id: string, status: 'active' | 'suspended' | 'closed') {
     setBusyId(id)
     try {
       await api(`/admin/members/${id}`, { method: 'PATCH', auth: true, body: { status } })
-      setNotice(`Member ${status === 'active' ? 'approved' : status === 'suspended' ? 'suspended' : 'closed'}.`)
+      addToast('success', `Member ${status === 'active' ? 'approved' : status === 'suspended' ? 'suspended' : 'closed'}.`)
       await load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not update the member.')
+      addToast('error', e instanceof ApiError ? e.message : 'Could not update the member.')
     } finally {
       setBusyId(null)
     }
@@ -60,27 +78,49 @@ export function AdminMembers() {
 
   async function deleteMember() {
     if (!deleteTarget || confirmText !== 'DELETE') return
-    setBusyId(deleteTarget.id)
+    setDeleteBusy(true)
     try {
       await api(`/admin/members/${deleteTarget.id}`, { method: 'DELETE', auth: true })
-      setNotice(`Member "${deleteTarget.full_name}" has been deactivated.`)
+      addToast('success', `Member "${deleteTarget.full_name}" has been deactivated.`)
       setDeleteTarget(null)
       setConfirmText('')
       await load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not delete the member.')
-      setDeleteTarget(null)
-      setConfirmText('')
+      addToast('error', e instanceof ApiError ? e.message : 'Could not delete the member.')
     } finally {
-      setBusyId(null)
+      setDeleteBusy(false)
     }
   }
 
+  async function bulkStatusUpdate(status: 'active' | 'suspended' | 'closed') {
+    setBulkLoading(true)
+    const ids = Array.from(selectedIds)
+    let success = 0
+    let errors = 0
+    for (const id of ids) {
+      try {
+        await api(`/admin/members/${id}`, { method: 'PATCH', auth: true, body: { status } })
+        success++
+      } catch {
+        errors++
+      }
+    }
+    setBulkLoading(false)
+    setBulkAction(null)
+    setSelectedIds(new Set())
+    if (errors > 0) {
+      addToast('warning', `${success} updated, ${errors} failed.`)
+    } else {
+      addToast('success', `${success} member${success !== 1 ? 's' : ''} ${status === 'active' ? 'approved' : status === 'suspended' ? 'suspended' : 'closed'}.`)
+    }
+    await load()
+  }
+
   function parseCSV(text: string): Record<string, string>[] {
-    const lines = text.split('\n').filter(l => l.trim())
+    const lines = text.split('\n').filter((l) => l.trim())
     if (lines.length < 2) return []
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_'))
-    return lines.slice(1).map(line => {
+    const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'))
+    return lines.slice(1).map((line) => {
       const values: string[] = []
       let current = ''
       let inQuotes = false
@@ -113,14 +153,37 @@ export function AdminMembers() {
       )
       setImportResults(d.results ?? [])
       if (d.summary.errors === 0) {
-        setNotice(`Successfully imported ${d.summary.success} members.`)
+        addToast('success', `Successfully imported ${d.summary.success} members.`)
         await load()
+      } else {
+        addToast('warning', `Imported ${d.summary.success} of ${d.summary.total} members.`)
       }
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Import failed.')
+      addToast('error', e instanceof ApiError ? e.message : 'Import failed.')
     } finally {
       setImporting(false)
     }
+  }
+
+  function exportCSV() {
+    const headers = ['Name', 'Email', 'Phone', 'Membership #', 'Status', 'Joined']
+    const rows = members.map((m) => [
+      m.full_name,
+      m.email ?? '',
+      m.phone,
+      m.membership_number ?? '',
+      m.status,
+      m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '',
+    ])
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `members-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    addToast('success', `Exported ${members.length} members to CSV.`)
   }
 
   const statusColor = (s: string) => {
@@ -133,12 +196,101 @@ export function AdminMembers() {
     }
   }
 
+  const columns: Column<Member>[] = [
+    {
+      key: 'full_name',
+      header: 'Member',
+      sortable: true,
+      render: (m) => (
+        <div>
+          <div className="font-medium text-gray-900">{m.full_name}</div>
+          <div className="text-xs text-gray-500">{m.email ?? ''}</div>
+          {m.membership_number && <div className="text-xs text-gray-400">#{m.membership_number}</div>}
+        </div>
+      ),
+    },
+    { key: 'phone', header: 'Phone', sortable: true },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      render: (m) => (
+        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor(m.status)}`}>
+          {m.status.replace('_', ' ')}
+        </span>
+      ),
+    },
+    {
+      key: 'joined_at',
+      header: 'Joined',
+      sortable: true,
+      render: (m) => (
+        <span className="text-gray-500 text-xs">
+          {m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      className: 'text-right',
+      render: (m) => (
+        <div className="flex items-center justify-end gap-1.5">
+          {m.status === 'pending_approval' && (
+            <button
+              disabled={busyId === m.id}
+              onClick={() => setStatus(m.id, 'active')}
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+            >
+              Approve
+            </button>
+          )}
+          {m.status === 'active' && (
+            <button
+              disabled={busyId === m.id}
+              onClick={() => setStatus(m.id, 'suspended')}
+              className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            >
+              Suspend
+            </button>
+          )}
+          {m.status === 'suspended' && (
+            <button
+              disabled={busyId === m.id}
+              onClick={() => setStatus(m.id, 'active')}
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+            >
+              Reinstate
+            </button>
+          )}
+          {m.status !== 'closed' && (
+            <button
+              disabled={busyId === m.id}
+              onClick={() => { setDeleteTarget(m); setConfirmText('') }}
+              className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div className="py-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Members</h1>
           <p className="mt-1 text-sm text-gray-500">{members.length} member{members.length !== 1 ? 's' : ''} found</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={exportCSV} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            Export CSV
+          </button>
+          <button onClick={() => { setShowImport(true); setImportFile(null); setImportResults(null) }} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 transition-colors">
+            Import CSV
+          </button>
         </div>
       </div>
 
@@ -170,64 +322,58 @@ export function AdminMembers() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load()}
             placeholder="Search name, phone, membership #..."
-            className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-luma-500"
+            className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
           />
         </div>
-        <button onClick={load} className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors">
-          Search
-        </button>
-        <button onClick={() => { setShowImport(true); setImportFile(null); setImportResults(null) }} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 transition-colors">
-          Import CSV
-        </button>
       </div>
 
       {error && (
-        <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-      )}
-      {notice && (
-        <div className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">{notice}</div>
+        <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
-      {/* Members Table */}
-      <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-            <tr>
-              <th className="px-4 py-3">Member</th>
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Joined</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {members.map((m) => (
-              <tr key={m.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">{m.full_name}</div>
-                  <div className="text-xs text-gray-500">{m.email ?? ''}</div>
-                  {m.membership_number && (
-                    <div className="text-xs text-gray-400">#{m.membership_number}</div>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-gray-600">{m.phone}</td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor(m.status)}`}>
-                    {m.status.replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">
-                  {m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-1.5">
+      {/* Members Table with Selection */}
+      <div className="mt-6">
+        {loading ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
+            <svg className="mx-auto h-6 w-6 animate-spin text-luma-600" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <p className="mt-3 text-sm text-gray-500">Loading members…</p>
+          </div>
+        ) : (
+          <DataTable
+            data={members as unknown as Record<string, unknown>[]}
+            columns={columns as Column<Record<string, unknown>>[]}
+            keyExtractor={(r) => String(r.id)}
+            selectable
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            getId={(r) => String(r.id)}
+            pageSize={25}
+            emptyMessage="No members found."
+            renderMobileCard={(row) => {
+              const m = row as unknown as Member
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900">{m.full_name}</div>
+                      <div className="text-xs text-gray-500">{m.email ?? ''}</div>
+                      {m.membership_number && <div className="text-xs text-gray-400">#{m.membership_number}</div>}
+                    </div>
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor(m.status)}`}>
+                      {m.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500">{m.phone}</div>
+                  <div className="flex gap-2">
                     {m.status === 'pending_approval' && (
                       <button
                         disabled={busyId === m.id}
                         onClick={() => setStatus(m.id, 'active')}
-                        className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                        className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         Approve
                       </button>
@@ -236,7 +382,7 @@ export function AdminMembers() {
                       <button
                         disabled={busyId === m.id}
                         onClick={() => setStatus(m.id, 'suspended')}
-                        className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                        className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                       >
                         Suspend
                       </button>
@@ -245,7 +391,7 @@ export function AdminMembers() {
                       <button
                         disabled={busyId === m.id}
                         onClick={() => setStatus(m.id, 'active')}
-                        className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                        className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         Reinstate
                       </button>
@@ -254,26 +400,75 @@ export function AdminMembers() {
                       <button
                         disabled={busyId === m.id}
                         onClick={() => { setDeleteTarget(m); setConfirmText('') }}
-                        className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                        className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                       >
                         Delete
                       </button>
                     )}
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {members.length === 0 && (
-          <div className="p-12 text-center text-gray-500">
-            <svg className="mx-auto h-10 w-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-            </svg>
-            <p className="mt-3 text-sm text-gray-500">No members found.</p>
-          </div>
+                </div>
+              )
+            }}
+          />
         )}
       </div>
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onClear={() => setSelectedIds(new Set())}
+        actions={[
+          { label: 'Approve', variant: 'primary', onClick: () => setBulkAction('active'), loading: bulkLoading },
+          { label: 'Suspend', variant: 'warning', onClick: () => setBulkAction('suspended'), loading: bulkLoading },
+          { label: 'Close', variant: 'danger', onClick: () => setBulkAction('closed'), loading: bulkLoading },
+        ]}
+      />
+
+      {/* Bulk Action Confirm Dialog */}
+      <ConfirmDialog
+        open={bulkAction !== null}
+        title={bulkAction === 'active' ? 'Approve Members' : bulkAction === 'suspended' ? 'Suspend Members' : 'Close Members'}
+        message={`This will ${bulkAction === 'active' ? 'approve' : bulkAction === 'suspended' ? 'suspend' : 'close'} ${selectedIds.size} selected member${selectedIds.size !== 1 ? 's' : ''}.`}
+        confirmLabel={bulkAction === 'active' ? 'Approve All' : bulkAction === 'suspended' ? 'Suspend All' : 'Close All'}
+        variant={bulkAction === 'active' ? 'primary' : bulkAction === 'suspended' ? 'warning' : 'danger'}
+        loading={bulkLoading}
+        onConfirm={() => bulkAction && bulkStatusUpdate(bulkAction)}
+        onCancel={() => setBulkAction(null)}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete Member"
+        variant="danger"
+        confirmLabel="Deactivate Member"
+        loading={deleteBusy}
+        onConfirm={deleteMember}
+        onCancel={() => { setDeleteTarget(null); setConfirmText('') }}
+        message={
+          <>
+            <div className="rounded-lg bg-gray-50 px-4 py-3 mb-3">
+              <p className="text-sm font-medium text-gray-900">{deleteTarget?.full_name}</p>
+              <p className="text-xs text-gray-500">{deleteTarget?.email ?? deleteTarget?.phone}</p>
+              <p className="text-xs text-gray-400">Status: {deleteTarget?.status}</p>
+            </div>
+            <p>This will <strong>deactivate</strong> the member account. All historical records will be preserved. The member will no longer be able to access their account.</p>
+            <div className="mt-3">
+              <label className="text-sm font-medium text-gray-700">
+                Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
+              </label>
+              <input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder='Type "DELETE" to confirm'
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && confirmText === 'DELETE' && deleteMember()}
+              />
+            </div>
+          </>
+        }
+      />
 
       {/* Import CSV Modal */}
       {showImport && (
@@ -304,7 +499,6 @@ export function AdminMembers() {
                       className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-luma-100 file:px-3 file:py-1 file:text-sm file:font-medium file:text-luma-700 hover:file:bg-luma-200"
                     />
                   </div>
-
                   <div className="mt-4">
                     <button
                       onClick={handleImport}
@@ -347,74 +541,12 @@ export function AdminMembers() {
                 </div>
               )}
             </div>
-
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
               <button
                 onClick={() => { setShowImport(false); setImportFile(null); setImportResults(null) }}
                 className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 {importResults ? 'Close' : 'Cancel'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
-            <div className="px-6 py-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-                  <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Delete Member</h3>
-                  <p className="text-sm text-gray-500">This action cannot be easily undone.</p>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-lg bg-gray-50 px-4 py-3">
-                <p className="text-sm font-medium text-gray-900">{deleteTarget.full_name}</p>
-                <p className="text-xs text-gray-500">{deleteTarget.email ?? deleteTarget.phone}</p>
-                <p className="text-xs text-gray-400">Status: {deleteTarget.status}</p>
-              </div>
-
-              <p className="mt-4 text-sm text-gray-600">
-                This will <strong>deactivate</strong> the member account. All historical records (subscriptions, contributions, claims) will be preserved. The member will no longer be able to access their account.
-              </p>
-
-              <div className="mt-4">
-                <label className="text-sm font-medium text-gray-700">
-                  Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
-                </label>
-                <input
-                  value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  placeholder='Type "DELETE" to confirm'
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Enter' && confirmText === 'DELETE' && deleteMember()}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
-              <button
-                onClick={() => { setDeleteTarget(null); setConfirmText('') }}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={confirmText !== 'DELETE' || busyId === deleteTarget.id}
-                onClick={deleteMember}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {busyId === deleteTarget.id ? 'Deactivating...' : 'Deactivate Member'}
               </button>
             </div>
           </div>

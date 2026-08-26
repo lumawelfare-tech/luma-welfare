@@ -1,5 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api, ApiError } from '../../lib/api'
+import { useToast } from '../../components/Toast'
+import { DataTable, type Column } from '../../components/DataTable'
+import { BulkActionBar } from '../../components/BulkActionBar'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 
 type Claim = {
   id: string
@@ -45,11 +49,16 @@ const filterTabs = [
 ]
 
 export function AdminClaims() {
+  const { addToast } = useToast()
   const [claims, setClaims] = useState<Claim[]>([])
   const [filter, setFilter] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  // Selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
 
   // Detail modal
   const [detail, setDetail] = useState<Claim | null>(null)
@@ -60,15 +69,16 @@ export function AdminClaims() {
   const [approveTarget, setApproveTarget] = useState<Claim | null>(null)
   const [approveNotes, setApproveNotes] = useState('')
   const [approveAmount, setApproveAmount] = useState('')
-
   const [rejectTarget, setRejectTarget] = useState<Claim | null>(null)
   const [rejectNotes, setRejectNotes] = useState('')
-
   const [infoTarget, setInfoTarget] = useState<Claim | null>(null)
   const [infoMessage, setInfoMessage] = useState('')
+  const [bulkRejectNotes, setBulkRejectNotes] = useState('')
+  const [showBulkReject, setShowBulkReject] = useState(false)
 
   const load = useCallback(async () => {
     setError(null)
+    setLoading(true)
     try {
       const d = await api<{ claims: Claim[] }>(
         `/admin/claims${filter ? `?status=${filter}` : ''}`,
@@ -77,6 +87,8 @@ export function AdminClaims() {
       setClaims(d.claims ?? [])
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load claims.')
+    } finally {
+      setLoading(false)
     }
   }, [filter])
 
@@ -90,7 +102,7 @@ export function AdminClaims() {
       const d = await api<{ claim: Claim; documents: ClaimDocument[] }>(`/admin/claims/${claim.id}`, { auth: true })
       setDocuments(d.documents ?? [])
     } catch {
-      // Silently fail — we still show the claim info
+      addToast('warning', 'Could not load claim documents.')
     } finally {
       setLoadingDetail(false)
     }
@@ -98,25 +110,20 @@ export function AdminClaims() {
 
   async function approve(claim: Claim) {
     setBusyId(claim.id)
-    setNotice(null)
     try {
       await api(`/admin/claims/${claim.id}`, {
         method: 'PATCH',
         auth: true,
-        body: {
-          decision: 'approve',
-          adminNotes: approveNotes.trim() || undefined,
-          amount: approveAmount ? Number(approveAmount) : undefined,
-        },
+        body: { decision: 'approve', adminNotes: approveNotes.trim() || undefined, amount: approveAmount ? Number(approveAmount) : undefined },
       })
-      setNotice(`Claim ${claim.claim_number} approved.`)
+      addToast('success', `Claim ${claim.claim_number} approved.`)
       setApproveTarget(null)
       setApproveNotes('')
       setApproveAmount('')
       setDetail(null)
       await load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not approve claim.')
+      addToast('error', e instanceof ApiError ? e.message : 'Could not approve claim.')
     } finally {
       setBusyId(null)
     }
@@ -124,20 +131,19 @@ export function AdminClaims() {
 
   async function reject(claim: Claim) {
     setBusyId(claim.id)
-    setNotice(null)
     try {
       await api(`/admin/claims/${claim.id}`, {
         method: 'PATCH',
         auth: true,
         body: { decision: 'reject', adminNotes: rejectNotes.trim() || undefined },
       })
-      setNotice(`Claim ${claim.claim_number} rejected.`)
+      addToast('success', `Claim ${claim.claim_number} rejected.`)
       setRejectTarget(null)
       setRejectNotes('')
       setDetail(null)
       await load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not reject claim.')
+      addToast('error', e instanceof ApiError ? e.message : 'Could not reject claim.')
     } finally {
       setBusyId(null)
     }
@@ -145,34 +151,179 @@ export function AdminClaims() {
 
   async function requestInfo(claim: Claim) {
     setBusyId(claim.id)
-    setNotice(null)
     try {
       await api(`/admin/claims/${claim.id}`, {
         method: 'PATCH',
         auth: true,
         body: { decision: 'request-info', adminNotes: infoMessage.trim() || undefined },
       })
-      setNotice(`Additional information requested for ${claim.claim_number}.`)
+      addToast('success', `Additional information requested for ${claim.claim_number}.`)
       setInfoTarget(null)
       setInfoMessage('')
       setDetail(null)
       await load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not update claim.')
+      addToast('error', e instanceof ApiError ? e.message : 'Could not update claim.')
     } finally {
       setBusyId(null)
     }
   }
 
-  const submittedCount = claims.filter(c => c.status === 'Submitted').length
+  async function bulkReject() {
+    setBulkLoading(true)
+    const ids = Array.from(selectedIds)
+    let success = 0
+    let errors = 0
+    for (const id of ids) {
+      try {
+        await api(`/admin/claims/${id}`, {
+          method: 'PATCH',
+          auth: true,
+          body: { decision: 'reject', adminNotes: bulkRejectNotes.trim() || undefined },
+        })
+        success++
+      } catch {
+        errors++
+      }
+    }
+    setBulkLoading(false)
+    setShowBulkReject(false)
+    setBulkRejectNotes('')
+    setSelectedIds(new Set())
+    if (errors > 0) {
+      addToast('warning', `${success} rejected, ${errors} failed.`)
+    } else {
+      addToast('success', `${success} claim${success !== 1 ? 's' : ''} rejected.`)
+    }
+    await load()
+  }
+
+  const submittedCount = claims.filter((c) => c.status === 'Submitted').length
+
+  function exportCSV() {
+    const headers = ['Claim #', 'Member', 'Package', 'Type', 'Amount', 'Status', 'Date']
+    const rows = claims.map((c) => [
+      c.claim_number,
+      c.members?.full_name ?? '',
+      c.packages?.name ?? '',
+      c.claim_type ?? '',
+      c.amount_requested != null ? String(c.amount_requested) : '',
+      c.status,
+      new Date(c.created_at).toLocaleDateString(),
+    ])
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `claims-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    addToast('success', `Exported ${claims.length} claims to CSV.`)
+  }
+
+  const columns: Column<Record<string, unknown>>[] = [
+    {
+      key: 'claim_number',
+      header: 'Claim',
+      render: (row) => {
+        const cl = row as unknown as Claim
+        return (
+          <button onClick={() => viewDetail(cl)} className="font-medium text-luma-700 hover:text-luma-800 hover:underline text-left">
+            {cl.claim_number}
+          </button>
+        )
+      },
+    },
+    {
+      key: 'member_name',
+      header: 'Member',
+      render: (row) => {
+        const cl = row as unknown as Claim
+        return (
+          <div>
+            <div className="font-medium text-gray-900">{cl.members?.full_name ?? 'Unknown'}</div>
+            <div className="text-xs text-gray-500">{cl.members?.phone ?? ''}</div>
+          </div>
+        )
+      },
+    },
+    { key: 'package_name', header: 'Package', render: (row) => (row as unknown as Claim).packages?.name ?? '—' },
+    { key: 'claim_type', header: 'Type', render: (row) => (row as unknown as Claim).claim_type ?? '—', className: 'text-xs' },
+    {
+      key: 'amount_requested',
+      header: 'Amount',
+      render: (row) => {
+        const cl = row as unknown as Claim
+        return <span className="font-medium text-gray-900">{cl.amount_requested != null ? `KSh ${cl.amount_requested.toLocaleString('en-KE')}` : '—'}</span>
+      },
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (row) => {
+        const cl = row as unknown as Claim
+        return (
+          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusStyles[cl.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+            {cl.status}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'created_at',
+      header: 'Date',
+      render: (row) => <span className="text-gray-500 text-xs">{new Date((row as unknown as Claim).created_at).toLocaleDateString()}</span>,
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      className: 'text-right',
+      render: (row) => {
+        const cl = row as unknown as Claim
+        return (
+          <div className="flex justify-end gap-1.5">
+            {cl.status === 'Submitted' && (
+              <>
+                <button
+                  disabled={busyId === cl.id}
+                  onClick={() => { setApproveTarget(cl); setApproveAmount(cl.amount_requested != null ? String(cl.amount_requested) : ''); setApproveNotes('') }}
+                  className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                >
+                  Approve
+                </button>
+                <button
+                  disabled={busyId === cl.id}
+                  onClick={() => { setInfoTarget(cl); setInfoMessage('') }}
+                  className="rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                >
+                  Info
+                </button>
+                <button
+                  disabled={busyId === cl.id}
+                  onClick={() => { setRejectTarget(cl); setRejectNotes('') }}
+                  className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                >
+                  Reject
+                </button>
+              </>
+            )}
+          </div>
+        )
+      },
+    },
+  ]
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Claims</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Review member claims. Approved claims are recorded for future payout processing.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Claims</h1>
+          <p className="text-sm text-gray-500 mt-1">Review member claims. Approved claims are recorded for future payout processing.</p>
+        </div>
+        <button onClick={exportCSV} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+          Export CSV
+        </button>
       </div>
 
       {/* Filters */}
@@ -195,102 +346,77 @@ export function AdminClaims() {
         ))}
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
-      )}
-      {notice && (
-        <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">{notice}</div>
-      )}
+      {error && <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {/* Claims Table */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-            <tr>
-              <th className="px-4 py-3">Claim</th>
-              <th className="px-4 py-3">Member</th>
-              <th className="px-4 py-3">Package</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {claims.map((cl) => (
-              <tr key={cl.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => viewDetail(cl)}
-                    className="font-medium text-luma-700 hover:text-luma-800 hover:underline text-left"
-                  >
+      {loading ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
+          <svg className="mx-auto h-6 w-6 animate-spin text-luma-600" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p className="mt-3 text-sm text-gray-500">Loading claims…</p>
+        </div>
+      ) : (
+        <DataTable
+          data={claims as unknown as Record<string, unknown>[]}
+          columns={columns}
+          keyExtractor={(r) => String(r.id)}
+          selectable
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+          getId={(r) => String(r.id)}
+          pageSize={25}
+          emptyMessage="No claims found."
+          renderMobileCard={(row) => {
+            const cl = row as unknown as Claim
+            return (
+              <div className="space-y-2">
+                <div className="flex items-start justify-between">
+                  <button onClick={() => viewDetail(cl)} className="font-medium text-luma-700 hover:underline text-left">
                     {cl.claim_number}
                   </button>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">{cl.members?.full_name ?? 'Unknown'}</div>
-                  <div className="text-xs text-gray-500">{cl.members?.phone ?? ''}</div>
-                </td>
-                <td className="px-4 py-3 text-gray-600">{cl.packages?.name ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-600 text-xs">{cl.claim_type ?? '—'}</td>
-                <td className="px-4 py-3 font-medium text-gray-900">
-                  {cl.amount_requested != null ? `KSh ${cl.amount_requested.toLocaleString('en-KE')}` : '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusStyles[cl.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusStyles[cl.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
                     {cl.status}
                   </span>
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">
-                  {new Date(cl.created_at).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {cl.status === 'Submitted' && (
-                    <div className="flex justify-end gap-1.5">
-                      <button
-                        disabled={busyId === cl.id}
-                        onClick={() => {
-                          setApproveTarget(cl)
-                          setApproveAmount(cl.amount_requested != null ? String(cl.amount_requested) : '')
-                          setApproveNotes('')
-                        }}
-                        className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        disabled={busyId === cl.id}
-                        onClick={() => { setInfoTarget(cl); setInfoMessage('') }}
-                        className="rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
-                      >
-                        Info
-                      </button>
-                      <button
-                        disabled={busyId === cl.id}
-                        onClick={() => { setRejectTarget(cl); setRejectNotes('') }}
-                        className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  )}
-                  {cl.status !== 'Submitted' && cl.admin_notes && (
-                    <span className="text-xs text-gray-400 italic max-w-[140px] block truncate" title={cl.admin_notes}>
-                      {cl.admin_notes}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {claims.length === 0 && (
-          <div className="p-12 text-center text-gray-500">
-            <p className="text-sm">No {filter ? filter.toLowerCase() : ''} claims found.</p>
-          </div>
-        )}
-      </div>
+                </div>
+                <div className="text-sm text-gray-900">{cl.members?.full_name ?? 'Unknown'}</div>
+                <div className="text-xs text-gray-500">{cl.packages?.name ?? '—'} · {cl.claim_type ?? '—'}</div>
+                <div className="text-sm font-medium text-gray-900">
+                  {cl.amount_requested != null ? `KSh ${cl.amount_requested.toLocaleString('en-KE')}` : '—'}
+                </div>
+                {cl.status === 'Submitted' && (
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      disabled={busyId === cl.id}
+                      onClick={() => { setApproveTarget(cl); setApproveAmount(cl.amount_requested != null ? String(cl.amount_requested) : ''); setApproveNotes('') }}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      disabled={busyId === cl.id}
+                      onClick={() => { setRejectTarget(cl); setRejectNotes('') }}
+                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          }}
+        />
+      )}
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onClear={() => setSelectedIds(new Set())}
+        actions={[
+          { label: 'Reject Selected', variant: 'danger', onClick: () => setShowBulkReject(true), loading: bulkLoading },
+        ]}
+      />
 
       {/* Detail Modal */}
       {detail && (
@@ -330,14 +456,6 @@ export function AdminClaims() {
                     {detail.amount_requested != null ? `KSh ${detail.amount_requested.toLocaleString('en-KE')}` : '—'}
                   </div>
                 </div>
-                <div>
-                  <span className="text-gray-400 text-xs">Submitted</span>
-                  <div className="text-gray-700">{detail.submitted_at ? new Date(detail.submitted_at).toLocaleString() : '—'}</div>
-                </div>
-                <div>
-                  <span className="text-gray-400 text-xs">Created</span>
-                  <div className="text-gray-700">{new Date(detail.created_at).toLocaleString()}</div>
-                </div>
               </div>
               {detail.description && (
                 <div>
@@ -371,34 +489,13 @@ export function AdminClaims() {
                   </div>
                 </div>
               )}
-              {loadingDetail && (
-                <div className="text-center text-gray-400 text-xs py-2">Loading documents…</div>
-              )}
+              {loadingDetail && <div className="text-center text-gray-400 text-xs py-2">Loading documents…</div>}
             </div>
             {detail.status === 'Submitted' && (
               <div className="border-t border-gray-200 px-6 py-4 flex gap-2 justify-end">
-                <button
-                  onClick={() => {
-                    setApproveTarget(detail)
-                    setApproveAmount(detail.amount_requested != null ? String(detail.amount_requested) : '')
-                    setApproveNotes('')
-                  }}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
-                >
-                  Approve
-                </button>
-                <button
-                  onClick={() => { setInfoTarget(detail); setInfoMessage('') }}
-                  className="rounded-lg border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors"
-                >
-                  Request Info
-                </button>
-                <button
-                  onClick={() => { setRejectTarget(detail); setRejectNotes('') }}
-                  className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-                >
-                  Reject
-                </button>
+                <button onClick={() => { setApproveTarget(detail); setApproveAmount(detail.amount_requested != null ? String(detail.amount_requested) : ''); setApproveNotes('') }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">Approve</button>
+                <button onClick={() => { setInfoTarget(detail); setInfoMessage('') }} className="rounded-lg border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors">Request Info</button>
+                <button onClick={() => { setRejectTarget(detail); setRejectNotes('') }} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">Reject</button>
               </div>
             )}
           </div>
@@ -412,41 +509,22 @@ export function AdminClaims() {
             <div className="px-6 py-5">
               <h3 className="text-lg font-semibold text-gray-900">Approve Claim</h3>
               <p className="mt-1 text-sm text-gray-500">
-                Approve <strong>{approveTarget.claim_number}</strong> from{' '}
-                <strong>{approveTarget.members?.full_name ?? 'member'}</strong>?
+                Approve <strong>{approveTarget.claim_number}</strong> from <strong>{approveTarget.members?.full_name ?? 'member'}</strong>?
               </p>
               <div className="mt-4 space-y-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600">Payout Amount (KSh)</label>
-                  <input
-                    type="number"
-                    value={approveAmount}
-                    onChange={(e) => setApproveAmount(e.target.value)}
-                    placeholder={approveTarget.amount_requested != null ? String(approveTarget.amount_requested) : 'e.g. 100000'}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500"
-                  />
+                  <input type="number" value={approveAmount} onChange={(e) => setApproveAmount(e.target.value)} placeholder={approveTarget.amount_requested != null ? String(approveTarget.amount_requested) : 'e.g. 100000'} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600">Admin Notes (optional)</label>
-                  <textarea
-                    value={approveNotes}
-                    onChange={(e) => setApproveNotes(e.target.value)}
-                    placeholder="Any notes about this approval…"
-                    rows={2}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none"
-                  />
+                  <textarea value={approveNotes} onChange={(e) => setApproveNotes(e.target.value)} placeholder="Any notes about this approval…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
                 </div>
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
-              <button onClick={() => setApproveTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                Cancel
-              </button>
-              <button
-                onClick={() => approve(approveTarget)}
-                disabled={busyId === approveTarget.id}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
+              <button onClick={() => setApproveTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => approve(approveTarget)} disabled={busyId === approveTarget.id} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                 {busyId === approveTarget.id ? 'Approving…' : 'Approve Claim'}
               </button>
             </div>
@@ -461,29 +539,16 @@ export function AdminClaims() {
             <div className="px-6 py-5">
               <h3 className="text-lg font-semibold text-gray-900">Reject Claim</h3>
               <p className="mt-1 text-sm text-gray-500">
-                Reject <strong>{rejectTarget.claim_number}</strong> from{' '}
-                <strong>{rejectTarget.members?.full_name ?? 'member'}</strong>?
+                Reject <strong>{rejectTarget.claim_number}</strong> from <strong>{rejectTarget.members?.full_name ?? 'member'}</strong>?
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
-                <textarea
-                  value={rejectNotes}
-                  onChange={(e) => setRejectNotes(e.target.value)}
-                  placeholder="e.g. Insufficient documentation, not eligible…"
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none"
-                />
+                <textarea value={rejectNotes} onChange={(e) => setRejectNotes(e.target.value)} placeholder="e.g. Insufficient documentation, not eligible…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
-              <button onClick={() => setRejectTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                Cancel
-              </button>
-              <button
-                onClick={() => reject(rejectTarget)}
-                disabled={busyId === rejectTarget.id}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-              >
+              <button onClick={() => setRejectTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => reject(rejectTarget)} disabled={busyId === rejectTarget.id} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
                 {busyId === rejectTarget.id ? 'Rejecting…' : 'Reject Claim'}
               </button>
             </div>
@@ -498,35 +563,42 @@ export function AdminClaims() {
             <div className="px-6 py-5">
               <h3 className="text-lg font-semibold text-gray-900">Request Additional Information</h3>
               <p className="mt-1 text-sm text-gray-500">
-                Ask <strong>{infoTarget.members?.full_name ?? 'member'}</strong> for more information on claim{' '}
-                <strong>{infoTarget.claim_number}</strong>.
+                Ask <strong>{infoTarget.members?.full_name ?? 'member'}</strong> for more information on claim <strong>{infoTarget.claim_number}</strong>.
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium text-gray-600">Message *</label>
-                <textarea
-                  value={infoMessage}
-                  onChange={(e) => setInfoMessage(e.target.value)}
-                  placeholder="e.g. Please upload a copy of the hospital bill…"
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none"
-                />
+                <textarea value={infoMessage} onChange={(e) => setInfoMessage(e.target.value)} placeholder="e.g. Please upload a copy of the hospital bill…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
-              <button onClick={() => setInfoTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                Cancel
-              </button>
-              <button
-                onClick={() => requestInfo(infoTarget)}
-                disabled={busyId === infoTarget.id || !infoMessage.trim()}
-                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
-              >
+              <button onClick={() => setInfoTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => requestInfo(infoTarget)} disabled={busyId === infoTarget.id || !infoMessage.trim()} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50">
                 {busyId === infoTarget.id ? 'Sending…' : 'Request Info'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Bulk Reject Dialog */}
+      <ConfirmDialog
+        open={showBulkReject}
+        title="Reject Selected Claims"
+        variant="danger"
+        confirmLabel={`Reject ${selectedIds.size} Claim${selectedIds.size !== 1 ? 's' : ''}`}
+        loading={bulkLoading}
+        onConfirm={bulkReject}
+        onCancel={() => { setShowBulkReject(false); setBulkRejectNotes('') }}
+        message={
+          <>
+            <p>This will reject {selectedIds.size} selected claim{selectedIds.size !== 1 ? 's' : ''}.</p>
+            <div className="mt-3">
+              <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
+              <textarea value={bulkRejectNotes} onChange={(e) => setBulkRejectNotes(e.target.value)} placeholder="e.g. Insufficient documentation…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
+            </div>
+          </>
+        }
+      />
     </div>
   )
 }

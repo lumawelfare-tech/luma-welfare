@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
+import { useToast } from '../../components/Toast'
 
 type Setting = { key: string; value: unknown; description: string | null }
 
 export function AdminSettings() {
   useHead('Settings', undefined, { noindex: true })
+  const { addToast } = useToast()
   const [settings, setSettings] = useState<Setting[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [editing, setEditing] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState('general')
@@ -60,7 +61,7 @@ export function AdminSettings() {
           await api(`/admin/settings`, { method: 'PATCH', auth: true, body: { key: s.key, value: editing[s.key] } })
         }
       }
-      setNotice('Settings saved.')
+      addToast('success', 'Settings saved.')
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save settings.')
@@ -143,7 +144,6 @@ export function AdminSettings() {
       </div>
 
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {notice && <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
 
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg border border-gray-200 bg-white p-1">

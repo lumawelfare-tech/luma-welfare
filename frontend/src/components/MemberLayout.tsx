@@ -46,6 +46,10 @@ export function MemberLayout() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
+      {/* Skip navigation link for accessibility */}
+      <a href="#member-main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:rounded-lg focus:bg-luma-700 focus:px-4 focus:py-2 focus:text-sm focus:text-white focus:shadow-lg">
+        Skip to main content
+      </a>
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-gray-200">
         {/* Brand */}
@@ -172,7 +176,7 @@ export function MemberLayout() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 lg:pl-64">
+        <main id="member-main" className="flex-1 lg:pl-64" role="main">
         <div className="pt-14 lg:pt-0">
           <Outlet />
         </div>

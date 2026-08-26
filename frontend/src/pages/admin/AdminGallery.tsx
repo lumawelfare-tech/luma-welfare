@@ -1,6 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
+import { useToast } from '../../components/Toast'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { EmptyState } from '../../components/EmptyState'
+import { SkeletonCard } from '../../components/Skeleton'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 
 type GalleryItem = {
   id: string
@@ -15,9 +20,10 @@ const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 
 export function AdminGallery() {
   useHead('Gallery', undefined, { noindex: true })
+  const { addToast } = useToast()
   const [items, setItems] = useState<GalleryItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<GalleryItem | null>(null)
   const [form, setForm] = useState({ title: '', caption: '' })
@@ -26,15 +32,20 @@ export function AdminGallery() {
   const [uploading, setUploading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search)
   const [dragOver, setDragOver] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<GalleryItem | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function load() {
+    setLoading(true)
     try {
       const d = await api<{ items: GalleryItem[] }>('/admin/gallery', { auth: true })
       setItems(d.items ?? [])
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load gallery.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -58,11 +69,11 @@ export function AdminGallery() {
 
   function validateAndPreview(file: File) {
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      setError('Please upload a JPEG, PNG, or WEBP image.')
+      addToast('error', 'Please upload a JPEG, PNG, or WEBP image.')
       return
     }
     if (file.size > MAX_SIZE) {
-      setError('Image must be 5MB or smaller.')
+      addToast('error', 'Image must be 5MB or smaller.')
       return
     }
     setError(null)
@@ -102,7 +113,6 @@ export function AdminGallery() {
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    setNotice(null)
     setUploading(true)
 
     try {
@@ -115,7 +125,7 @@ export function AdminGallery() {
         body.image_data = await fileToBase64(selectedFile)
         body.image_filename = selectedFile.name
       } else if (!editing) {
-        setError('Please select an image.')
+        addToast('error', 'Please select an image.')
         setUploading(false)
         return
       }
@@ -125,13 +135,13 @@ export function AdminGallery() {
           method: 'PATCH', auth: true,
           body,
         })
-        setNotice('Image updated.')
+        addToast('success', 'Image updated.')
       } else {
         await api('/admin/gallery', {
           method: 'POST', auth: true,
           body,
         })
-        setNotice('Image uploaded.')
+        addToast('success', 'Image uploaded.')
       }
       setShowForm(false)
       setPreview(null)
@@ -139,29 +149,31 @@ export function AdminGallery() {
       if (fileRef.current) fileRef.current.value = ''
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save. Please try again.')
+      const msg = err instanceof ApiError ? err.message : 'Could not save. Please try again.'
+      addToast('error', msg)
+      setError(msg)
     } finally {
       setUploading(false)
     }
   }
 
   async function remove(item: GalleryItem) {
-    if (!confirm('Delete this image? This cannot be undone.')) return
     setBusyId(item.id)
     setError(null)
     try {
       await api(`/admin/gallery/${item.id}`, { method: 'DELETE', auth: true })
-      setNotice('Image deleted.')
+      addToast('success', 'Image deleted.')
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not delete.')
+      addToast('error', err instanceof ApiError ? err.message : 'Could not delete.')
     } finally {
       setBusyId(null)
+      setConfirmDelete(null)
     }
   }
 
-  const filtered = search
-    ? items.filter(i => (i.title?.toLowerCase().includes(search.toLowerCase())) || (i.caption?.toLowerCase().includes(search.toLowerCase())))
+  const filtered = debouncedSearch
+    ? items.filter(i => (i.title?.toLowerCase().includes(debouncedSearch.toLowerCase())) || (i.caption?.toLowerCase().includes(debouncedSearch.toLowerCase())))
     : items
 
   return (
@@ -177,13 +189,11 @@ export function AdminGallery() {
       </div>
 
       {error && <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {notice && <div className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">{notice}</div>}
 
       {showForm && (
         <form onSubmit={save} className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
           <h2 className="font-semibold text-gray-900">{editing ? 'Edit Image' : 'Upload Image'}</h2>
           <div className="mt-4 space-y-4">
-            {/* File upload with drag-and-drop */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Image</label>
               <div
@@ -211,7 +221,6 @@ export function AdminGallery() {
               )}
             </div>
 
-            {/* Preview */}
             {preview && (
               <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
                 <img src={preview} alt="Preview" className="max-h-48 w-full object-contain" />
@@ -242,27 +251,52 @@ export function AdminGallery() {
       </div>
 
       {/* Image grid */}
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filtered.map((item) => (
-          <div key={item.id} className="group overflow-hidden rounded-xl border border-gray-200 bg-white">
-            <div className="aspect-square overflow-hidden bg-gray-100">
-              <img src={item.image_url} alt={item.title ?? 'Gallery image'} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-            </div>
-            <div className="p-3">
-              {item.title && <div className="font-medium text-gray-900 text-sm truncate">{item.title}</div>}
-              {item.caption && <div className="mt-0.5 text-xs text-gray-500 truncate">{item.caption}</div>}
-              <div className="mt-1 text-[10px] text-gray-400">{new Date(item.created_at).toLocaleDateString()}</div>
-              <div className="mt-2 flex gap-2">
-                <button onClick={() => openEdit(item)} className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50">Edit</button>
-                <button disabled={busyId === item.id} onClick={() => remove(item)} className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Delete</button>
+      {loading ? (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonCard key={i} lines={2} />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filtered.map((item) => (
+            <div key={item.id} className="group overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <div className="aspect-square overflow-hidden bg-gray-100">
+                <img src={item.image_url} alt={item.title ?? 'Gallery image'} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+              </div>
+              <div className="p-3">
+                {item.title && <div className="font-medium text-gray-900 text-sm truncate">{item.title}</div>}
+                {item.caption && <div className="mt-0.5 text-xs text-gray-500 truncate">{item.caption}</div>}
+                <div className="mt-1 text-[10px] text-gray-400">{new Date(item.created_at).toLocaleDateString()}</div>
+                <div className="mt-2 flex gap-2">
+                  <button onClick={() => openEdit(item)} className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50">Edit</button>
+                  <button disabled={busyId === item.id} onClick={() => setConfirmDelete(item)} className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Delete</button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-        {filtered.length === 0 && <div className="col-span-full rounded-xl border border-gray-200 bg-white p-10 text-center text-gray-500">
-          {search ? 'No images match your search.' : 'No images yet. Upload one to get started.'}
-        </div>}
-      </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="col-span-full">
+              <EmptyState
+                icon="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"
+                title={debouncedSearch ? 'No images match your search' : 'No images yet'}
+                message={debouncedSearch ? 'Try a different search term.' : 'Upload an image to get started.'}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete Image"
+        message={`Delete "${confirmDelete?.title ?? 'this image'}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={busyId === confirmDelete?.id}
+        onConfirm={() => confirmDelete && remove(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

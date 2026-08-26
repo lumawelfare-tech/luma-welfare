@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useHead } from '../lib/seo'
 import { AdminNotificationBell } from './AdminNotificationBell'
+import { ShortcutHelp } from './ShortcutHelp'
 
 const navSections = [
   {
@@ -79,6 +80,11 @@ export function AdminLayout() {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      <ShortcutHelp />
+      {/* Skip navigation link for accessibility */}
+      <a href="#admin-main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:rounded-lg focus:bg-luma-700 focus:px-4 focus:py-2 focus:text-sm focus:text-white focus:shadow-lg">
+        Skip to main content
+      </a>
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -166,7 +172,7 @@ export function AdminLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <main id="admin-main" className="flex-1 overflow-y-auto p-4 lg:p-6" role="main">
           <Outlet />
         </main>
       </div>

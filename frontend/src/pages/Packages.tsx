@@ -34,7 +34,7 @@ export function PackagesPage() {
   const q = (params.get('q') ?? '').toLowerCase()
 
   useEffect(() => {
-    api<{ packages: Package[] }>('/packages')
+    api<{ packages: Package[] }>('/packages?resource=packages')
       .then((d) => setPackages(d.packages))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))

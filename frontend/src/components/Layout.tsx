@@ -25,6 +25,10 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      {/* Skip navigation link for accessibility */}
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:rounded-lg focus:bg-luma-700 focus:px-4 focus:py-2 focus:text-sm focus:text-white focus:shadow-lg">
+        Skip to main content
+      </a>
       {/* Top Info Bar */}
       <div className="bg-luma-700 text-white">
         <div className="container-luma flex items-center justify-between py-2 text-xs">
@@ -206,7 +210,7 @@ export function Layout() {
         )}
       </header>
 
-      <main className="flex-1">
+      <main id="main-content" className="flex-1" role="main">
         <Outlet />
       </main>
 

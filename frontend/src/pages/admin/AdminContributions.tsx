@@ -1,5 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { api, ApiError } from '../../lib/api'
+import { useToast } from '../../components/Toast'
+import { DataTable, type Column } from '../../components/DataTable'
+import { BulkActionBar } from '../../components/BulkActionBar'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 
 type Contribution = {
   id: string
@@ -30,16 +34,26 @@ const filterOptions = [
 ]
 
 export function AdminContributions() {
+  const { addToast } = useToast()
   const [rows, setRows] = useState<Contribution[]>([])
   const [filter, setFilter] = useState('Pending')
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  // Selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+
+  // Dialogs
   const [rejectTarget, setRejectTarget] = useState<Contribution | null>(null)
   const [rejectNotes, setRejectNotes] = useState('')
+  const [showBulkReject, setShowBulkReject] = useState(false)
+  const [bulkRejectNotes, setBulkRejectNotes] = useState('')
 
-  async function load() {
+  const load = useCallback(async () => {
     setError(null)
+    setLoading(true)
     try {
       const d = await api<{ contributions: Contribution[] }>(
         `/admin/contributions${filter ? `?status=${filter}` : ''}`,
@@ -48,56 +62,203 @@ export function AdminContributions() {
       setRows(d.contributions ?? [])
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load contributions.')
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [filter])
 
-  useEffect(() => { load() }, [filter])
+  useEffect(() => { load() }, [load])
 
   async function verify(id: string) {
     setBusyId(id)
-    setNotice(null)
     try {
-      await api(`/admin/contributions/${id}`, {
-        method: 'PATCH',
-        auth: true,
-        body: { action: 'verify' },
-      })
-      setNotice('Contribution verified successfully.')
+      await api(`/admin/contributions/${id}`, { method: 'PATCH', auth: true, body: { action: 'verify' } })
+      addToast('success', 'Contribution verified successfully.')
       await load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not verify contribution.')
+      addToast('error', e instanceof ApiError ? e.message : 'Could not verify contribution.')
     } finally {
       setBusyId(null)
     }
   }
 
-  async function reject(contribution: Contribution) {
+  async function rejectContribution(contribution: Contribution) {
     setBusyId(contribution.id)
-    setNotice(null)
     try {
       await api(`/admin/contributions/${contribution.id}`, {
-        method: 'PATCH',
-        auth: true,
-        body: { action: 'reject', notes: rejectNotes.trim() || undefined },
+        method: 'PATCH', auth: true, body: { action: 'reject', notes: rejectNotes.trim() || undefined },
       })
-      setNotice(`Contribution for ${contribution.members?.full_name ?? 'member'} rejected.`)
+      addToast('success', `Contribution for ${contribution.members?.full_name ?? 'member'} rejected.`)
       setRejectTarget(null)
       setRejectNotes('')
       await load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not reject contribution.')
+      addToast('error', e instanceof ApiError ? e.message : 'Could not reject contribution.')
     } finally {
       setBusyId(null)
     }
   }
 
-  const pendingCount = rows.filter(r => r.status === 'Pending').length
+  async function bulkVerify() {
+    setBulkLoading(true)
+    const ids = Array.from(selectedIds)
+    let success = 0
+    let errors = 0
+    for (const id of ids) {
+      try {
+        await api(`/admin/contributions/${id}`, { method: 'PATCH', auth: true, body: { action: 'verify' } })
+        success++
+      } catch {
+        errors++
+      }
+    }
+    setBulkLoading(false)
+    setSelectedIds(new Set())
+    if (errors > 0) {
+      addToast('warning', `${success} verified, ${errors} failed.`)
+    } else {
+      addToast('success', `${success} contribution${success !== 1 ? 's' : ''} verified.`)
+    }
+    await load()
+  }
+
+  async function bulkReject() {
+    setBulkLoading(true)
+    const ids = Array.from(selectedIds)
+    let success = 0
+    let errors = 0
+    for (const id of ids) {
+      try {
+        await api(`/admin/contributions/${id}`, {
+          method: 'PATCH', auth: true, body: { action: 'reject', notes: bulkRejectNotes.trim() || undefined },
+        })
+        success++
+      } catch {
+        errors++
+      }
+    }
+    setBulkLoading(false)
+    setShowBulkReject(false)
+    setBulkRejectNotes('')
+    setSelectedIds(new Set())
+    if (errors > 0) {
+      addToast('warning', `${success} rejected, ${errors} failed.`)
+    } else {
+      addToast('success', `${success} contribution${success !== 1 ? 's' : ''} rejected.`)
+    }
+    await load()
+  }
+
+  function exportCSV() {
+    const headers = ['Member', 'Package', 'Period', 'Amount', 'Method', 'Reference', 'Status', 'Date']
+    const csvRows = rows.map((c) => [
+      c.members?.full_name ?? '',
+      c.packages?.name ?? '',
+      c.period,
+      String(c.amount),
+      (c.payments?.channel ?? 'manual').replace(/_/g, ' '),
+      c.payments?.mpesa_receipt ?? '',
+      c.status,
+      new Date(c.created_at).toLocaleDateString(),
+    ])
+    const csv = [headers, ...csvRows].map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `contributions-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    addToast('success', `Exported ${rows.length} contributions to CSV.`)
+  }
+
+  const pendingCount = rows.filter((r) => r.status === 'Pending').length
+
+  const columns: Column<Record<string, unknown>>[] = [
+    {
+      key: 'member_name',
+      header: 'Member',
+      render: (row) => {
+        const c = row as unknown as Contribution
+        return (
+          <div>
+            <div className="font-medium text-gray-900">{c.members?.full_name ?? 'Unknown'}</div>
+            <div className="text-xs text-gray-500">{c.members?.email ?? c.members?.phone ?? ''}</div>
+          </div>
+        )
+      },
+    },
+    { key: 'package_name', header: 'Package', render: (row) => (row as unknown as Contribution).packages?.name ?? '—' },
+    { key: 'period', header: 'Period', render: (row) => <span className="font-mono">{(row as unknown as Contribution).period}</span> },
+    {
+      key: 'amount',
+      header: 'Amount',
+      render: (row) => <span className="font-medium text-gray-900">KSh {(row as unknown as Contribution).amount.toLocaleString('en-KE')}</span>,
+    },
+    {
+      key: 'method',
+      header: 'Method',
+      render: (row) => <span className="text-gray-500 text-xs capitalize">{((row as unknown as Contribution).payments?.channel ?? 'manual').replace(/_/g, ' ')}</span>,
+    },
+    {
+      key: 'reference',
+      header: 'Reference',
+      render: (row) => <span className="text-gray-500 text-xs font-mono">{(row as unknown as Contribution).payments?.mpesa_receipt ?? '—'}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (row) => {
+        const c = row as unknown as Contribution
+        return (
+          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusStyles[c.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+            {c.status}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      className: 'text-right',
+      render: (row) => {
+        const c = row as unknown as Contribution
+        return (
+          <div className="flex justify-end gap-2">
+            {c.status === 'Pending' && (
+              <>
+                <button
+                  disabled={busyId === c.id}
+                  onClick={() => verify(c.id)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                >
+                  {busyId === c.id ? 'Processing…' : 'Verify'}
+                </button>
+                <button
+                  disabled={busyId === c.id}
+                  onClick={() => { setRejectTarget(c); setRejectNotes('') }}
+                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                >
+                  Reject
+                </button>
+              </>
+            )}
+          </div>
+        )
+      },
+    },
+  ]
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Contributions</h1>
-        <p className="text-sm text-gray-500 mt-1">Review and verify member contribution payments.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Contributions</h1>
+          <p className="text-sm text-gray-500 mt-1">Review and verify member contribution payments.</p>
+        </div>
+        <button onClick={exportCSV} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+          Export CSV
+        </button>
       </div>
 
       {/* Filters */}
@@ -120,90 +281,62 @@ export function AdminContributions() {
         ))}
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
-      )}
-      {notice && (
-        <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">{notice}</div>
-      )}
+      {error && <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-            <tr>
-              <th className="px-4 py-3">Member</th>
-              <th className="px-4 py-3">Package</th>
-              <th className="px-4 py-3">Period</th>
-              <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Method</th>
-              <th className="px-4 py-3">Reference</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((c) => (
-              <tr key={c.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3">
+      {loading ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
+          <svg className="mx-auto h-6 w-6 animate-spin text-luma-600" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p className="mt-3 text-sm text-gray-500">Loading contributions…</p>
+        </div>
+      ) : (
+        <DataTable
+          data={rows as unknown as Record<string, unknown>[]}
+          columns={columns}
+          keyExtractor={(r) => String(r.id)}
+          selectable={filter === 'Pending' || filter === ''}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+          getId={(r) => String(r.id)}
+          pageSize={25}
+          emptyMessage="No contributions found."
+          renderMobileCard={(row) => {
+            const c = row as unknown as Contribution
+            return (
+              <div className="space-y-2">
+                <div className="flex items-start justify-between">
                   <div className="font-medium text-gray-900">{c.members?.full_name ?? 'Unknown'}</div>
-                  <div className="text-xs text-gray-500">{c.members?.email ?? c.members?.phone ?? ''}</div>
-                </td>
-                <td className="px-4 py-3 text-gray-600">{c.packages?.name ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-600 font-mono">{c.period}</td>
-                <td className="px-4 py-3 font-medium text-gray-900">KSh {c.amount.toLocaleString('en-KE')}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs capitalize">
-                  {(c.payments?.channel ?? 'manual').replace(/_/g, ' ')}
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-xs font-mono">
-                  {c.payments?.mpesa_receipt ?? '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusStyles[c.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusStyles[c.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
                     {c.status}
                   </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {c.status === 'Pending' && (
-                    <div className="flex justify-end gap-2">
-                      <button
-                        disabled={busyId === c.id}
-                        onClick={() => verify(c.id)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-                      >
-                        {busyId === c.id ? 'Processing…' : (
-                          <>
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                            Verify
-                          </>
-                        )}
-                      </button>
-                      <button
-                        disabled={busyId === c.id}
-                        onClick={() => { setRejectTarget(c); setRejectNotes('') }}
-                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                        Reject
-                      </button>
-                    </div>
-                  )}
-                  {c.status !== 'Pending' && c.notes && (
-                    <span className="text-xs text-gray-400 italic max-w-[120px] block truncate" title={c.notes}>
-                      {c.notes}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length === 0 && (
-          <div className="p-12 text-center text-gray-500">
-            <p className="text-sm">No {filter ? filter.toLowerCase() : ''} contributions found.</p>
-          </div>
-        )}
-      </div>
+                </div>
+                <div className="text-xs text-gray-500">{c.packages?.name ?? '—'} · {c.period}</div>
+                <div className="text-sm font-medium text-gray-900">KSh {c.amount.toLocaleString('en-KE')}</div>
+                {c.payments?.mpesa_receipt && <div className="text-xs text-gray-400 font-mono">{c.payments.mpesa_receipt}</div>}
+                {c.status === 'Pending' && (
+                  <div className="flex gap-2 pt-1">
+                    <button disabled={busyId === c.id} onClick={() => verify(c.id)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Verify</button>
+                    <button disabled={busyId === c.id} onClick={() => { setRejectTarget(c); setRejectNotes('') }} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Reject</button>
+                  </div>
+                )}
+              </div>
+            )
+          }}
+        />
+      )}
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onClear={() => setSelectedIds(new Set())}
+        actions={[
+          { label: 'Verify Selected', variant: 'primary', onClick: bulkVerify, loading: bulkLoading },
+          { label: 'Reject Selected', variant: 'danger', onClick: () => setShowBulkReject(true), loading: bulkLoading },
+        ]}
+      />
 
       {/* Reject Dialog */}
       {rejectTarget && (
@@ -213,38 +346,42 @@ export function AdminContributions() {
               <h3 className="text-lg font-semibold text-gray-900">Reject Contribution</h3>
               <p className="mt-1 text-sm text-gray-500">
                 Reject the KSh {rejectTarget.amount.toLocaleString('en-KE')} contribution from{' '}
-                <strong>{rejectTarget.members?.full_name ?? 'member'}</strong> for period{' '}
-                <strong>{rejectTarget.period}</strong>?
+                <strong>{rejectTarget.members?.full_name ?? 'member'}</strong> for period <strong>{rejectTarget.period}</strong>?
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
-                <textarea
-                  value={rejectNotes}
-                  onChange={(e) => setRejectNotes(e.target.value)}
-                  placeholder="e.g. Transaction reference not found, amount mismatch…"
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none"
-                />
+                <textarea value={rejectNotes} onChange={(e) => setRejectNotes(e.target.value)} placeholder="e.g. Transaction reference not found, amount mismatch…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
-              <button
-                onClick={() => { setRejectTarget(null); setRejectNotes('') }}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => reject(rejectTarget)}
-                disabled={busyId === rejectTarget.id}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-              >
+              <button onClick={() => { setRejectTarget(null); setRejectNotes('') }} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => rejectContribution(rejectTarget)} disabled={busyId === rejectTarget.id} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
                 {busyId === rejectTarget.id ? 'Rejecting…' : 'Reject Contribution'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Bulk Reject Dialog */}
+      <ConfirmDialog
+        open={showBulkReject}
+        title="Reject Selected Contributions"
+        variant="danger"
+        confirmLabel={`Reject ${selectedIds.size} Contribution${selectedIds.size !== 1 ? 's' : ''}`}
+        loading={bulkLoading}
+        onConfirm={bulkReject}
+        onCancel={() => { setShowBulkReject(false); setBulkRejectNotes('') }}
+        message={
+          <>
+            <p>This will reject {selectedIds.size} selected contribution{selectedIds.size !== 1 ? 's' : ''}.</p>
+            <div className="mt-3">
+              <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
+              <textarea value={bulkRejectNotes} onChange={(e) => setBulkRejectNotes(e.target.value)} placeholder="e.g. Transaction reference not found…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
+            </div>
+          </>
+        }
+      />
     </div>
   )
 }
