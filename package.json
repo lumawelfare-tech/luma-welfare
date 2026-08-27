@@ -17,6 +17,9 @@
     "audit:security": "npx tsx backend/src/tests/dependency-audit.ts",
     "security:check": "npm audit && npm run audit:security",
     "verify:deploy": "bash scripts/verify-deploy.sh",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui",
+    "test:all": "npm run test -w frontend && npm run test:e2e",
     "prepare": "husky"
   },
   "engines": {
@@ -31,6 +34,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@vercel/node": "^7.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.4.1",

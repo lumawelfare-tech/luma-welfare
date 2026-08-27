@@ -16,3 +16,4 @@ supabase/supabase/
 
 .vercel
 .env*
+test-results/

@@ -5,6 +5,10 @@ import App from './App.tsx'
 import { ToastProvider } from './components/Toast'
 import { registerSW } from './lib/pwa'
 import { initSync } from './lib/sync'
+import { initSentry } from './lib/sentry'
+
+// Initialize Sentry for production error monitoring
+initSentry()
 
 // Register service worker for PWA support
 registerSW()
