@@ -94,27 +94,54 @@ export function AdminMembers() {
     }
   }
 
-  function handleExport(format: 'csv' | 'excel' | 'pdf') {
-    if (members.length === 0) {
-      addToast('info', 'No member records available for export.')
-      return
-    }
+  // Export all matching records from server
+  const [showExportMenu, setShowExportMenu] = useState(false)
+
+  async function fetchAllMembers(): Promise<Member[]> {
+    const d = await api<{ members: Member[]; total: number }>(
+      '/admin/members?action=export',
+      { method: 'POST', auth: true, body: { status: filter || undefined, q: debouncedQuery.trim() || undefined } },
+    )
+    return d.members ?? []
+  }
+
+  function handleExport(format: 'csv' | 'excel' | 'pdf', allRecords: boolean = false) {
+    setShowExportMenu(false)
     setExporting(format)
-    try {
-      const records = members.map(normalizeMember)
-      const parts: string[] = []
-      if (filter) parts.push(`Status: ${filter}`)
-      if (debouncedQuery.trim()) parts.push(`Search: ${debouncedQuery.trim()}`)
-      const filterSummary = parts.length > 0 ? `Filters: ${parts.join(' | ')}` : 'All members'
-      if (format === 'csv') exportMemberRecordsCSV(records)
-      else if (format === 'excel') exportMemberRecordsExcel(records, filterSummary)
-      else exportMemberRecordsPDF(records, filterSummary)
-      addToast('success', `Export complete — ${records.length} member${records.length !== 1 ? 's' : ''}`)
-    } catch {
-      addToast('error', 'Export failed. Please try again.')
-    } finally {
-      setExporting(null)
+    async function run() {
+      try {
+        let records: MemberRecord[]
+        let filterSummary: string
+        if (allRecords) {
+          const allMembers = await fetchAllMembers()
+          records = allMembers.map(normalizeMember)
+          const parts: string[] = []
+          if (filter) parts.push(`Status: ${filter}`)
+          if (debouncedQuery.trim()) parts.push(`Search: ${debouncedQuery.trim()}`)
+          filterSummary = parts.length > 0 ? `All matching: ${parts.join(' | ')}` : 'All members'
+        } else {
+          records = members.map(normalizeMember)
+          const parts: string[] = []
+          if (filter) parts.push(`Status: ${filter}`)
+          if (debouncedQuery.trim()) parts.push(`Search: ${debouncedQuery.trim()}`)
+          filterSummary = parts.length > 0 ? `Current page: ${parts.join(' | ')}` : 'Current page'
+        }
+        if (records.length === 0) {
+          addToast('info', 'No member records available for export.')
+          setExporting(null)
+          return
+        }
+        if (format === 'csv') exportMemberRecordsCSV(records)
+        else if (format === 'excel') exportMemberRecordsExcel(records, filterSummary)
+        else exportMemberRecordsPDF(records, filterSummary)
+        addToast('success', `Export complete — ${records.length} member${records.length !== 1 ? 's' : ''}`)
+      } catch {
+        addToast('error', 'Export failed. Please try again.')
+      } finally {
+        setExporting(null)
+      }
     }
+    run()
   }
 
   async function viewMember(member: Member) {
@@ -162,26 +189,25 @@ export function AdminMembers() {
 
   async function bulkStatusUpdate(status: 'active' | 'suspended' | 'closed') {
     setBulkLoading(true)
-    const ids = Array.from(selectedIds)
-    let success = 0
-    let errors = 0
-    for (const id of ids) {
-      try {
-        await api(`/admin/members/${id}`, { method: 'PATCH', auth: true, body: { status } })
-        success++
-      } catch {
-        errors++
+    try {
+      const ids = Array.from(selectedIds)
+      const d = await api<{ results: { id: string; success: boolean; error?: string }[]; summary: { total: number; success: number; errors: number } }>(
+        '/admin/members?action=batch',
+        { method: 'POST', auth: true, body: { ids, status } },
+      )
+      if (d.summary.errors > 0) {
+        addToast('warning', `${d.summary.success} updated, ${d.summary.errors} failed.`)
+      } else {
+        addToast('success', `${d.summary.success} member${d.summary.success !== 1 ? 's' : ''} ${status === 'active' ? 'approved' : status === 'suspended' ? 'suspended' : 'closed'}.`)
       }
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Batch operation failed.')
+    } finally {
+      setBulkLoading(false)
+      setBulkAction(null)
+      setSelectedIds(new Set())
+      await load()
     }
-    setBulkLoading(false)
-    setBulkAction(null)
-    setSelectedIds(new Set())
-    if (errors > 0) {
-      addToast('warning', `${success} updated, ${errors} failed.`)
-    } else {
-      addToast('success', `${success} member${success !== 1 ? 's' : ''} ${status === 'active' ? 'approved' : status === 'suspended' ? 'suspended' : 'closed'}.`)
-    }
-    await load()
   }
 
   function parseCSV(text: string): Record<string, string>[] {
@@ -332,29 +358,29 @@ export function AdminMembers() {
           <p className="mt-1 text-sm text-gray-500">{totalCount} member{totalCount !== 1 ? 's' : ''} found</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 mr-1">Export:</span>
-          {([
-            ['csv', 'CSV'],
-            ['excel', 'Excel'],
-            ['pdf', 'PDF'],
-          ] as const).map(([fmt, label]) => (
-            <button
-              key={fmt}
-              onClick={() => handleExport(fmt)}
-              disabled={exporting !== null || loading}
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {exporting === fmt ? (
-                <>
-                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Generating…
-                </>
-              ) : label}
+          <div className="relative">
+            <button onClick={() => setShowExportMenu(!showExportMenu)} disabled={exporting !== null || loading}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              {exporting ? (
+                <><svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Exporting…</>
+              ) : 'Export ▾'}
             </button>
-          ))}
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                  <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Current Page ({members.length})</div>
+                  {([['csv', 'CSV'], ['excel', 'Excel'], ['pdf', 'PDF']] as const).map(([fmt, label]) => (
+                    <button key={fmt} onClick={() => handleExport(fmt, false)} className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">{label}</button>
+                  ))}
+                  <div className="border-t border-gray-100 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">All Matching Records</div>
+                  {([['csv', 'CSV'], ['excel', 'Excel'], ['pdf', 'PDF']] as const).map(([fmt, label]) => (
+                    <button key={`all-${fmt}`} onClick={() => handleExport(fmt, true)} className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">{label}</button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           <button onClick={() => { setShowImport(true); setImportFile(null); setImportResults(null) }} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 transition-colors">
             Import CSV
           </button>

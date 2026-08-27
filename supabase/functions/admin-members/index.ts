@@ -162,6 +162,114 @@ Deno.serve(async (req) => {
       })
     }
 
+    // POST /admin-members?action=batch — batch status update for multiple members
+    if (req.method === 'POST' && (action === 'batch' || resourceId === 'batch')) {
+      requirePermission(session, 'members', 'approve')
+      const body = await req.json()
+      const { ids, status: memberStatus } = body
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return new Response(JSON.stringify({ message: 'No member IDs provided.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (ids.length > 100) {
+        return new Response(JSON.stringify({ message: 'Maximum 100 members per batch.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (!['active', 'suspended', 'closed'].includes(memberStatus)) {
+        return new Response(JSON.stringify({ message: 'Invalid status' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Deduplicate IDs
+      const uniqueIds = [...new Set(ids)]
+      const results: { id: string; success: boolean; error?: string }[] = []
+      const now = new Date().toISOString()
+
+      for (const id of uniqueIds) {
+        // Prevent self-deletion
+        if (id === user.id) {
+          results.push({ id, success: false, error: 'Cannot modify your own account.' })
+          continue
+        }
+
+        // Prevent modifying other admins
+        const { data: targetAdmin } = await adminClient
+          .from('admins').select('id').eq('id', id).maybeSingle()
+        if (targetAdmin) {
+          results.push({ id, success: false, error: 'Cannot modify administrator accounts.' })
+          continue
+        }
+
+        try {
+          const { error } = await adminClient
+            .from('members')
+            .update({
+              status: memberStatus,
+              approved_at: memberStatus === 'active' ? now : undefined,
+              approved_by: memberStatus === 'active' ? session.id : undefined,
+              updated_at: now,
+            })
+            .eq('id', id)
+          if (error) throw error
+          results.push({ id, success: true })
+        } catch {
+          results.push({ id, success: false, error: 'Update failed.' })
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length
+      const errorCount = results.filter(r => !r.success).length
+
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: `members_batch_${memberStatus}`,
+        resource: 'member',
+        meta: { total: uniqueIds.length, success: successCount, errors: errorCount, status: memberStatus },
+      })
+
+      return new Response(JSON.stringify({ results, summary: { total: uniqueIds.length, success: successCount, errors: errorCount } }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // POST /admin-members?action=export — server-side export all matching members
+    if (req.method === 'POST' && (action === 'export' || resourceId === 'export')) {
+      requirePermission(session, 'members', 'read')
+      const body = await req.json()
+      const { status: exportStatus, q: exportQuery } = body
+
+      // Use the same RPC search but get ALL results (up to 5000)
+      const { data, error } = await adminClient.rpc('admin_search_members', {
+        p_q: exportQuery || null,
+        p_status: exportStatus || null,
+        p_page: 1,
+        p_per_page: 5000,
+      })
+      if (error) throw new Error(error.message)
+
+      const result = data?.[0] ?? { members: [] }
+      const members = result.members ?? []
+
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: 'members_export',
+        resource: 'member',
+        meta: { count: members.length, filters: { status: exportStatus, q: exportQuery } },
+      })
+
+      return new Response(JSON.stringify({ members, total: members.length }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // POST /admin-members?action=import — bulk import members from CSV
     if (req.method === 'POST' && (action === 'import' || resourceId === 'import')) {
       requirePermission(session, 'members', 'create')

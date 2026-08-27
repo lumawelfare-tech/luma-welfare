@@ -54,6 +54,100 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ claim, documents: documents ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    // POST /admin-claims?action=batch — batch reject claims
+    const batchAction = url.searchParams.get('action')
+    if (req.method === 'POST' && (batchAction === 'batch' || resourceId === 'batch')) {
+      requirePermission(session, 'claims', 'approve')
+      const body = await req.json()
+      const { ids, decision, adminNotes } = body
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return new Response(JSON.stringify({ message: 'No claim IDs provided.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (ids.length > 100) {
+        return new Response(JSON.stringify({ message: 'Maximum 100 claims per batch.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const statusMap: Record<string, string> = { approve: 'Approved', reject: 'Rejected', 'request-info': 'Additional Information Required' }
+      if (!statusMap[decision]) {
+        return new Response(JSON.stringify({ message: 'Invalid decision' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const uniqueIds = [...new Set(ids)]
+      const results: { id: string; success: boolean; error?: string }[] = []
+
+      for (const id of uniqueIds) {
+        try {
+          const updates: Record<string, unknown> = {
+            status: statusMap[decision],
+            admin_notes: adminNotes || null,
+            reviewed_at: new Date().toISOString(),
+          }
+          if (decision === 'approve' || decision === 'reject') {
+            updates.decided_at = new Date().toISOString()
+            updates.decided_by = session.id
+          }
+          const { error } = await adminClient.from('claims').update(updates).eq('id', id)
+          if (error) throw error
+          results.push({ id, success: true })
+        } catch {
+          results.push({ id, success: false, error: 'Update failed.' })
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length
+      const errorCount = results.filter(r => !r.success).length
+
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: `claims_batch_${decision}`,
+        resource: 'claim',
+        meta: { total: uniqueIds.length, success: successCount, errors: errorCount, decision },
+      })
+
+      return new Response(JSON.stringify({ results, summary: { total: uniqueIds.length, success: successCount, errors: errorCount } }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // POST /admin-claims?action=export — server-side export all matching claims
+    if (req.method === 'POST' && (batchAction === 'export' || resourceId === 'export')) {
+      requirePermission(session, 'claims', 'read')
+      const body = await req.json().catch(() => ({}))
+      const { status: exportStatus, q: exportQuery } = body
+
+      const { data, error } = await adminClient.rpc('admin_search_claims', {
+        p_q: exportQuery || null,
+        p_status: exportStatus || null,
+        p_page: 1,
+        p_per_page: 5000,
+      })
+      if (error) throw new Error(error.message)
+
+      const result = data?.[0] ?? { claims: [] }
+      const claims = result.claims ?? []
+
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: 'claims_export',
+        resource: 'claim',
+        meta: { count: claims.length },
+      })
+
+      return new Response(JSON.stringify({ claims, total: claims.length }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // PATCH /admin-claims?resource_id=xxx — approve/reject/request-info
     if (req.method === 'PATCH' && claimId) {
       requirePermission(session, 'claims', 'approve')

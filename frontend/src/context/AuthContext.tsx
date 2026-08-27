@@ -17,7 +17,15 @@ export type Member = {
   status: 'pending_approval' | 'active' | 'suspended' | 'closed'
   joined_at: string | null
   approved_at: string | null
-  [key: string]: unknown
+  approved_by: string | null
+  photo_url: string | null
+  id_number: string | null
+  alt_phone: string | null
+  county: string | null
+  location: string | null
+  occupation: string | null
+  created_at: string | null
+  updated_at: string | null
 }
 
 export type LoginResult = {
@@ -199,6 +207,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     })
     if (error) throw error
+    // Note: After OAuth redirect, the onAuthStateChange listener above handles
+    // authorization check and admin redirect. The redirectTo is /dashboard as a
+    // fallback — the listener checks isAdmin and redirects to /admin/dashboard
+    // for admin users.
   }
 
   async function register(input: {
