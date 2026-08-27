@@ -12,16 +12,30 @@ Deno.serve(async (req) => {
     const adminClient = createAdminClient()
     const url = new URL(req.url)
 
-    // GET /member-contributions — list contributions
+    // GET /member-contributions — list contributions with pagination
     if (req.method === 'GET') {
       const subId = url.searchParams.get('subscriptionId')
-      let query = adminClient
-        .from('contributions').select('id, period, amount, status, notes, created_at, subscription_id, packages(code, name)')
-        .eq('member_id', user.id)
-      if (subId) query = query.eq('subscription_id', subId)
-      const { data, error } = await query.order('period', { ascending: false })
+      const status = url.searchParams.get('status')
+      const page = parseInt(url.searchParams.get('page') || '1')
+      const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '20'), 100)
+
+      const { data, error } = await adminClient.rpc('member_search_contributions', {
+        p_member_id: user.id,
+        p_subscription_id: subId || null,
+        p_status: status || null,
+        p_page: page,
+        p_per_page: perPage,
+      })
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ contributions: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+      const result = data?.[0] ?? { contributions: [], total: 0, page, per_page: perPage, pages: 1 }
+      return new Response(JSON.stringify({
+        contributions: result.contributions ?? [],
+        total: Number(result.total) ?? 0,
+        page: result.page ?? page,
+        per_page: result.per_page ?? perPage,
+        pages: result.pages ?? 1,
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // POST /member-contributions — record contribution

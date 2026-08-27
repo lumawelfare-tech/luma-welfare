@@ -1,6 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
-import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
+import { sendNotification } from '../shared/notifications.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -117,21 +117,14 @@ Deno.serve(async (req) => {
         meta: { mpesa_receipt: mpesaReceipt, by: session.display_name, notes },
       })
 
-      // Notify member that registration fee is confirmed
-      const notifSubject = 'Membership Activated'
-      const notifBody = 'Your KSh 300 registration fee has been confirmed. You can now explore and join welfare packages.'
-      await adminClient.from('notifications').insert({
-        member_id: memberId,
-        channel: 'in_app',
-        subject: notifSubject,
-        body: notifBody,
-        status: 'queued',
+      // Notify member that registration fee is confirmed (respects channel preferences)
+      await sendNotification(adminClient, {
+        memberId,
+        subject: 'Membership Activated',
+        body: 'Your KSh 300 registration fee has been confirmed. You can now explore and join welfare packages.',
+        emailButtonText: 'Explore Packages',
+        emailButtonUrl: 'https://luma-welfare.vercel.app/join',
       })
-
-      // Send email notification
-      const { data: member } = await adminClient.from('members').select('email').eq('id', memberId).single()
-      if (member?.email) {
-        const emailHtml = buildEmailTemplate(notifSubject, notifBody, 'Explore Packages', 'https://luma-welfare.vercel.app/member/packages')
         await sendEmail(member.email, notifSubject, emailHtml)
       }
 
@@ -146,10 +139,9 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error'
-    const status = message.includes('FORBIDDEN') ? 403 : 500
-    return new Response(JSON.stringify({ message, code: message.includes('FORBIDDEN') ? 'FORBIDDEN' : 'INTERNAL' }), {
-      status,
+    console.error('admin-registration-fee error:', err)
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), {
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

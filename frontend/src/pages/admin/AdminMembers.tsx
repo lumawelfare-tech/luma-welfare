@@ -4,6 +4,7 @@ import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { ExportDialog } from '../../components/ExportDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 
 type Member = {
@@ -16,6 +17,7 @@ type Member = {
   joined_at: string | null
 }
 
+
 export function AdminMembers() {
   const { addToast } = useToast()
   const [members, setMembers] = useState<Member[]>([])
@@ -25,6 +27,10 @@ export function AdminMembers() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const perPage = 50
 
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -35,6 +41,9 @@ export function AdminMembers() {
   const [confirmText, setConfirmText] = useState('')
   const [deleteBusy, setDeleteBusy] = useState(false)
 
+  // Export
+  const [showExport, setShowExport] = useState(false)
+
   // CSV Import
   const [showImport, setShowImport] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -44,16 +53,20 @@ export function AdminMembers() {
   // Bulk dialogs
   const [bulkAction, setBulkAction] = useState<'active' | 'suspended' | 'closed' | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pageNum = 1) => {
     setError(null)
     setLoading(true)
     try {
       const qs = new URLSearchParams()
       if (filter) qs.set('status', filter)
       if (debouncedQuery.trim()) qs.set('q', debouncedQuery.trim())
-      const qsStr = qs.toString()
-      const d = await api<{ members: Member[] }>(`/admin/members${qsStr ? '?' + qsStr : ''}`, { auth: true })
+      qs.set('page', String(pageNum))
+      qs.set('per_page', String(perPage))
+      const d = await api<{ members: Member[]; total: number; page: number; pages: number }>(`/admin/members?${qs.toString()}`, { auth: true })
       setMembers(d.members ?? [])
+      setTotalCount(d.total ?? 0)
+      setTotalPages(d.pages ?? 1)
+      setPage(d.page ?? pageNum)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load members.')
     } finally {
@@ -61,7 +74,7 @@ export function AdminMembers() {
     }
   }, [filter, debouncedQuery])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(1) }, [load])
 
   async function setStatus(id: string, status: 'active' | 'suspended' | 'closed') {
     setBusyId(id)
@@ -165,27 +178,6 @@ export function AdminMembers() {
     }
   }
 
-  function exportCSV() {
-    const headers = ['Name', 'Email', 'Phone', 'Membership #', 'Status', 'Joined']
-    const rows = members.map((m) => [
-      m.full_name,
-      m.email ?? '',
-      m.phone,
-      m.membership_number ?? '',
-      m.status,
-      m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '',
-    ])
-    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `members-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    addToast('success', `Exported ${members.length} members to CSV.`)
-  }
-
   const statusColor = (s: string) => {
     switch (s) {
       case 'active': return 'bg-emerald-100 text-emerald-700'
@@ -282,10 +274,10 @@ export function AdminMembers() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Members</h1>
-          <p className="mt-1 text-sm text-gray-500">{members.length} member{members.length !== 1 ? 's' : ''} found</p>
+          <p className="mt-1 text-sm text-gray-500">{totalCount} member{totalCount !== 1 ? 's' : ''} found</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportCSV} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+          <button onClick={() => setShowExport(true)} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
             Export CSV
           </button>
           <button onClick={() => { setShowImport(true); setImportFile(null); setImportResults(null) }} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 transition-colors">
@@ -320,6 +312,7 @@ export function AdminMembers() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
+            aria-label="Search members"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name, phone, membership #..."
@@ -413,6 +406,31 @@ export function AdminMembers() {
         )}
       </div>
 
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+          <div className="text-sm text-gray-500">
+            Page {page} of {totalPages}
+          </div>
+          <div className="flex gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => load(page - 1)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => load(page + 1)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bulk Action Bar */}
       <BulkActionBar
         selectedCount={selectedIds.size}
@@ -458,6 +476,7 @@ export function AdminMembers() {
                 Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
               </label>
               <input
+                aria-label="Type member name to confirm deletion"
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
                 placeholder='Type "DELETE" to confirm'
@@ -477,7 +496,7 @@ export function AdminMembers() {
             <div className="px-6 py-5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Import Members from CSV</h3>
-                <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => setShowImport(false)} aria-label="Close import dialog" className="text-gray-400 hover:text-gray-600">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
@@ -493,6 +512,7 @@ export function AdminMembers() {
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700">Select CSV File</label>
                     <input
+                      aria-label="Select CSV file to import"
                       type="file"
                       accept=".csv"
                       onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
@@ -552,6 +572,14 @@ export function AdminMembers() {
           </div>
         </div>
       )}
+
+      <ExportDialog
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        exportType="members"
+        filters={{ status: filter || undefined, q: debouncedQuery.trim() || undefined }}
+        filterLabels={{ status: 'Status', q: 'Search' }}
+      />
     </div>
   )
 }

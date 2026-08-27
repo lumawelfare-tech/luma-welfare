@@ -82,6 +82,9 @@ verify_jwt = true
 [functions.member-notifications]
 verify_jwt = true
 
+[functions.member-notification-prefs]
+verify_jwt = true
+
 [functions.admin-2fa]
 verify_jwt = true
 
@@ -129,3 +132,14 @@ verify_jwt = true
 
 [functions.send-report-email]
 verify_jwt = false
+
+# Health check — no auth needed
+[functions.health]
+verify_jwt = false
+
+# Admin monitoring — requires admin JWT
+[functions.admin-monitoring]
+verify_jwt = true
+
+[functions.admin-reconciliation]
+verify_jwt = true

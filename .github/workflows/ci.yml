@@ -1,0 +1,237 @@
+# Luma Welfare — CI Pipeline
+# Runs on every push and pull request to catch issues before deployment.
+#
+# Jobs:
+# 1. security-audit — npm audit for dependency vulnerabilities
+# 2. typecheck — TypeScript type checking
+# 3. lint — Code linting
+# 4. build — Production build verification
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same branch/PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  # ============================================================================
+  # SECURITY AUDIT
+  # ============================================================================
+  security-audit:
+    name: "🔒 Security Audit"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit (root)
+        run: |
+          echo "=== Root workspace audit ==="
+          npm audit --omit=dev 2>&1 | tee audit-root.txt
+          echo ""
+
+      - name: Run npm audit (frontend)
+        working-directory: frontend
+        run: |
+          echo "=== Frontend audit ==="
+          npm audit --omit=dev 2>&1 | tee ../audit-frontend.txt
+          echo ""
+
+      - name: Run npm audit (full — including dev)
+        run: |
+          echo "=== Full audit (including dev dependencies) ==="
+          npm audit 2>&1 | tee audit-full.txt
+          echo ""
+
+      - name: Evaluate audit results
+        run: |
+          echo "============================================="
+          echo "  SECURITY AUDIT RESULTS"
+          echo "============================================="
+          echo ""
+
+          # Check for critical/high vulnerabilities
+          CRITICAL=$(grep -c "critical" audit-full.txt 2>/dev/null || echo "0")
+          HIGH=$(grep -c "high" audit-full.txt 2>/dev/null || echo "0")
+
+          echo "Critical vulnerabilities: $CRITICAL"
+          echo "High vulnerabilities: $HIGH"
+          echo ""
+
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ CRITICAL vulnerabilities found!"
+            echo "Review audit-full.txt for details."
+            echo ""
+            cat audit-full.txt
+            exit 1
+          fi
+
+          if [ "$HIGH" -gt 0 ]; then
+            echo "⚠️  HIGH vulnerabilities found."
+            echo "Review audit-full.txt for details."
+            echo ""
+            cat audit-full.txt
+            # Don't fail on high — but make it visible
+            # exit 1
+          fi
+
+          echo "✅ No critical vulnerabilities found."
+          echo ""
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-reports
+          path: |
+            audit-root.txt
+            audit-frontend.txt
+            audit-full.txt
+          retention-days: 30
+
+  # ============================================================================
+  # TYPECHECK
+  # ============================================================================
+  typecheck:
+    name: "🔍 Typecheck"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check (frontend)
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: TypeScript check (backend)
+        working-directory: backend
+        run: npx tsc --noEmit 2>&1 || true
+        # Backend may have Deno-specific imports that tsc can't resolve
+
+  # ============================================================================
+  # LINT
+  # ============================================================================
+  lint:
+    name: "🧹 Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (frontend)
+        working-directory: frontend
+        run: npm run lint
+
+  # ============================================================================
+  # BUILD
+  # ============================================================================
+  build:
+    name: "🏗️ Build"
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          echo "=== Build output ==="
+          ls -la frontend/dist/
+          echo ""
+          echo "=== Bundle sizes ==="
+          du -sh frontend/dist/assets/
+          echo ""
+          echo "✅ Build successful"
+
+  # ============================================================================
+  # SECURITY SCORECARD (summary)
+  # ============================================================================
+  security-summary:
+    name: "📊 Security Summary"
+    runs-on: ubuntu-latest
+    needs: [security-audit, typecheck, lint, build]
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          echo "============================================="
+          echo "  CI PIPELINE SUMMARY"
+          echo "============================================="
+          echo ""
+          echo "Security Audit: ${{ needs.security-audit.result }}"
+          echo "Typecheck:      ${{ needs.typecheck.result }}"
+          echo "Lint:           ${{ needs.lint.result }}"
+          echo "Build:          ${{ needs.build.result }}"
+          echo ""
+
+          if [ "${{ needs.security-audit.result }}" = "failure" ]; then
+            echo "❌ Security audit failed — deployment blocked"
+            exit 1
+          fi
+
+          if [ "${{ needs.typecheck.result }}" = "failure" ]; then
+            echo "❌ Typecheck failed — deployment blocked"
+            exit 1
+          fi
+
+          if [ "${{ needs.lint.result }}" = "failure" ]; then
+            echo "❌ Lint failed — deployment blocked"
+            exit 1
+          fi
+
+          if [ "${{ needs.build.result }}" = "failure" ]; then
+            echo "❌ Build failed — deployment blocked"
+            exit 1
+          fi
+
+          echo "✅ All checks passed — safe to deploy"

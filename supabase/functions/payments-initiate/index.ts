@@ -268,6 +268,13 @@ Deno.serve(async (req) => {
       .update({ checkout_request_id: stkData.CheckoutRequestID })
       .eq('id', inserted.id)
 
+    // Record payment timeline
+    await adminClient.rpc('record_payment_initiation', {
+      p_payment_id: inserted.id,
+      p_checkout_request_id: stkData.CheckoutRequestID,
+      p_actor: 'member',
+    })
+
     await logAudit(adminClient, {
       actor_id: user.id,
       action: 'payment_initiated',

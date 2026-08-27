@@ -324,8 +324,8 @@ Deno.serve(async (req) => {
 
       // POST?action=verify — verify TOTP during login (called by auth-login)
       if (action === 'verify') {
-        const { code, userId } = body
-        const targetUserId = userId || user.id
+        const { code } = body
+        const targetUserId = user.id
 
         if (!code) {
           return new Response(JSON.stringify({ message: 'Verification code is required.' }), {
@@ -381,7 +381,8 @@ Deno.serve(async (req) => {
       status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal server error' }), {
+    console.error('admin-2fa error:', err)
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

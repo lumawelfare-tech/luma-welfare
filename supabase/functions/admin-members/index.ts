@@ -1,6 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
-import { createUserClient } from '../shared/supabase.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -10,8 +9,7 @@ Deno.serve(async (req) => {
     const user = await getAuthenticatedUser(req)
     if (!user) {
       return new Response(JSON.stringify({ message: 'Not authenticated', code: 'UNAUTHORIZED' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -19,32 +17,41 @@ Deno.serve(async (req) => {
     const session = await loadAdminSession(adminClient, user.id)
     if (!session) {
       return new Response(JSON.stringify({ message: 'No admin access', code: 'FORBIDDEN' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     const url = new URL(req.url)
-    // Use query params for sub-resource operations (Supabase Edge Functions don't support path params)
     const resourceId = url.searchParams.get('resource_id')
     const action = url.searchParams.get('action')
 
-    // GET /admin-members — list members
+    // GET /admin-members — list members with optimized search
     if (req.method === 'GET' && !resourceId) {
       requirePermission(session, 'members', 'read')
       const status = url.searchParams.get('status')
       const q = url.searchParams.get('q')
-      let query = adminClient
-        .from('members')
-        .select('id, membership_number, full_name, phone, email, status, joined_at, approved_at')
-        .order('joined_at', { ascending: false })
-      if (status) query = query.eq('status', status)
-      if (q) query = query.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,membership_number.ilike.%${q}%`)
-      const { data, error } = await query
+      const page = parseInt(url.searchParams.get('page') || '1')
+      const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '50'), 200)
+
+      // Use RPC for server-side indexed search with pagination
+      const { data, error } = await adminClient.rpc('admin_search_members', {
+        p_q: q || null,
+        p_status: status || null,
+        p_page: page,
+        p_per_page: perPage,
+      })
+
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ members: data ?? [] }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+
+      const result = data?.[0] ?? { members: [], total: 0, page, per_page: perPage, pages: 1 }
+      return new Response(JSON.stringify({
+        members: result.members ?? [],
+        total: Number(result.total) ?? 0,
+        page: result.page ?? page,
+        per_page: result.per_page ?? perPage,
+        pages: result.pages ?? 1,
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -70,8 +77,7 @@ Deno.serve(async (req) => {
         family_members: family.data ?? [],
         contributions: contribs.data ?? [],
       }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -82,8 +88,7 @@ Deno.serve(async (req) => {
       const { status: memberStatus } = body
       if (!['active', 'suspended', 'closed'].includes(memberStatus)) {
         return new Response(JSON.stringify({ message: 'Invalid status', code: 'VALIDATION' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
@@ -110,8 +115,7 @@ Deno.serve(async (req) => {
       })
 
       return new Response(JSON.stringify({ member: data }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -119,15 +123,12 @@ Deno.serve(async (req) => {
     if (req.method === 'DELETE' && resourceId) {
       requirePermission(session, 'members', 'delete')
 
-      // Prevent self-deletion
       if (resourceId === user.id) {
         return new Response(JSON.stringify({ message: 'Administrators cannot delete their own account', code: 'SELF_DELETE_BLOCKED' }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      // Prevent deleting another administrator
       const { data: targetAdmin } = await adminClient
         .from('admins')
         .select('id, display_name')
@@ -135,18 +136,13 @@ Deno.serve(async (req) => {
         .maybeSingle()
       if (targetAdmin) {
         return new Response(JSON.stringify({ message: 'Cannot delete an administrator account through member management', code: 'ADMIN_DELETE_BLOCKED' }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      // Soft-delete: set status to 'closed'
       const { data: member, error } = await adminClient
         .from('members')
-        .update({
-          status: 'closed',
-          updated_at: new Date().toISOString(),
-        })
+        .update({ status: 'closed', updated_at: new Date().toISOString() })
         .eq('id', resourceId)
         .select('id, full_name, email')
         .single()
@@ -162,10 +158,11 @@ Deno.serve(async (req) => {
       })
 
       return new Response(JSON.stringify({ message: 'Member deactivated', member }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
-    }    // POST /admin-members?action=import — bulk import members from CSV
+    }
+
+    // POST /admin-members?action=import — bulk import members from CSV
     if (req.method === 'POST' && (action === 'import' || resourceId === 'import')) {
       requirePermission(session, 'members', 'create')
       const body = await req.json()
@@ -187,7 +184,7 @@ Deno.serve(async (req) => {
 
       for (let i = 0; i < importMembers.length; i++) {
         const row = importMembers[i]
-        const rowNum = i + 2 // +2 for header row + 0-index
+        const rowNum = i + 2
         const email = (row.email ?? '').trim().toLowerCase()
         const fullName = (row.full_name ?? row.fullName ?? '').trim()
         const phone = (row.phone ?? '').trim()
@@ -198,7 +195,6 @@ Deno.serve(async (req) => {
           continue
         }
 
-        // Check for existing member with this email
         const { data: existing } = await adminClient
           .from('members')
           .select('id, email')
@@ -210,11 +206,9 @@ Deno.serve(async (req) => {
           continue
         }
 
-        // Generate a temporary password
         const tempPassword = `Luma${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
         try {
-          // Create auth user
           const { data: authUser, error: authErr } = await adminClient.auth.admin.createUser({
             email,
             password: tempPassword,
@@ -227,7 +221,6 @@ Deno.serve(async (req) => {
             continue
           }
 
-          // Create member record
           const { error: memberErr } = await adminClient
             .from('members')
             .insert({
@@ -241,22 +234,14 @@ Deno.serve(async (req) => {
             })
 
           if (memberErr) {
-            // Cleanup: delete the auth user if member creation fails
             await adminClient.auth.admin.deleteUser(authUser.user.id)
             results.push({ row: rowNum, email, status: 'error', message: memberErr.message })
             continue
           }
 
-          // Create registration fee record
           await adminClient
             .from('registration_fees')
-            .insert({
-              member_id: authUser.user.id,
-              fee_type: 'registration',
-              amount: 300,
-              currency: 'KES',
-              status: 'unpaid',
-            })
+            .insert({ member_id: authUser.user.id, fee_type: 'registration', amount: 300, currency: 'KES', status: 'unpaid' })
 
           results.push({ row: rowNum, email, status: 'success', message: 'Member created.', member_id: authUser.user.id })
         } catch (err) {
@@ -288,11 +273,9 @@ Deno.serve(async (req) => {
       status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error'
-    const status = message.includes('FORBIDDEN') ? 403 : message.includes('not found') ? 404 : 500
-    return new Response(JSON.stringify({ message, code: message.includes('FORBIDDEN') ? 'FORBIDDEN' : 'INTERNAL' }), {
-      status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    console.error('admin-members error:', err)
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })

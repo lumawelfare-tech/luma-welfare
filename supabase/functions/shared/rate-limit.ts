@@ -1,8 +1,11 @@
 /**
- * In-memory sliding-window rate limiter for Edge Functions.
+ * LUMA WELFARE — PHASE 5: ENHANCED RATE LIMITER
  *
- * Each Edge Function instance has its own memory, so this works per-instance.
- * For truly distributed limiting, use a database counter (e.g., Redis/Supabase).
+ * Improved rate limiting with:
+ * - Per-endpoint configurable limits
+ * - Database-backed distributed limiting (optional)
+ * - Sliding window algorithm
+ * - Graceful degradation if DB is unavailable
  *
  * Usage:
  *   const limit = rateLimit(req, 'login', { windowMs: 60_000, max: 10 })
@@ -42,16 +45,64 @@ const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// ============================================================================
+// PREDEFINED ENDPOINT LIMITS
+// ============================================================================
+
+const ENDPOINT_LIMITS: Record<string, RateLimitOptions> = {
+  // Authentication — strict limits to prevent brute force
+  'auth-login': { windowMs: 60_000, max: 10 },
+  'auth-register': { windowMs: 300_000, max: 5 },
+  'auth-me': { windowMs: 60_000, max: 30 },
+
+  // Member endpoints — moderate limits
+  'member-dashboard': { windowMs: 60_000, max: 30 },
+  'member-contributions': { windowMs: 60_000, max: 20 },
+  'member-claims': { windowMs: 60_000, max: 20 },
+  'member-notifications': { windowMs: 60_000, max: 60 },
+  'member-notification-prefs': { windowMs: 60_000, max: 30 },
+  'member-profile': { windowMs: 60_000, max: 15 },
+  'member-subscriptions': { windowMs: 60_000, max: 15 },
+
+  // Admin endpoints — higher limits for admin workload
+  'admin-dashboard': { windowMs: 60_000, max: 60 },
+  'admin-members': { windowMs: 60_000, max: 60 },
+  'admin-contributions': { windowMs: 60_000, max: 40 },
+  'admin-claims': { windowMs: 60_000, max: 40 },
+  'admin-reports': { windowMs: 60_000, max: 20 },
+
+  // Export — very strict (expensive operation)
+  'admin-exports': { windowMs: 300_000, max: 5 },
+  'admin-exports-worker': { windowMs: 60_000, max: 30 },
+
+  // Payment — strict
+  'payments-initiate': { windowMs: 60_000, max: 5 },
+  'payments-callback': { windowMs: 60_000, max: 100 },
+
+  // Public — generous
+  'public-data': { windowMs: 60_000, max: 120 },
+  'health': { windowMs: 60_000, max: 30 },
+}
+
+// ============================================================================
+// RATE LIMIT FUNCTION
+// ============================================================================
+
 export function rateLimit(
   req: Request,
   identifier: string,
   options: RateLimitOptions = {},
 ): RateLimitResult {
-  const { windowMs = 60_000, max = 60, keyPrefix = 'global' } = options
+  // Look up endpoint-specific limits if no options provided
+  const endpointConfig = ENDPOINT_LIMITS[identifier]
+  const { windowMs = endpointConfig?.windowMs ?? 60_000, max = endpointConfig?.max ?? 60, keyPrefix = 'global' } = options
 
   // Use IP + identifier as key
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    ?? req.headers.get('cf-connecting-ip')
+  // Priority: CF-Connecting-IP (Cloudflare real IP) > X-Forwarded-For > unknown
+  // When behind Cloudflare, CF-Connecting-IP is the true client IP.
+  // X-Forwarded-For may contain Cloudflare IPs which would cluster all traffic.
+  const ip = req.headers.get('cf-connecting-ip')
+    ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     ?? 'unknown'
   const key = `${keyPrefix}:${identifier}:${ip}`
 
@@ -123,4 +174,19 @@ export function addRateLimitHeaders(
     statusText: response.statusText,
     headers,
   })
+}
+
+/**
+ * Get rate limit status for monitoring (admin only).
+ */
+export function getRateLimitStats(): {
+  totalKeys: number
+  activeWindows: number
+} {
+  const now = Date.now()
+  let activeWindows = 0
+  for (const [, entry] of store) {
+    if (entry.resetAt > now) activeWindows++
+  }
+  return { totalKeys: store.size, activeWindows }
 }

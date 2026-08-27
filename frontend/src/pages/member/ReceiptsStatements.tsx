@@ -5,6 +5,21 @@ import { EmptyState } from '../../components/EmptyState'
 import { SkeletonRow } from '../../components/Skeleton'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function escapeXml(str: string | null | undefined): string {
+  if (!str) return ''
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 type Transaction = {
   id: string
   type: string
@@ -44,10 +59,9 @@ const statusColors: Record<string, string> = {
 }
 
 function escapeCSV(val: string): string {
-  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-    return `"${val.replace(/"/g, '""')}"`
-  }
-  return val
+  const safe = val ?? ''
+  if (/^[=+\-@\t\r]/.test(safe)) return `'${safe.replace(/"/g, '""')}`
+  return `"${safe.replace(/"/g, '""')}"`
 }
 
 function toCSV(transactions: Transaction[]): string {
@@ -103,7 +117,7 @@ function downloadExcel(transactions: Transaction[], _filename: string) {
   for (const row of rows) {
     xml += '<Row>' + row.map((val) => {
       const type = typeof val === 'number' ? 'Number' : 'String'
-      return `<Cell><Data ss:Type="${type}">${val}</Data></Cell>`
+      return `<Cell><Data ss:Type="${type}">${escapeXml(String(val))}</Data></Cell>`
     }).join('') + '</Row>\n'
   }
   xml += '</Table>\n</Worksheet>\n</Workbook>'
@@ -135,12 +149,12 @@ function downloadPDFStatement(transactions: Transaction[], _filename: string) {
     if (t.status === 'paid' || t.status === 'Paid' || t.status === 'Verified') total += t.amount
     html += `<tr>
       <td>${new Date(t.date).toLocaleDateString()}</td>
-      <td>${t.type}</td>
-      <td>${t.description}</td>
-      <td>${t.package ?? '—'}</td>
+      <td>${escapeHtml(t.type)}</td>
+      <td>${escapeHtml(t.description)}</td>
+      <td>${escapeHtml(t.package ?? '—')}</td>
       <td style="text-align:right">KSh ${t.amount.toLocaleString('en-KE')}</td>
-      <td>${t.status}</td>
-      <td>${t.reference ?? '—'}</td>
+      <td>${escapeHtml(t.status)}</td>
+      <td>${escapeHtml(t.reference ?? '—')}</td>
     </tr>`
   }
 
@@ -153,8 +167,8 @@ function downloadPDFStatement(transactions: Transaction[], _filename: string) {
 }
 
 function downloadReceiptPDF(r: ReceiptData) {
-  const title = `${r.type} Receipt`
-  const html = `<!DOCTYPE html><html><head><title>${r.number}</title>
+  const title = `${escapeHtml(r.type)} Receipt`
+  const html = `<!DOCTYPE html><html><head><title>${escapeHtml(r.number)}</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
   .header { text-align: center; border-bottom: 2px solid #006B2E; padding-bottom: 16px; margin-bottom: 24px; }
@@ -172,18 +186,18 @@ function downloadReceiptPDF(r: ReceiptData) {
   <div class="brand">Luma Welfare</div>
   <div class="sub">Community Welfare Management System</div>
   <div class="title">${title}</div>
-  <div class="receipt-no">${r.number}</div>
+  <div class="receipt-no">${escapeHtml(r.number)}</div>
 </div>
-<div class="field"><span class="label">Member</span><span class="value">${r.member?.full_name ?? '—'}</span></div>
-<div class="field"><span class="label">Membership #</span><span class="value">${r.member?.membership_number ?? '—'}</span></div>
-<div class="field"><span class="label">Email</span><span>${r.member?.email ?? '—'}</span></div>
-<div class="field"><span class="label">Phone</span><span>${r.member?.phone ?? '—'}</span></div>
-${r.package ? `<div class="field"><span class="label">Package</span><span class="value">${r.package}</span></div>` : ''}
-${r.period ? `<div class="field"><span class="label">Period</span><span>${r.period}</span></div>` : ''}
+<div class="field"><span class="label">Member</span><span class="value">${escapeHtml(r.member?.full_name ?? '—')}</span></div>
+<div class="field"><span class="label">Membership #</span><span class="value">${escapeHtml(r.member?.membership_number ?? '—')}</span></div>
+<div class="field"><span class="label">Email</span><span>${escapeHtml(r.member?.email ?? '—')}</span></div>
+<div class="field"><span class="label">Phone</span><span>${escapeHtml(r.member?.phone ?? '—')}</span></div>
+${r.package ? `<div class="field"><span class="label">Package</span><span class="value">${escapeHtml(r.package)}</span></div>` : ''}
+${r.period ? `<div class="field"><span class="label">Period</span><span>${escapeHtml(r.period)}</span></div>` : ''}
 <div class="field"><span class="label">Date</span><span>${new Date(r.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
-<div class="field"><span class="label">Status</span><span class="value">${r.status}</span></div>
-${r.payment_method ? `<div class="field"><span class="label">Payment Method</span><span>${r.payment_method}</span></div>` : ''}
-${r.reference ? `<div class="field"><span class="label">Reference</span><span>${r.reference}</span></div>` : ''}
+<div class="field"><span class="label">Status</span><span class="value">${escapeHtml(r.status)}</span></div>
+${r.payment_method ? `<div class="field"><span class="label">Payment Method</span><span>${escapeHtml(r.payment_method)}</span></div>` : ''}
+${r.reference ? `<div class="field"><span class="label">Reference</span><span>${escapeHtml(r.reference)}</span></div>` : ''}
 <div class="amount">KSh ${r.amount.toLocaleString('en-KE')}</div>
 <div class="footer">
   <p>This is a computer-generated receipt. No signature required.</p>

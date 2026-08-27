@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
@@ -36,20 +36,32 @@ export function AdminGallery() {
   const [dragOver, setDragOver] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<GalleryItem | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const perPage = 50
 
-  async function load() {
+  const load = useCallback(async (pageNum = 1) => {
     setLoading(true)
     try {
-      const d = await api<{ items: GalleryItem[] }>('/admin/gallery', { auth: true })
+      const qs = new URLSearchParams()
+      qs.set('page', String(pageNum))
+      qs.set('per_page', String(perPage))
+      const query = qs.toString()
+      const path = `/admin/gallery${query ? `?${query}` : ''}`
+      const d = await api<{ items: GalleryItem[]; total: number; page: number; pages: number }>(path, { auth: true })
       setItems(d.items ?? [])
+      setTotalCount(d.total ?? 0)
+      setTotalPages(d.pages ?? 1)
+      setPage(d.page ?? pageNum)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load gallery.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(1) }, [load])
 
   function openCreate() {
     setEditing(null)
@@ -147,7 +159,7 @@ export function AdminGallery() {
       setPreview(null)
       setSelectedFile(null)
       if (fileRef.current) fileRef.current.value = ''
-      await load()
+      await load(page)
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Could not save. Please try again.'
       addToast('error', msg)
@@ -163,7 +175,7 @@ export function AdminGallery() {
     try {
       await api(`/admin/gallery/${item.id}`, { method: 'DELETE', auth: true })
       addToast('success', 'Image deleted.')
-      await load()
+      await load(page)
     } catch (err) {
       addToast('error', err instanceof ApiError ? err.message : 'Could not delete.')
     } finally {
@@ -181,7 +193,7 @@ export function AdminGallery() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gallery</h1>
-          <p className="mt-1 text-sm text-gray-500">{items.length} image{items.length !== 1 ? 's' : ''}</p>
+          <p className="mt-1 text-sm text-gray-500">{totalCount} image{totalCount !== 1 ? 's' : ''}</p>
         </div>
         <button onClick={openCreate} className="rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-colors">
           + Upload Image
@@ -205,7 +217,7 @@ export function AdminGallery() {
                 }`}
               >
                 <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect}
-                  className="absolute inset-0 cursor-pointer opacity-0" />
+                  aria-label="Upload gallery image" className="absolute inset-0 cursor-pointer opacity-0" />
                 <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                 </svg>
@@ -225,14 +237,14 @@ export function AdminGallery() {
               <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
                 <img src={preview} alt="Preview" className="max-h-48 w-full object-contain" />
                 <button type="button" onClick={() => { setPreview(null); if (fileRef.current) fileRef.current.value = '' }}
-                  className="absolute right-2 top-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70">
+                  aria-label="Remove image preview" className="absolute right-2 top-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
             )}
 
-            <input value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title (optional)" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
-            <input value={form.caption} onChange={(e) => setForm(f => ({ ...f, caption: e.target.value }))} placeholder="Caption (optional)" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+            <input value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title (optional)" aria-label="Gallery image title" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+            <input value={form.caption} onChange={(e) => setForm(f => ({ ...f, caption: e.target.value }))} placeholder="Caption (optional)" aria-label="Gallery image caption" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
 
             <div className="flex gap-2">
               <button type="submit" disabled={uploading} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-60">
@@ -246,7 +258,7 @@ export function AdminGallery() {
 
       {/* Search */}
       <div className="mt-6">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search gallery…"
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search gallery…" aria-label="Search gallery"
           className="w-full max-w-sm rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-luma-500" />
       </div>
 
@@ -284,6 +296,16 @@ export function AdminGallery() {
               />
             </div>
           )}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+          <div className="text-sm text-gray-500">Page {page} of {totalPages}</div>
+          <div className="flex gap-2">
+            <button disabled={page <= 1} onClick={() => load(page - 1)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+            <button disabled={page >= totalPages} onClick={() => load(page + 1)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+          </div>
         </div>
       )}
 

@@ -235,6 +235,7 @@ export function AdminSettings() {
                       placeholder="000000"
                       maxLength={6}
                       className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-center font-mono text-lg tracking-widest focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+                      aria-label="2FA verification code"
                     />
                     <button onClick={handleEnable2FA} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
                       Verify & Enable
@@ -259,6 +260,7 @@ export function AdminSettings() {
                     onChange={(e) => { setVerifyCode(e.target.value); setVerifyError('') }}
                     placeholder="6-digit code or recovery code"
                     className="w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+                    aria-label="2FA code or recovery code"
                   />
                   <button onClick={handleDisable2FA} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors">
                     Disable 2FA

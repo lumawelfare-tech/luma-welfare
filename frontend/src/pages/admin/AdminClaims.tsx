@@ -4,6 +4,8 @@ import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { ExportDialog } from '../../components/ExportDialog'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 
 type Claim = {
   id: string
@@ -48,13 +50,23 @@ const filterTabs = [
   { value: 'Rejected', label: 'Rejected' },
 ]
 
+
 export function AdminClaims() {
   const { addToast } = useToast()
   const [claims, setClaims] = useState<Claim[]>([])
   const [filter, setFilter] = useState('')
+  const [query, setQuery] = useState('')
+  const debouncedQuery = useDebouncedValue(query, 300)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const perPage = 50
+
+  // Export
+  const [showExport, setShowExport] = useState(false)
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -76,23 +88,31 @@ export function AdminClaims() {
   const [bulkRejectNotes, setBulkRejectNotes] = useState('')
   const [showBulkReject, setShowBulkReject] = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pageNum = 1) => {
     setError(null)
     setLoading(true)
     try {
-      const d = await api<{ claims: Claim[] }>(
-        `/admin/claims${filter ? `?status=${filter}` : ''}`,
+      const qs = new URLSearchParams()
+      if (filter) qs.set('status', filter)
+      if (debouncedQuery.trim()) qs.set('q', debouncedQuery.trim())
+      qs.set('page', String(pageNum))
+      qs.set('per_page', String(perPage))
+      const d = await api<{ claims: Claim[]; total: number; page: number; pages: number }>(
+        `/admin/claims?${qs.toString()}`,
         { auth: true },
       )
       setClaims(d.claims ?? [])
+      setTotalCount(d.total ?? 0)
+      setTotalPages(d.pages ?? 1)
+      setPage(d.page ?? pageNum)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load claims.')
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [filter, debouncedQuery])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(1) }, [load])
 
   async function viewDetail(claim: Claim) {
     setDetail(claim)
@@ -198,30 +218,6 @@ export function AdminClaims() {
     await load()
   }
 
-  const submittedCount = claims.filter((c) => c.status === 'Submitted').length
-
-  function exportCSV() {
-    const headers = ['Claim #', 'Member', 'Package', 'Type', 'Amount', 'Status', 'Date']
-    const rows = claims.map((c) => [
-      c.claim_number,
-      c.members?.full_name ?? '',
-      c.packages?.name ?? '',
-      c.claim_type ?? '',
-      c.amount_requested != null ? String(c.amount_requested) : '',
-      c.status,
-      new Date(c.created_at).toLocaleDateString(),
-    ])
-    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `claims-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    addToast('success', `Exported ${claims.length} claims to CSV.`)
-  }
-
   const columns: Column<Record<string, unknown>>[] = [
     {
       key: 'claim_number',
@@ -321,29 +317,38 @@ export function AdminClaims() {
           <h1 className="text-2xl font-bold text-gray-900">Claims</h1>
           <p className="text-sm text-gray-500 mt-1">Review member claims. Approved claims are recorded for future payout processing.</p>
         </div>
-        <button onClick={exportCSV} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        <button onClick={() => setShowExport(true)} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
           Export CSV
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-white p-1">
-        {filterTabs.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              filter === f.value ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            {f.label}
-            {f.value === 'Submitted' && submittedCount > 0 && (
-              <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-100 px-1 text-[10px] font-bold text-blue-700">
-                {submittedCount}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* Filters + Search */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-white p-1">
+          {filterTabs.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setFilter(f.value)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                filter === f.value ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1 min-w-[200px]">
+          <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            aria-label="Search claims"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search member name, phone, claim #, type..."
+            className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+          />
+        </div>
       </div>
 
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -430,7 +435,7 @@ export function AdminClaims() {
                     {detail.status}
                   </span>
                 </div>
-                <button onClick={() => setDetail(null)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
+                <button onClick={() => setDetail(null)} aria-label="Close claim detail" className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
@@ -514,7 +519,7 @@ export function AdminClaims() {
               <div className="mt-4 space-y-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600">Payout Amount (KSh)</label>
-                  <input type="number" value={approveAmount} onChange={(e) => setApproveAmount(e.target.value)} placeholder={approveTarget.amount_requested != null ? String(approveTarget.amount_requested) : 'e.g. 100000'} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+                  <input type="number" aria-label="Payout amount" value={approveAmount} onChange={(e) => setApproveAmount(e.target.value)} placeholder={approveTarget.amount_requested != null ? String(approveTarget.amount_requested) : 'e.g. 100000'} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600">Admin Notes (optional)</label>
@@ -598,6 +603,39 @@ export function AdminClaims() {
             </div>
           </>
         }
+      />
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+          <div className="text-sm text-gray-500">
+            {totalCount.toLocaleString()} claim{totalCount !== 1 ? 's' : ''} · Page {page} of {totalPages}
+          </div>
+          <div className="flex gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => load(page - 1)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => load(page + 1)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ExportDialog
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        exportType="claims"
+        filters={{ status: filter || undefined, q: debouncedQuery.trim() || undefined }}
+        filterLabels={{ status: 'Status', q: 'Search' }}
       />
     </div>
   )

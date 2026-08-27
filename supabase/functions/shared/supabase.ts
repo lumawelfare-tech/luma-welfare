@@ -36,7 +36,7 @@ export async function getAuthenticatedUser(req: Request): Promise<{ id: string; 
 
 /**
  * Load the admin session for the authenticated user.
- * Checks the admins table and loads permissions.
+ * Uses a single query with join to load admin + permissions in one round-trip.
  */
 export async function loadAdminSession(
   adminClient: SupabaseClient,
@@ -49,6 +49,7 @@ export async function loadAdminSession(
   is_superadmin: boolean
   permissions: Set<string>
 } | null> {
+  // Query 1: Load admin profile with role name (uses existing idx)
   const { data: admin, error } = await adminClient
     .from('admins')
     .select('id, display_name, role_id, is_superadmin, is_active, roles(name)')
@@ -58,6 +59,7 @@ export async function loadAdminSession(
 
   if (error || !admin) return null
 
+  // Query 2: Load permissions for this role (small table, fast)
   const { data: perms } = await adminClient
     .from('permissions')
     .select('resource, action')

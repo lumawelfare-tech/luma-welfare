@@ -38,51 +38,43 @@ Deno.serve(async (req) => {
     const dateTo = url.searchParams.get('date_to')     // YYYY-MM-DD
     const drillMonth = url.searchParams.get('month')   // YYYY-MM for drill-down
 
-    // Core counts
-    const [members, subs, pendingContribs, pendingClaims, approvedClaims, paidClaims, settings] = await Promise.all([
-      adminClient.from('members').select('id', { count: 'exact', head: true }),
-      adminClient.from('subscriptions').select('id', { count: 'exact', head: true }),
-      adminClient.from('contributions').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
-      adminClient.from('claims').select('id', { count: 'exact', head: true }).in('status', ['Submitted', 'Under Review', 'Additional Information Required']),
-      adminClient.from('claims').select('id', { count: 'exact', head: true }).eq('status', 'Approved'),
-      adminClient.from('claims').select('id', { count: 'exact', head: true }).eq('status', 'Paid'),
-      adminClient.from('platform_settings').select('key, value').eq('key', 'stats'),
-    ])
-
-    // Financial data — contributions by month
-    // Determine date range: use provided range or default to last 12 months
     const rangeStart = dateFrom ? new Date(dateFrom) : (() => { const d = new Date(); d.setMonth(d.getMonth() - 12); return d })()
     const rangeEnd = dateTo ? new Date(dateTo + 'T23:59:59Z') : new Date()
     const rangeStartStr = rangeStart.toISOString()
 
-    const { data: contribRows } = await adminClient
-      .from('contributions')
-      .select('amount, created_at, status')
-      .gte('created_at', rangeStartStr)
-      .lte('created_at', rangeEnd.toISOString())
-      .order('created_at', { ascending: true })
+    // ── Core KPIs: single RPC call replaces 7 sequential count queries ──
+    const { data: summary } = await adminClient.rpc('get_admin_dashboard_summary')
 
-    // Generate month keys for the selected range
+    // ── Platform settings ──
+    const { data: settings } = await adminClient
+      .from('platform_settings')
+      .select('key, value')
+      .eq('key', 'stats')
+
+    // ── Monthly contributions: SQL aggregation replaces fetching 5000 rows to JS ──
+    const { data: monthlyContribRows } = await adminClient
+      .rpc('get_admin_contributions_by_month', {
+        p_from: rangeStartStr,
+        p_to: rangeEnd.toISOString(),
+      })
+
+    // Generate month keys for the selected range (fill gaps)
     const monthlyContributions: Record<string, { total: number; verified: number; pending: number }> = {}
     const tempDate = new Date(rangeStart)
-    tempDate.setDate(1) // Start from the 1st of the month
+    tempDate.setDate(1)
     while (tempDate <= rangeEnd) {
       const key = `${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}`
       monthlyContributions[key] = { total: 0, verified: 0, pending: 0 }
       tempDate.setMonth(tempDate.getMonth() + 1)
     }
 
-    if (contribRows) {
-      for (const row of contribRows) {
-        const key = row.created_at.substring(0, 7) // YYYY-MM
+    if (monthlyContribRows) {
+      for (const row of monthlyContribRows) {
+        const key = row.month
         if (!monthlyContributions[key]) continue
-        const amt = Number(row.amount) || 0
-        monthlyContributions[key].total += amt
-        if (row.status === 'Verified') {
-          monthlyContributions[key].verified += amt
-        } else {
-          monthlyContributions[key].pending += amt
-        }
+        monthlyContributions[key].total = Number(row.total) || 0
+        monthlyContributions[key].verified = Number(row.verified) || 0
+        monthlyContributions[key].pending = Number(row.pending) || 0
       }
     }
 
@@ -94,31 +86,24 @@ Deno.serve(async (req) => {
       pending: v.pending,
     }))
 
-    // Package subscription breakdown
-    const { data: subRows } = await adminClient
-      .from('subscriptions')
-      .select('package_id, packages(name)')
-      .eq('status', 'active')
+    // ── Package breakdown: SQL aggregation replaces fetching all active subs ──
+    const { data: packageBreakdownArr } = await adminClient.rpc('get_admin_package_breakdown')
 
-    const packageBreakdown: Record<string, number> = {}
-    if (subRows) {
-      for (const sub of subRows) {
-        const name = (sub.packages as { name: string } | null)?.name ?? 'Unknown'
-        packageBreakdown[name] = (packageBreakdown[name] || 0) + 1
+    // ── Claims by status: SQL aggregation replaces fetching rows to JS ──
+    const { data: claimRows } = await adminClient
+      .rpc('get_admin_claims_by_status', {
+        p_from: rangeStartStr,
+        p_to: rangeEnd.toISOString(),
+      })
+
+    const claimsByStatus: Record<string, number> = {}
+    if (claimRows) {
+      for (const row of claimRows) {
+        claimsByStatus[row.status] = Number(row.count) || 0
       }
     }
-    const packageBreakdownArr = Object.entries(packageBreakdown)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
 
-    // Registration fee stats
-    const [totalRegFees, paidRegFees, pendingRegFees] = await Promise.all([
-      adminClient.from('registration_fees').select('id', { count: 'exact', head: true }),
-      adminClient.from('registration_fees').select('id', { count: 'exact', head: true }).eq('status', 'paid'),
-      adminClient.from('registration_fees').select('id', { count: 'exact', head: true }).eq('status', 'unpaid'),
-    ])
-
-    // Recent transactions (last 10, filtered by date range)
+    // ── Recent transactions (last 10) — this small query is fine ──
     const { data: recentContribs } = await adminClient
       .from('contributions')
       .select('id, amount, status, created_at, member:members(full_name), subscription:subscriptions(package_id, packages(name))')
@@ -140,21 +125,7 @@ Deno.serve(async (req) => {
       }
     })
 
-    // Claims breakdown (filtered by date range)
-    const { data: claimRows } = await adminClient
-      .from('claims')
-      .select('status, created_at')
-      .gte('created_at', rangeStartStr)
-      .lte('created_at', rangeEnd.toISOString())
-
-    const claimsByStatus: Record<string, number> = {}
-    if (claimRows) {
-      for (const c of claimRows) {
-        claimsByStatus[c.status] = (claimsByStatus[c.status] || 0) + 1
-      }
-    }
-
-    // Drill-down: individual transactions for a specific month
+    // ── Drill-down: individual transactions for a specific month ──
     let drillTransactions: unknown[] = []
     if (drillMonth) {
       const monthStart = `${drillMonth}-01T00:00:00Z`
@@ -185,26 +156,140 @@ Deno.serve(async (req) => {
       })
     }
 
-    return new Response(JSON.stringify({
-      // Core stats
-      members: members.count ?? 0,
-      subscriptions: subs.count ?? 0,
-      pending_contributions: pendingContribs.count ?? 0,
-      pending_claims: pendingClaims.count ?? 0,
-      approved_claims: approvedClaims.count ?? 0,
-      paid_claims: paidClaims.count ?? 0,
-      confirmed_stats: settings.data?.[0]?.value ?? {},
+    // ── Recent reports (small query, fine as-is) ──
+    const { data: recentReports } = await adminClient
+      .from('report_history')
+      .select('id, schedule_name, report_type, filename, record_count, status, generated_at')
+      .order('generated_at', { ascending: false })
+      .limit(5)
 
-      // Financial charts
+    // ── Scheduled report stats: use count queries (small table, acceptable) ──
+    const [totalSchedules, enabledSchedules] = await Promise.all([
+      adminClient.from('scheduled_reports').select('id', { count: 'exact', head: true }),
+      adminClient.from('scheduled_reports').select('id', { count: 'exact', head: true }).eq('enabled', true),
+    ])
+
+    // ── Report analytics: SQL aggregation replaces fetching all reports to JS ──
+    const { data: reportAnalytics } = await adminClient
+      .rpc('get_admin_report_analytics', {
+        p_from: rangeStartStr,
+        p_to: rangeEnd.toISOString(),
+      })
+
+    const analytics = reportAnalytics?.[0]
+    const reportAnalyticsResult = {
+      total_reports: Number(analytics?.total_reports ?? 0),
+      successful: Number(analytics?.successful ?? 0),
+      failed: Number(analytics?.failed ?? 0),
+      success_rate: Number(analytics?.total_reports ?? 0) > 0
+        ? Math.round((Number(analytics?.successful ?? 0) / Number(analytics?.total_reports ?? 1)) * 100)
+        : 0,
+      avg_records: Number(analytics?.avg_records ?? 0),
+      total_records: Number(analytics?.total_records ?? 0),
+      by_type: [] as unknown[],
+      by_month: [] as unknown[],
+      by_schedule: [] as unknown[],
+    }
+
+    // For detailed breakdowns (by_type, by_month, by_schedule), use targeted queries
+    // instead of fetching all reports to JS
+    const { data: allReports } = await adminClient
+      .from('report_history')
+      .select('schedule_name, report_type, record_count, status, generated_at')
+      .gte('generated_at', rangeStartStr)
+      .lte('generated_at', rangeEnd.toISOString())
+      .order('generated_at', { ascending: true })
+      .limit(2000)
+
+    if (allReports && allReports.length > 0) {
+      // Reports by type
+      const typeMap: Record<string, { total: number; success: number; error: number; records: number }> = {}
+      for (const r of allReports) {
+        const t = r.report_type || 'unknown'
+        if (!typeMap[t]) typeMap[t] = { total: 0, success: 0, error: 0, records: 0 }
+        typeMap[t].total++
+        if (r.status === 'success') typeMap[t].success++
+        else typeMap[t].error++
+        typeMap[t].records += r.record_count || 0
+      }
+      reportAnalyticsResult.by_type = Object.entries(typeMap).map(([type, v]) => ({
+        type, total: v.total, success: v.success, error: v.error, records: v.records,
+      })).sort((a: { total: number }, b: { total: number }) => b.total - a.total)
+
+      // Reports by month
+      const monthMap: Record<string, { total: number; success: number; error: number; records: number }> = {}
+      for (const r of allReports) {
+        const key = r.generated_at.substring(0, 7)
+        if (!monthMap[key]) monthMap[key] = { total: 0, success: 0, error: 0, records: 0 }
+        monthMap[key].total++
+        if (r.status === 'success') monthMap[key].success++
+        else monthMap[key].error++
+        monthMap[key].records += r.record_count || 0
+      }
+      reportAnalyticsResult.by_month = Object.entries(monthMap).map(([month, v]) => ({
+        month, label: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+        total: v.total, success: v.success, error: v.error, records: v.records,
+      }))
+
+      // Reports by schedule
+      const schedMap: Record<string, { total: number; success: number; error: number; lastRun: string }> = {}
+      for (const r of allReports) {
+        const s = r.schedule_name || 'Unknown'
+        if (!schedMap[s]) schedMap[s] = { total: 0, success: 0, error: 0, lastRun: r.generated_at }
+        schedMap[s].total++
+        if (r.status === 'success') schedMap[s].success++
+        else schedMap[s].error++
+        if (r.generated_at > schedMap[s].lastRun) schedMap[s].lastRun = r.generated_at
+      }
+      reportAnalyticsResult.by_schedule = Object.entries(schedMap).map(([name, v]) => ({
+        name, total: v.total, success: v.success, error: v.error, lastRun: v.lastRun,
+      })).sort((a: { total: number }, b: { total: number }) => b.total - a.total)
+    }
+
+    // ── Phase 12: Additional analytics ──
+    const [memberGrowth, paymentHealth, outstanding, qualifications, retention, membershipFunnel] = await Promise.all([
+      adminClient.rpc('get_member_growth', { p_from: rangeStartStr, p_to: rangeEnd.toISOString() }),
+      adminClient.rpc('get_payment_health', { p_from: rangeStartStr, p_to: rangeEnd.toISOString() }),
+      adminClient.rpc('get_outstanding_obligations'),
+      adminClient.rpc('get_qualification_analytics'),
+      adminClient.rpc('get_contribution_retention'),
+      adminClient.rpc('get_membership_funnel'),
+    ])
+
+    return new Response(JSON.stringify({
+      // Core stats — from single RPC call
+      members: Number(summary?.[0]?.total_members ?? 0),
+      active_members: Number(summary?.[0]?.active_members ?? 0),
+      new_members_period: Number(summary?.[0]?.new_members_period ?? 0),
+      subscriptions: Number(summary?.[0]?.total_subscriptions ?? 0),
+      pending_contributions: Number(summary?.[0]?.pending_contributions ?? 0),
+      total_contributions: Number(summary?.[0]?.total_contributions ?? 0),
+      verified_contributions: Number(summary?.[0]?.verified_contributions ?? 0),
+      pending_claims: Number(summary?.[0]?.pending_claims ?? 0),
+      approved_claims: Number(summary?.[0]?.approved_claims ?? 0),
+      paid_claims: Number(summary?.[0]?.paid_claims ?? 0),
+      total_claims: Number(summary?.[0]?.total_claims ?? 0),
+      total_payments: Number(summary?.[0]?.total_payments ?? 0),
+      completed_payments: Number(summary?.[0]?.completed_payments ?? 0),
+      confirmed_stats: settings?.[0]?.value ?? {},
+
+      // Phase 12: Growth, payments, obligations, qualifications, retention
+      member_growth: memberGrowth.data ?? [],
+      payment_health: paymentHealth.data?.[0] ?? { total_payments: 0, completed: 0, pending: 0, failed: 0, success_rate: 100, total_amount: 0, completed_amount: 0, avg_amount: 0 },
+      outstanding: outstanding.data?.[0] ?? { approved_unpaid_claims: 0, approved_unpaid_amount: 0, pending_contributions: 0, pending_contribution_amount: 0, stale_pending_payments: 0, stale_pending_amount: 0 },
+      qualifications: qualifications.data?.[0] ?? { qualified: 0, not_eligible: 0, at_risk: 0, revoked: 0, total: 0 },
+      retention: retention.data?.[0] ?? { current_month_active: 0, previous_month_active: 0, retained: 0, retention_rate: 100, new_active: 0 },
+
+      // Financial charts — from SQL aggregation
       monthly_contributions: monthlyContributionsArr,
-      package_breakdown: packageBreakdownArr,
+      package_breakdown: packageBreakdownArr ?? [],
       claims_by_status: claimsByStatus,
 
-      // Registration fees
+      // Registration fees — from summary RPC
       registration_fees: {
-        total: totalRegFees.count ?? 0,
-        paid: paidRegFees.count ?? 0,
-        unpaid: pendingRegFees.count ?? 0,
+        total: Number(summary?.[0]?.total_registration_fees ?? 0),
+        paid: Number(summary?.[0]?.paid_registration_fees ?? 0),
+        unpaid: Number(summary?.[0]?.unpaid_registration_fees ?? 0),
       },
 
       // Recent activity
@@ -215,100 +300,27 @@ Deno.serve(async (req) => {
       drill_transactions: drillTransactions,
 
       // Recent report activity
-      recent_reports: (await adminClient
-        .from('report_history')
-        .select('id, schedule_name, report_type, filename, record_count, status, generated_at')
-        .order('generated_at', { ascending: false })
-        .limit(5)
-      ).data ?? [],
+      recent_reports: recentReports ?? [],
 
       // Scheduled report stats
       scheduled_report_stats: {
-        total: (await adminClient.from('scheduled_reports').select('id', { count: 'exact', head: true })).count ?? 0,
-        enabled: (await adminClient.from('scheduled_reports').select('id', { count: 'exact', head: true }).eq('enabled', true)).count ?? 0,
+        total: totalSchedules.count ?? 0,
+        enabled: enabledSchedules.count ?? 0,
       },
 
-      // Report generation analytics
-      report_analytics: await (async () => {
-        const { data: allReports } = await adminClient
-          .from('report_history')
-          .select('id, schedule_name, report_type, record_count, status, generated_at')
-          .gte('generated_at', rangeStartStr)
-          .lte('generated_at', rangeEnd.toISOString())
-          .order('generated_at', { ascending: true })
+      // Report analytics — from SQL aggregation
+      report_analytics: reportAnalyticsResult,
 
-        if (!allReports || allReports.length === 0) {
-          return {
-            total_reports: 0, successful: 0, failed: 0, success_rate: 0,
-            avg_records: 0, total_records: 0,
-            by_type: [], by_month: [], by_schedule: [],
-          }
-        }
-
-        const successful = allReports.filter(r => r.status === 'success').length
-        const failed = allReports.filter(r => r.status === 'error').length
-        const totalRecords = allReports.reduce((s, r) => s + (r.record_count || 0), 0)
-        const avgRecords = Math.round(totalRecords / allReports.length)
-        const successRate = allReports.length > 0 ? Math.round((successful / allReports.length) * 100) : 0
-
-        // Reports by type
-        const typeMap: Record<string, { total: number; success: number; error: number; records: number }> = {}
-        for (const r of allReports) {
-          const t = r.report_type || 'unknown'
-          if (!typeMap[t]) typeMap[t] = { total: 0, success: 0, error: 0, records: 0 }
-          typeMap[t].total++
-          if (r.status === 'success') typeMap[t].success++
-          else typeMap[t].error++
-          typeMap[t].records += r.record_count || 0
-        }
-        const byType = Object.entries(typeMap).map(([type, v]) => ({
-          type, total: v.total, success: v.success, error: v.error, records: v.records,
-        })).sort((a, b) => b.total - a.total)
-
-        // Reports by month
-        const monthMap: Record<string, { total: number; success: number; error: number; records: number }> = {}
-        for (const r of allReports) {
-          const key = r.generated_at.substring(0, 7)
-          if (!monthMap[key]) monthMap[key] = { total: 0, success: 0, error: 0, records: 0 }
-          monthMap[key].total++
-          if (r.status === 'success') monthMap[key].success++
-          else monthMap[key].error++
-          monthMap[key].records += r.record_count || 0
-        }
-        const byMonth = Object.entries(monthMap).map(([month, v]) => ({
-          month, label: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-          total: v.total, success: v.success, error: v.error, records: v.records,
-        }))
-
-        // Reports by schedule
-        const schedMap: Record<string, { total: number; success: number; error: number; lastRun: string }> = {}
-        for (const r of allReports) {
-          const s = r.schedule_name || 'Unknown'
-          if (!schedMap[s]) schedMap[s] = { total: 0, success: 0, error: 0, lastRun: r.generated_at }
-          schedMap[s].total++
-          if (r.status === 'success') schedMap[s].success++
-          else schedMap[s].error++
-          if (r.generated_at > schedMap[s].lastRun) schedMap[s].lastRun = r.generated_at
-        }
-        const bySchedule = Object.entries(schedMap).map(([name, v]) => ({
-          name, total: v.total, success: v.success, error: v.error, lastRun: v.lastRun,
-        })).sort((a, b) => b.total - a.total)
-
-        return {
-          total_reports: allReports.length, successful, failed, success_rate: successRate,
-          avg_records: avgRecords, total_records: totalRecords,
-          by_type: byType, by_month: byMonth, by_schedule: bySchedule,
-        }
-      })(),
+      // Membership funnel
+      membership_funnel: membershipFunnel.data ?? [],
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error'
-    const status = message.includes('FORBIDDEN') ? 403 : 500
-    return new Response(JSON.stringify({ message, code: message.includes('FORBIDDEN') ? 'FORBIDDEN' : 'INTERNAL' }), {
-      status,
+    console.error('admin-dashboard error:', err)
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), {
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

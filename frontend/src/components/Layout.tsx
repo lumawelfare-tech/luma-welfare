@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -22,6 +22,28 @@ export function Layout() {
     e.preventDefault()
     if (q.trim()) navigate(`/packages?q=${encodeURIComponent(q.trim())}`)
   }
+
+  // ESC key closes mobile menu
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape' && open) {
+      setOpen(false)
+    }
+  }, [open])
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [open])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -87,7 +109,7 @@ export function Layout() {
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-1 lg:flex">
+          <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
             {navLinks.map((l) => (
               <NavLink
                 key={l.label}

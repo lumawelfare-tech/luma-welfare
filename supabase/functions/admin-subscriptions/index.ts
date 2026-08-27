@@ -21,13 +21,16 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && !subId) {
       requirePermission(session, 'members', 'read')
       const status = url.searchParams.get('status')
+      const page = parseInt(url.searchParams.get('page') || '1')
+      const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '50'), 200)
       let query = adminClient
-        .from('subscriptions').select('id, status, started_at, next_due_date, member_id, members(full_name, phone, membership_number), packages(code, name), package_tiers(name, amount)')
+        .from('subscriptions').select('id, status, started_at, next_due_date, member_id, members(full_name, phone, membership_number), packages(code, name), package_tiers(name, amount)', { count: 'exact' })
         .order('created_at', { ascending: false })
       if (status) query = query.eq('status', status)
-      const { data, error } = await query
+      query = query.range((page - 1) * perPage, page * perPage - 1)
+      const { data, error, count } = await query
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ subscriptions: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ subscriptions: data ?? [], total: count ?? 0, page, per_page: perPage, pages: Math.ceil((count ?? 0) / perPage) }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // PATCH /admin-subscriptions/:id — approve/reject/pause/cancel
@@ -51,6 +54,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    console.error('admin-subscriptions error:', err)
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })

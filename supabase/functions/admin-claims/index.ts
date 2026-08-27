@@ -1,6 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
-import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
+import { sendNotification } from '../shared/notifications.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -15,18 +15,37 @@ Deno.serve(async (req) => {
     if (!session) return new Response(JSON.stringify({ message: 'No admin access' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
     const url = new URL(req.url)
-    const resourceId = url.searchParams.get("resource_id")
+    const resourceId = url.searchParams.get('resource_id')
     const claimId = resourceId
 
+    // GET /admin-claims — list with search + pagination
     if (req.method === 'GET' && !claimId) {
       requirePermission(session, 'claims', 'read')
-      const { data, error } = await adminClient
-        .from('claims').select('id, claim_number, claim_type, amount_requested, status, created_at, member_id, members(full_name, phone), packages(code, name)')
-        .order('created_at', { ascending: false }).limit(100)
+      const status = url.searchParams.get('status')
+      const q = url.searchParams.get('q')
+      const page = parseInt(url.searchParams.get('page') || '1')
+      const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '50'), 200)
+
+      const { data, error } = await adminClient.rpc('admin_search_claims', {
+        p_q: q || null,
+        p_status: status || null,
+        p_page: page,
+        p_per_page: perPage,
+      })
+
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ claims: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+      const result = data?.[0] ?? { claims: [], total: 0, page, per_page: perPage, pages: 1 }
+      return new Response(JSON.stringify({
+        claims: result.claims ?? [],
+        total: Number(result.total) ?? 0,
+        page: result.page ?? page,
+        per_page: result.per_page ?? perPage,
+        pages: result.pages ?? 1,
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    // GET /admin-claims?resource_id=xxx — claim detail
     if (req.method === 'GET' && claimId) {
       requirePermission(session, 'claims', 'read')
       const { data: claim, error } = await adminClient.from('claims').select('*').eq('id', claimId).single()
@@ -35,6 +54,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ claim, documents: documents ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    // PATCH /admin-claims?resource_id=xxx — approve/reject/request-info
     if (req.method === 'PATCH' && claimId) {
       requirePermission(session, 'claims', 'approve')
       const body = await req.json()
@@ -50,9 +70,8 @@ Deno.serve(async (req) => {
       if (error) throw new Error('Claim not found')
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: `claim_${decision}`, resource: 'claim', resource_id: claimId })
 
-      // Send notification to member
+      // Send notification to member (respects channel preferences)
       const claimNum = data.claim_number ?? claimId
-      const memberName = (data.members as unknown as { full_name: string | null })?.full_name ?? 'Member'
       const notifMessages: Record<string, { subject: string; body: string }> = {
         approve: { subject: 'Claim Approved', body: `Your claim ${claimNum} has been approved${amount ? ` for KSh ${Number(amount).toLocaleString('en-KE')}` : ''}. The payout will be processed shortly.` },
         reject: { subject: 'Claim Rejected', body: `Your claim ${claimNum} has been rejected.${adminNotes ? ` Reason: ${adminNotes}` : ''}` },
@@ -60,20 +79,13 @@ Deno.serve(async (req) => {
       }
       const msg = notifMessages[decision]
       if (msg && data.member_id) {
-        await adminClient.from('notifications').insert({
-          member_id: data.member_id,
-          channel: 'in_app',
+        await sendNotification(adminClient, {
+          memberId: data.member_id,
           subject: msg.subject,
           body: msg.body,
-          status: 'queued',
+          emailButtonText: 'View Dashboard',
+          emailButtonUrl: 'https://luma-welfare.vercel.app/member',
         })
-
-        // Send email notification
-        const { data: member } = await adminClient.from('members').select('email, full_name').eq('id', data.member_id).single()
-        if (member?.email) {
-          const emailHtml = buildEmailTemplate(msg.subject, msg.body, 'View Dashboard', 'https://luma-welfare.vercel.app/member')
-          await sendEmail(member.email, msg.subject, emailHtml)
-        }
       }
 
       return new Response(JSON.stringify({ claim: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -81,7 +93,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error'
-    return new Response(JSON.stringify({ message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    console.error('admin-claims error:', err)
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })

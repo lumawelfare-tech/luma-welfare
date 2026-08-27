@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 
@@ -18,6 +19,7 @@ export function Notifications() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [markingId, setMarkingId] = useState<string | null>(null)
+  const [filter, setFilter] = useState<'all' | 'unread'>('all')
 
   async function load() {
     try {
@@ -54,6 +56,9 @@ export function Notifications() {
   }
 
   const unreadCount = notifications.filter(n => n.status === 'queued').length
+  const filtered = filter === 'unread'
+    ? notifications.filter(n => n.status === 'queued')
+    : notifications
 
   function timeAgo(dateStr: string): string {
     const now = Date.now()
@@ -87,15 +92,47 @@ export function Notifications() {
           <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
           <p className="mt-1 text-sm text-gray-500">Stay updated on your claims, payments, and membership.</p>
         </div>
-        {unreadCount > 0 && (
+        <div className="flex items-center gap-2">
+          <Link to="/notification-preferences" className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors min-h-[44px] flex items-center gap-1.5">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            Settings
+          </Link>
+          {unreadCount > 0 && (
           <button
             onClick={markAllRead}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors min-h-[44px] flex items-center"
           >
             Mark all read ({unreadCount})
           </button>
         )}
+        </div>
       </div>
+
+      {/* Filter tabs */}
+      {!loading && notifications.length > 0 && (
+        <div className="mt-6 flex gap-1 rounded-lg bg-gray-100 p-1" role="tablist">
+          <button
+            onClick={() => setFilter('all')}
+            className={`flex-1 rounded-md px-3 py-2 text-xs font-medium transition-colors min-h-[44px] ${
+              filter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+            role="tab"
+            aria-selected={filter === 'all'}
+          >
+            All ({notifications.length})
+          </button>
+          <button
+            onClick={() => setFilter('unread')}
+            className={`flex-1 rounded-md px-3 py-2 text-xs font-medium transition-colors min-h-[44px] ${
+              filter === 'unread' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+            role="tab"
+            aria-selected={filter === 'unread'}
+          >
+            Unread ({unreadCount})
+          </button>
+        </div>
+      )}
 
       {loading && (
         <div className="mt-8 space-y-3">
@@ -106,27 +143,40 @@ export function Notifications() {
       )}
 
       {error && !loading && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-          <button onClick={() => { setError(null); setLoading(true); load() }} className="ml-3 font-medium underline">Retry</button>
+        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2" role="alert">
+          <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+          <span className="flex-1">{error}</span>
+          <button onClick={() => { setError(null); setLoading(true); load() }} className="font-medium underline flex-shrink-0">Retry</button>
         </div>
       )}
 
       {!loading && !error && notifications.length === 0 && (
         <div className="mt-12 rounded-xl border border-gray-200 bg-white p-12 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-luma-50 text-luma-400">
             <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
             </svg>
           </div>
-          <h2 className="mt-4 text-lg font-semibold text-gray-900">No notifications yet</h2>
-          <p className="mt-2 text-sm text-gray-500">You'll see updates about your claims, payments, and membership here.</p>
+          <h2 className="mt-4 text-lg font-semibold text-gray-900">You're all caught up!</h2>
+          <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
+            When there are updates about your contributions, claims, or membership, they'll appear here.
+          </p>
         </div>
       )}
 
-      {!loading && !error && notifications.length > 0 && (
-        <div className="mt-6 space-y-2">
-          {notifications.map((n) => (
+      {!loading && !error && notifications.length > 0 && filtered.length === 0 && (
+        <div className="mt-8 rounded-xl border border-gray-200 bg-white p-8 text-center">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-400">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+          <h3 className="mt-3 text-sm font-semibold text-gray-900">No unread notifications</h3>
+          <p className="mt-1 text-xs text-gray-500">You've read all your notifications.</p>
+        </div>
+      )}
+
+      {!loading && !error && filtered.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {filtered.map((n) => (
             <div
               key={n.id}
               className={`rounded-xl border p-4 transition-all ${
@@ -145,7 +195,7 @@ export function Notifications() {
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-gray-900">{n.subject ?? 'Notification'}</h3>
                     {n.status === 'queued' && (
-                      <span className="h-2 w-2 rounded-full bg-luma-500" />
+                      <span className="h-2 w-2 rounded-full bg-luma-500" aria-label="Unread" />
                     )}
                   </div>
                   <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap">{n.body}</p>
@@ -155,7 +205,7 @@ export function Notifications() {
                       <button
                         onClick={() => markRead(n.id)}
                         disabled={markingId === n.id}
-                        className="text-xs font-medium text-luma-600 hover:text-luma-700 disabled:opacity-50"
+                        className="text-xs font-medium text-luma-600 hover:text-luma-700 disabled:opacity-50 min-h-[44px] flex items-center"
                       >
                         {markingId === n.id ? 'Marking…' : 'Mark as read'}
                       </button>

@@ -201,11 +201,11 @@ export function AdminRegistrationFees() {
               <div className="mt-4 space-y-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600">M-Pesa Receipt (optional)</label>
-                  <input value={confirmReceipt} onChange={(e) => setConfirmReceipt(e.target.value)} placeholder="e.g. QHK123ABC456" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+                  <input value={confirmReceipt} onChange={(e) => setConfirmReceipt(e.target.value)} placeholder="e.g. QHK123ABC456" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" aria-label="M-Pesa receipt number" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600">Transaction Reference (optional)</label>
-                  <input value={confirmRef} onChange={(e) => setConfirmRef(e.target.value)} placeholder="e.g. REF12345" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+                  <input value={confirmRef} onChange={(e) => setConfirmRef(e.target.value)} placeholder="e.g. REF12345" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" aria-label="Transaction reference" />
                 </div>
               </div>
             </div>

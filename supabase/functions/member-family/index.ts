@@ -38,8 +38,14 @@ Deno.serve(async (req) => {
     // PATCH /member-family?id=xxx — update family member
     if (req.method === 'PATCH' && resourceId) {
       const body = await req.json()
+      const allowedFields: Record<string, unknown> = {}
+      if (body.full_name !== undefined) allowedFields.full_name = body.full_name
+      if (body.relationship !== undefined) allowedFields.relationship = body.relationship
+      if (body.id_number !== undefined) allowedFields.id_number = body.id_number
+      if (body.date_of_birth !== undefined) allowedFields.date_of_birth = body.date_of_birth
+      if (body.tier !== undefined) allowedFields.tier = body.tier
       const { data, error } = await adminClient
-        .from('family_members').update(body).eq('id', resourceId).eq('member_id', user.id).select().single()
+        .from('family_members').update(allowedFields).eq('id', resourceId).eq('member_id', user.id).select().single()
       if (error) throw new Error('Family member not found')
       await logAudit(adminClient, { actor_id: user.id, action: 'updated_family_member', resource: 'family_member', resource_id: data.id })
       return new Response(JSON.stringify({ family_member: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

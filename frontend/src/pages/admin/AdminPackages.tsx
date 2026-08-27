@@ -128,10 +128,10 @@ export function AdminPackages() {
         <form onSubmit={addPackage} className="mt-6 max-w-lg rounded-2xl border border-stone-200 bg-white p-6">
           <h2 className="font-semibold text-luma-900">New package</h2>
           <div className="mt-4 space-y-3">
-            <input value={newPkg.code} onChange={(e) => setNewPkg((p) => ({ ...p, code: e.target.value }))} placeholder="code (e.g. water_drilling)" required className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-luma-500" />
-            <input value={newPkg.name} onChange={(e) => setNewPkg((p) => ({ ...p, name: e.target.value }))} placeholder="Name" required className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-luma-500" />
-            <input value={newPkg.description} onChange={(e) => setNewPkg((p) => ({ ...p, description: e.target.value }))} placeholder="Description" className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-luma-500" />
-            <input value={newPkg.waitingPeriodMonths} onChange={(e) => setNewPkg((p) => ({ ...p, waitingPeriodMonths: e.target.value }))} placeholder="Waiting period (months), blank = none" className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+            <input aria-label="Package code" value={newPkg.code} onChange={(e) => setNewPkg((p) => ({ ...p, code: e.target.value }))} placeholder="code (e.g. water_drilling)" required className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+            <input aria-label="Package name" value={newPkg.name} onChange={(e) => setNewPkg((p) => ({ ...p, name: e.target.value }))} placeholder="Name" required className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+            <input aria-label="Package description" value={newPkg.description} onChange={(e) => setNewPkg((p) => ({ ...p, description: e.target.value }))} placeholder="Description" className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+            <input aria-label="Waiting period in months" value={newPkg.waitingPeriodMonths} onChange={(e) => setNewPkg((p) => ({ ...p, waitingPeriodMonths: e.target.value }))} placeholder="Waiting period (months), blank = none" className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-luma-500" />
             <button className="rounded-md bg-luma-600 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-700">Add package</button>
           </div>
         </form>

@@ -194,11 +194,14 @@ function pathToFunctionName(path: string): string | null {
   if (cleanPath.startsWith('admin/2fa')) return 'admin-2fa'
   if (cleanPath.startsWith('admin/scheduled-reports')) return 'admin-scheduled-reports'
   if (cleanPath.startsWith('admin/notifications')) return 'admin-notifications'
+  if (cleanPath.startsWith('admin/exports')) return 'admin-exports'
+  if (cleanPath.startsWith('admin/reconciliation')) return 'admin-reconciliation'
   if (cleanPath.startsWith('admin/open-questions') || cleanPath.startsWith('admin/audit-logs') || cleanPath === 'admin/settings') return 'admin-settings'
 
   // Member routes (extended)
   if (cleanPath.startsWith('member/claims')) return 'member-claims'
   if (cleanPath.startsWith('member/receipts')) return 'member-receipts'
+  if (cleanPath.startsWith('member/notification-prefs')) return 'member-notification-prefs'
   if (cleanPath.startsWith('member/notifications')) return 'member-notifications'
 
   // Payment routes

@@ -25,6 +25,12 @@ async function uploadBase64(adminClient: ReturnType<typeof createAdminClient>, d
   const binaryStr = atob(base64)
   const bytes = new Uint8Array(binaryStr.length)
   for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i)
+
+  // Limit: 10MB
+  if (bytes.length > 10 * 1024 * 1024) {
+    throw new Error('File too large. Maximum size is 10MB.')
+  }
+
   const path = makeStoragePath(filename, bucket)
   const { error } = await adminClient.storage.from(bucket).upload(path, bytes, { contentType, upsert: false })
   if (error) throw new Error(`Storage upload failed: ${error.message}`)
@@ -71,17 +77,20 @@ Deno.serve(async (req) => {
       const type = url.searchParams.get('type')
       const status = url.searchParams.get('status')
       const q = url.searchParams.get('q')
+      const page = parseInt(url.searchParams.get('page') || '1')
+      const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '50'), 200)
       let query = adminClient
         .from('news_events')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
       if (type) query = query.eq('type', type)
       if (status === 'published') query = query.eq('is_published', true)
       if (status === 'draft') query = query.eq('is_published', false)
       if (q) query = query.or(`title.ilike.%${q}%,body.ilike.%${q}%,excerpt.ilike.%${q}%`)
-      const { data, error } = await query
+      query = query.range((page - 1) * perPage, page * perPage - 1)
+      const { data, error, count } = await query
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ items: data ?? [] }), {
+      return new Response(JSON.stringify({ items: data ?? [], total: count ?? 0, page, per_page: perPage, pages: Math.ceil((count ?? 0) / perPage) }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -228,10 +237,9 @@ Deno.serve(async (req) => {
       status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal error'
-    const status = message.includes('FORBIDDEN') ? 403 : message.includes('Storage upload failed') ? 400 : 500
-    return new Response(JSON.stringify({ message }), {
-      status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    console.error('admin-news error:', err)
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })

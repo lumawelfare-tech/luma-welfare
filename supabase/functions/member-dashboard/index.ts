@@ -23,38 +23,57 @@ Deno.serve(async (req) => {
 
     const adminClient = createAdminClient()
 
-    // Check registration fee status
-    const { data: regFee } = await adminClient
-      .from('registration_fees')
-      .select('status, amount, paid_at')
-      .eq('member_id', user.id)
-      .eq('fee_type', 'registration')
-      .maybeSingle()
+    // Parallel fetch: registration fee + dashboard data
+    const [regFeeResult, dashboardResult] = await Promise.all([
+      adminClient
+        .from('registration_fees')
+        .select('status, amount, paid_at')
+        .eq('member_id', user.id)
+        .eq('fee_type', 'registration')
+        .maybeSingle(),
+      adminClient.rpc('build_member_dashboard', { p_member_id: user.id }),
+    ])
 
-    const registrationFeeStatus = regFee?.status ?? 'unpaid'
+    const registrationFeeStatus = regFeeResult.data?.status ?? 'unpaid'
     const registrationFeePaid = registrationFeeStatus === 'paid'
 
-    // Use RPC for complex dashboard building
-    const { data: cards, error } = await adminClient
-      .rpc('build_member_dashboard', { p_member_id: user.id })
+    if (dashboardResult.error) {
+      // Fallback: use optimized direct queries with joins (not N+1)
+      const [subsResult, qualsResult, memberResult] = await Promise.all([
+        adminClient
+          .from('subscriptions')
+          .select('id, status, started_at, next_due_date, package_id, packages(code, name, waiting_period_months), package_tiers(name, amount)')
+          .eq('member_id', user.id)
+          .order('created_at'),
+        adminClient
+          .from('qualifications')
+          .select('subscription_id, status, eligible_from, criteria_met, evaluated_at')
+          .eq('member_id', user.id),
+        adminClient
+          .from('members')
+          .select('status')
+          .eq('id', user.id)
+          .single(),
+      ])
 
-    if (error) {
-      // Fallback to direct queries if RPC doesn't exist yet
-      const { data: subs } = await adminClient
-        .from('subscriptions')
-        .select('id, status, started_at, next_due_date, package_id, packages(code, name, waiting_period_months), package_tiers(name, amount)')
-        .eq('member_id', user.id)
-        .order('created_at')
+      const subs = subsResult.data ?? []
+      const quals = qualsResult.data ?? []
+      const member = memberResult.data
 
+      // Batch fetch all contributions for this member (not per-subscription N+1)
       const { data: allContributions } = await adminClient
         .from('contributions')
         .select('subscription_id, status, period')
         .eq('member_id', user.id)
-        .order('period')
 
-      const { data: allRules } = await adminClient
-        .from('package_rules')
-        .select('package_id, key, value')
+      // Batch fetch all package rules
+      const packageIds = [...new Set(subs.map(s => s.package_id))]
+      const { data: allRules } = packageIds.length > 0
+        ? await adminClient
+            .from('package_rules')
+            .select('package_id, key, value')
+            .in('package_id', packageIds)
+        : { data: [] }
 
       const rulesByPackage = new Map<string, Record<string, unknown>>()
       for (const r of allRules ?? []) {
@@ -63,23 +82,12 @@ Deno.serve(async (req) => {
         rulesByPackage.set(r.package_id, map)
       }
 
-      const { data: quals } = await adminClient
-        .from('qualifications')
-        .select('subscription_id, status, eligible_from, criteria_met, evaluated_at')
-        .eq('member_id', user.id)
-
       const qualsBySub = new Map((quals ?? []).map((q) => [q.subscription_id, q]))
-
-      const { data: member } = await adminClient
-        .from('members')
-        .select('status')
-        .eq('id', user.id)
-        .single()
 
       const today = new Date()
       const currentPeriod = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
 
-      const result = (subs ?? []).map((s) => {
+      const result = subs.map((s) => {
         const rules = rulesByPackage.get(s.package_id) ?? {}
         const contributions = (allContributions ?? []).filter((c) => c.subscription_id === s.id)
         const paid = contributions.filter((c) => ['Paid', 'Verified', 'Late'].includes(c.status)).length
@@ -125,13 +133,13 @@ Deno.serve(async (req) => {
         }
       })
 
-    return new Response(JSON.stringify({ cards: result, registration_fee_status: registrationFeeStatus, registration_fee_paid: registrationFeePaid }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+      return new Response(JSON.stringify({ cards: result, registration_fee_status: registrationFeeStatus, registration_fee_paid: registrationFeePaid }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    return new Response(JSON.stringify({ cards: cards ?? [], registration_fee_status: registrationFeeStatus, registration_fee_paid: registrationFeePaid }), {
+    return new Response(JSON.stringify({ cards: dashboardResult.data ?? [], registration_fee_status: registrationFeeStatus, registration_fee_paid: registrationFeePaid }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

@@ -58,9 +58,10 @@ export function AdminAuditLogs() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search logs…"
+          aria-label="Search audit logs"
           className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-luma-500"
         />
-        <select value={filter} onChange={(e) => setFilter(e.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+        <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter by action" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
           <option value="">All actions</option>
           {uniqueActions.map(a => <option key={a} value={a}>{a}</option>)}
         </select>

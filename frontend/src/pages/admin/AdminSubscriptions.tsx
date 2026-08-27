@@ -5,6 +5,7 @@ import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { ExportDialog } from '../../components/ExportDialog'
 
 type Subscription = {
   id: string
@@ -27,6 +28,7 @@ const statusStyles: Record<string, string> = {
   rejected: 'bg-red-50 text-red-700 border-red-200',
 }
 
+
 const filterTabs = [
   { value: '', label: 'All' },
   { value: 'active', label: 'Active' },
@@ -43,6 +45,13 @@ export function AdminSubscriptions() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const perPage = 50
+
+  // Export
+  const [showExport, setShowExport] = useState(false)
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -56,14 +65,19 @@ export function AdminSubscriptions() {
   const [bulkAction, setBulkAction] = useState<'active' | 'paused' | 'cancelled' | null>(null)
   const [bulkReason, setBulkReason] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pageNum = 1) => {
     setError(null)
     setLoading(true)
     try {
-      let path = '/admin/subscriptions'
-      if (filter) path += `?status=${filter}`
-      const d = await api<{ subscriptions: Subscription[] }>(path, { auth: true })
+      const qs = new URLSearchParams()
+      if (filter) qs.set('status', filter)
+      qs.set('page', String(pageNum))
+      qs.set('per_page', String(perPage))
+      const d = await api<{ subscriptions: Subscription[]; total: number; page: number; pages: number }>(`/admin/subscriptions?${qs.toString()}`, { auth: true })
       setSubs(d.subscriptions ?? [])
+      setTotalCount(d.total ?? 0)
+      setTotalPages(d.pages ?? 1)
+      setPage(d.page ?? pageNum)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load subscriptions.')
     } finally {
@@ -71,7 +85,7 @@ export function AdminSubscriptions() {
     }
   }, [filter])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(1) }, [load])
 
   async function approve(sub: Subscription) {
     setBusyId(sub.id)
@@ -149,28 +163,6 @@ export function AdminSubscriptions() {
       addToast('success', `${success} subscription${success !== 1 ? 's' : ''} ${status === 'active' ? 'activated' : status === 'paused' ? 'suspended' : 'cancelled'}.`)
     }
     await load()
-  }
-
-  function exportCSV() {
-    const headers = ['Member', 'Package', 'Tier', 'Amount', 'Status', 'Started', 'Next Due']
-    const csvRows = subs.map((s) => [
-      s.members?.full_name ?? '',
-      s.packages?.name ?? '',
-      s.package_tiers?.name ?? '',
-      s.package_tiers?.amount != null ? String(s.package_tiers.amount) : '',
-      s.status,
-      s.started_at ? new Date(s.started_at).toLocaleDateString() : '',
-      s.next_due_date ? new Date(s.next_due_date).toLocaleDateString() : '',
-    ])
-    const csv = [headers, ...csvRows].map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `subscriptions-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    addToast('success', `Exported ${subs.length} subscriptions to CSV.`)
   }
 
   const pendingCount = subs.filter((s) => s.status === 'pending').length
@@ -258,7 +250,7 @@ export function AdminSubscriptions() {
           <h1 className="text-2xl font-bold text-gray-900">Subscriptions</h1>
           <p className="text-sm text-gray-500 mt-1">Manage member package subscriptions.</p>
         </div>
-        <button onClick={exportCSV} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        <button onClick={() => setShowExport(true)} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
           Export CSV
         </button>
       </div>
@@ -267,7 +259,7 @@ export function AdminSubscriptions() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Total</div>
-          <div className="mt-1 text-2xl font-bold text-gray-900">{subs.length}</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{totalCount}</div>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Active</div>
@@ -351,6 +343,31 @@ export function AdminSubscriptions() {
         />
       )}
 
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+          <div className="text-sm text-gray-500">
+            Page {page} of {totalPages}
+          </div>
+          <div className="flex gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => load(page - 1)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => load(page + 1)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bulk Action Bar */}
       <BulkActionBar
         selectedCount={selectedIds.size}
@@ -373,7 +390,7 @@ export function AdminSubscriptions() {
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium text-gray-600">Notes (optional)</label>
-                <textarea value={dialogReason} onChange={(e) => setDialogReason(e.target.value)} placeholder="Any notes…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
+                <textarea value={dialogReason} onChange={(e) => setDialogReason(e.target.value)} placeholder="Any notes…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Activation notes" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
@@ -397,7 +414,7 @@ export function AdminSubscriptions() {
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
-                <textarea value={dialogReason} onChange={(e) => setDialogReason(e.target.value)} placeholder="e.g. Non-payment, policy violation…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
+                <textarea value={dialogReason} onChange={(e) => setDialogReason(e.target.value)} placeholder="e.g. Non-payment, policy violation…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Suspension reason" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
@@ -421,7 +438,7 @@ export function AdminSubscriptions() {
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
-                <textarea value={dialogReason} onChange={(e) => setDialogReason(e.target.value)} placeholder="e.g. Member request, policy violation…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
+                <textarea value={dialogReason} onChange={(e) => setDialogReason(e.target.value)} placeholder="e.g. Member request, policy violation…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Cancellation reason" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
@@ -449,11 +466,19 @@ export function AdminSubscriptions() {
             {(bulkAction === 'paused' || bulkAction === 'cancelled') && (
               <div className="mt-3">
                 <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
-                <textarea value={bulkReason} onChange={(e) => setBulkReason(e.target.value)} placeholder="e.g. Non-payment, policy violation…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
+                <textarea value={bulkReason} onChange={(e) => setBulkReason(e.target.value)} placeholder="e.g. Non-payment, policy violation…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Bulk action reason" />
               </div>
             )}
           </>
         }
+      />
+
+      <ExportDialog
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        exportType="subscriptions"
+        filters={{ status: filter || undefined }}
+        filterLabels={{ status: 'Status' }}
       />
     </div>
   )

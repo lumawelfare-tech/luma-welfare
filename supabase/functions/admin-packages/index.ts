@@ -97,8 +97,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error'
-    const status = message.includes('FORBIDDEN') ? 403 : 500
-    return new Response(JSON.stringify({ message, code: status === 403 ? 'FORBIDDEN' : 'INTERNAL' }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    console.error('admin-packages error:', err)
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })

@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
+import { supabase } from '../../lib/supabase'
 
 type Subscription = { id: string; status: string; packages: { code: string; name: string }[]; qualification?: { status: string } | null }
 type Claim = {
@@ -14,6 +15,7 @@ type Claim = {
   created_at: string
   submitted_at: string | null
   decided_at: string | null
+  paid_at: string | null
   packages: { code: string | null; name: string | null } | null
 }
 type ClaimDocument = {
@@ -37,6 +39,9 @@ const statusStyles: Record<string, string> = {
   Paid: 'bg-purple-50 text-purple-700 border-purple-200',
 }
 
+// Ordered claim statuses for timeline visualization
+const claimTimeline = ['Draft', 'Submitted', 'Under Review', 'Approved', 'Paid']
+
 const claimTypes = [
   'Burial Support',
   'Hospital Insurance',
@@ -52,6 +57,55 @@ const claimTypes = [
   'Senior Citizen Support',
   'Other',
 ]
+
+function ClaimTimeline({ status }: { status: string }) {
+  const currentIndex = claimTimeline.indexOf(status)
+  const isRejected = status === 'Rejected'
+  const isAdditionalInfo = status === 'Additional Information Required'
+  const currentIdx = isRejected || isAdditionalInfo ? -1 : currentIndex
+
+  return (
+    <div className="flex items-center gap-0 w-full" role="group" aria-label={`Claim status: ${status}`}>
+      {claimTimeline.map((step, i) => {
+        const isActive = i <= currentIdx
+        const isCurrent = i === currentIdx
+        return (
+          <div key={step} className="flex items-center flex-1">
+            <div className="flex flex-col items-center flex-shrink-0">
+              <div className={`flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold border-2 transition-colors ${
+                isCurrent
+                  ? 'border-luma-500 bg-luma-500 text-white'
+                  : isActive
+                    ? 'border-emerald-400 bg-emerald-400 text-white'
+                    : 'border-gray-200 bg-white text-gray-300'
+              }`}>
+                {isActive && !isCurrent ? '✓' : (i + 1)}
+              </div>
+              <span className={`text-[9px] mt-1 whitespace-nowrap font-medium ${isCurrent ? 'text-luma-700' : isActive ? 'text-emerald-600' : 'text-gray-400'}`}>
+                {step}
+              </span>
+            </div>
+            {i < claimTimeline.length - 1 && (
+              <div className={`flex-1 h-0.5 mx-1 -mt-3 ${i < currentIdx ? 'bg-emerald-400' : 'bg-gray-200'}`} />
+            )}
+          </div>
+        )
+      })}
+      {(isRejected || isAdditionalInfo) && (
+        <div className="flex flex-col items-center flex-shrink-0 ml-1">
+          <div className={`flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold border-2 ${
+            isRejected ? 'border-red-400 bg-red-400 text-white' : 'border-orange-400 bg-orange-400 text-white'
+          }`}>
+            {isRejected ? '✗' : '!'}
+          </div>
+          <span className={`text-[9px] mt-1 whitespace-nowrap font-medium ${isRejected ? 'text-red-600' : 'text-orange-600'}`}>
+            {status}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function Claims() {
   const { registrationFeePaid } = useAuth()
@@ -75,6 +129,10 @@ export function Claims() {
   const [documents, setDocuments] = useState<ClaimDocument[]>([])
   const [uploading, setUploading] = useState(false)
 
+  // Focus management
+  const formRef = useRef<HTMLFormElement>(null)
+  const detailRef = useRef<HTMLDivElement>(null)
+
   const load = useCallback(async () => {
     try {
       const [me, claimsData] = await Promise.all([
@@ -91,6 +149,36 @@ export function Claims() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Focus management for form
+  useEffect(() => {
+    if (showForm && formRef.current) {
+      const firstInput = formRef.current.querySelector('select, input, textarea') as HTMLElement
+      if (firstInput) firstInput.focus()
+    }
+  }, [showForm])
+
+  // Focus management for detail modal
+  useEffect(() => {
+    if (detail && detailRef.current) {
+      detailRef.current.focus()
+    }
+  }, [detail])
+
+  // Realtime: subscribe to claim status changes for the current member
+  useEffect(() => {
+    const channel = supabase
+      .channel('member-claims-live')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'claims' }, () => {
+        load() // Reload claims when any claim is updated
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'claims' }, () => {
+        load() // Reload when a new claim appears (e.g. admin creates one)
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [load])
 
   function resetForm() {
     setFormSubId('')
@@ -145,7 +233,7 @@ export function Claims() {
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     if (!detail || !e.target.files?.[0]) return
     const file = e.target.files[0]
-    e.target.value = '' // Reset input
+    e.target.value = ''
 
     if (file.size > 10 * 1024 * 1024) {
       setError('File size must be under 10MB.')
@@ -154,12 +242,10 @@ export function Claims() {
 
     setUploading(true)
     try {
-      // Read file as base64
       const reader = new FileReader()
       const base64 = await new Promise<string>((resolve, reject) => {
         reader.onload = () => {
           const result = reader.result as string
-          // Remove data URL prefix
           const base64Data = result.split(',')[1]
           resolve(base64Data)
         }
@@ -179,7 +265,6 @@ export function Claims() {
       })
 
       setNotice('Document uploaded successfully.')
-      // Reload documents
       const d = await api<{ claim: Claim; documents: ClaimDocument[] }>(`/member/claims?id=${detail.id}`, { auth: true })
       setDocuments(d.documents ?? [])
     } catch (e) {
@@ -200,6 +285,10 @@ export function Claims() {
     )
   }
 
+  // Stats
+  const submittedCount = claims.filter(c => c.status === 'Submitted' || c.status === 'Under Review').length
+  const approvedCount = claims.filter(c => c.status === 'Approved' || c.status === 'Paid').length
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
@@ -211,7 +300,7 @@ export function Claims() {
           <button
             onClick={() => setShowForm(true)}
             disabled={subscriptions.length === 0}
-            className="inline-flex items-center gap-2 rounded-lg bg-luma-700 px-4 py-2 text-sm font-medium text-white hover:bg-luma-800 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-luma-800 disabled:opacity-50 transition-colors min-h-[44px]"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             New Claim
@@ -220,30 +309,59 @@ export function Claims() {
       </div>
 
       {notice && (
-        <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">{notice}</div>
+        <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
+          <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          {notice}
+        </div>
       )}
       {error && (
-        <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-center gap-2" role="alert">
+          <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+          <span className="flex-1">{error}</span>
+          <button onClick={() => { setError(null); setLoading(true); load() }} className="font-medium underline flex-shrink-0 min-h-[44px] px-2">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Quick stats */}
+      {!loading && claims.length > 0 && (
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-center">
+            <div className="text-lg font-bold text-gray-900">{claims.length}</div>
+            <div className="text-[10px] font-medium uppercase text-gray-400">Total</div>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-center">
+            <div className="text-lg font-bold text-amber-700">{submittedCount}</div>
+            <div className="text-[10px] font-medium uppercase text-amber-600">In Progress</div>
+          </div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-center">
+            <div className="text-lg font-bold text-emerald-700">{approvedCount}</div>
+            <div className="text-[10px] font-medium uppercase text-emerald-600">Approved</div>
+          </div>
+        </div>
       )}
 
       {/* Submit Form */}
       {showForm && (
-        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6" role="region" aria-label="Claim submission form">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">File a Claim</h2>
-            <button onClick={resetForm} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+            <button onClick={resetForm} className="text-sm text-gray-500 hover:text-gray-700 min-h-[44px] px-2" aria-label="Cancel claim submission">Cancel</button>
           </div>
           <p className="text-sm text-gray-500 mb-4">
             Describe your welfare claim. You can save as draft and upload documents before submitting.
           </p>
-          <form onSubmit={(e) => submitClaim(e, true)} className="space-y-4">
+          <form ref={formRef} onSubmit={(e) => submitClaim(e, true)} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Package *</label>
+                <label htmlFor="claim-pkg" className="block text-sm font-medium text-gray-700 mb-1">Package *</label>
                 <select
+                  id="claim-pkg"
                   value={formSubId}
                   onChange={(e) => { setFormSubId(e.target.value); setFormError('') }}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500 min-h-[44px]"
+                  aria-required="true"
                 >
                   <option value="">Select package</option>
                   {subscriptions.map(s => (
@@ -252,11 +370,13 @@ export function Claims() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Claim Type *</label>
+                <label htmlFor="claim-type" className="block text-sm font-medium text-gray-700 mb-1">Claim Type *</label>
                 <select
+                  id="claim-type"
                   value={formType}
                   onChange={(e) => { setFormType(e.target.value); setFormError('') }}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500 min-h-[44px]"
+                  aria-required="true"
                 >
                   <option value="">Select type</option>
                   {claimTypes.map(t => (
@@ -265,37 +385,40 @@ export function Claims() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount Requested (KSh, optional)</label>
+                <label htmlFor="claim-amt" className="block text-sm font-medium text-gray-700 mb-1">Amount Requested (KSh, optional)</label>
                 <input
+                  id="claim-amt"
                   type="number"
                   min="0"
                   value={formAmount}
                   onChange={(e) => setFormAmount(e.target.value)}
                   placeholder="e.g. 50000"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500 min-h-[44px]"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+              <label htmlFor="claim-desc" className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
               <textarea
+                id="claim-desc"
                 value={formDesc}
                 onChange={(e) => { setFormDesc(e.target.value); setFormError('') }}
                 rows={4}
                 placeholder="Describe your claim in detail — why you need support, relevant dates, circumstances…"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500 resize-none"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500 resize-none"
+                aria-required="true"
               />
             </div>
 
             {formError && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{formError}</div>
+              <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700" role="alert">{formError}</div>
             )}
 
             <div className="flex gap-3 pt-2">
               <button
                 type="submit"
                 disabled={submitting}
-                className="inline-flex items-center gap-2 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-luma-800 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-luma-800 disabled:opacity-50 transition-colors min-h-[44px]"
               >
                 {submitting ? 'Submitting…' : 'Submit Claim'}
               </button>
@@ -303,7 +426,7 @@ export function Claims() {
                 type="button"
                 onClick={(e) => submitClaim(e, false)}
                 disabled={submitting}
-                className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors min-h-[44px]"
               >
                 Save as Draft
               </button>
@@ -326,7 +449,20 @@ export function Claims() {
             <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
           <h2 className="mt-4 text-lg font-semibold text-gray-900">No claims yet</h2>
-          <p className="mt-2 text-sm text-gray-500">When you need welfare support, you can file a claim from here.</p>
+          <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
+            When you need welfare support, you can file a claim from here. Your claim will be reviewed by an administrator.
+          </p>
+          {subscriptions.length > 0 ? (
+            <button
+              onClick={() => setShowForm(true)}
+              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-all min-h-[44px]"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              File Your First Claim
+            </button>
+          ) : (
+            <p className="mt-4 text-xs text-gray-400">Join a package first to be eligible for claims.</p>
+          )}
         </div>
       )}
 
@@ -340,7 +476,7 @@ export function Claims() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => viewDetail(cl)}
-                      className="font-semibold text-luma-700 hover:text-luma-800 hover:underline text-left"
+                      className="font-semibold text-luma-700 hover:text-luma-800 hover:underline text-left min-h-[44px] flex items-center"
                     >
                       {cl.claim_number}
                     </button>
@@ -361,6 +497,13 @@ export function Claims() {
                       <span className="font-medium">Admin:</span> {cl.admin_notes}
                     </div>
                   )}
+
+                  {/* Inline timeline for active claims */}
+                  {(cl.status === 'Submitted' || cl.status === 'Under Review' || cl.status === 'Approved' || cl.status === 'Paid') && (
+                    <div className="mt-3 max-w-sm">
+                      <ClaimTimeline status={cl.status} />
+                    </div>
+                  )}
                 </div>
                 <div className="text-right flex-shrink-0">
                   {cl.amount_requested != null && (
@@ -378,8 +521,8 @@ export function Claims() {
 
       {/* Detail Modal */}
       {detail && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-12 overflow-y-auto" onClick={() => setDetail(null)}>
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-12 overflow-y-auto" onClick={() => setDetail(null)} role="dialog" aria-modal="true" aria-label={`Claim ${detail.claim_number}`} onKeyDown={(e) => { if (e.key === 'Escape') setDetail(null) }}>
+          <div ref={detailRef} className="w-full max-w-lg rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()} tabIndex={-1}>
             <div className="px-6 py-5 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
@@ -391,9 +534,14 @@ export function Claims() {
                     <span className="text-xs text-gray-400">{detail.claim_type}</span>
                   </div>
                 </div>
-                <button onClick={() => setDetail(null)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
+                <button onClick={() => setDetail(null)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Close">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
+              </div>
+
+              {/* Timeline in detail modal */}
+              <div className="mt-4">
+                <ClaimTimeline status={detail.status} />
               </div>
             </div>
             <div className="px-6 py-4 space-y-3 text-sm">
@@ -424,6 +572,12 @@ export function Claims() {
                     <div className="text-gray-700">{new Date(detail.decided_at).toLocaleString()}</div>
                   </div>
                 )}
+                {detail.paid_at && (
+                  <div>
+                    <span className="text-gray-400 text-xs">Paid</span>
+                    <div className="text-gray-700">{new Date(detail.paid_at).toLocaleString()}</div>
+                  </div>
+                )}
               </div>
               {detail.description && (
                 <div>
@@ -443,8 +597,8 @@ export function Claims() {
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400 text-xs">Documents</span>
                   {(detail.status === 'Draft' || detail.status === 'Submitted' || detail.status === 'Additional Information Required') && (
-                    <label className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-luma-700 hover:bg-gray-50 cursor-pointer transition-colors">
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                    <label className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2.5 text-xs font-medium text-luma-700 hover:bg-gray-50 cursor-pointer transition-colors min-h-[44px]">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
                       {uploading ? 'Uploading…' : 'Upload File'}
                       <input
                         type="file"
@@ -452,12 +606,17 @@ export function Claims() {
                         accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx"
                         onChange={handleFileUpload}
                         disabled={uploading}
+                        aria-label="Upload supporting document"
                       />
                     </label>
                   )}
                 </div>
                 {documents.length === 0 && (
-                  <p className="mt-1 text-xs text-gray-400">No documents uploaded yet.</p>
+                  <div className="mt-2 rounded-lg border border-dashed border-gray-200 p-4 text-center">
+                    <svg className="h-8 w-8 mx-auto text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                    <p className="mt-1 text-xs text-gray-400">No documents uploaded yet</p>
+                    <p className="text-[10px] text-gray-300">Upload supporting documents (photos, receipts, etc.)</p>
+                  </div>
                 )}
                 <div className="mt-2 space-y-1">
                   {documents.map((doc) => (
@@ -466,7 +625,7 @@ export function Claims() {
                       href={doc.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50 transition-colors"
+                      className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5 hover:bg-gray-50 transition-colors min-h-[44px]"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <svg className="h-4 w-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>

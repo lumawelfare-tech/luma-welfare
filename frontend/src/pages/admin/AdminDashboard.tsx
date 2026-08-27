@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, memo } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { supabase } from '../../lib/supabase'
@@ -18,12 +18,24 @@ import {
 
 type DashboardData = {
   members: number
+  active_members: number
+  new_members_period: number
   subscriptions: number
   pending_contributions: number
+  total_contributions: number
+  verified_contributions: number
   pending_claims: number
   approved_claims: number
   paid_claims: number
+  total_claims: number
+  total_payments: number
+  completed_payments: number
   confirmed_stats: Record<string, unknown>
+  member_growth: { month: string; new_members: number; active_members: number; cumulative: number }[]
+  payment_health: { total_payments: number; completed: number; pending: number; failed: number; success_rate: number; total_amount: number; completed_amount: number; avg_amount: number }
+  outstanding: { approved_unpaid_claims: number; approved_unpaid_amount: number; pending_contributions: number; pending_contribution_amount: number; stale_pending_payments: number; stale_pending_amount: number }
+  qualifications: { qualified: number; not_eligible: number; at_risk: number; revoked: number; total: number }
+  retention: { current_month_active: number; previous_month_active: number; retained: number; retention_rate: number; new_active: number }
   monthly_contributions: { month: string; label: string; total: number; verified: number; pending: number }[]
   package_breakdown: { name: string; count: number }[]
   claims_by_status: Record<string, number>
@@ -40,9 +52,10 @@ type DashboardData = {
     by_month: { month: string; label: string; total: number; success: number; error: number; records: number }[]
     by_schedule: { name: string; total: number; success: number; error: number; lastRun: string }[]
   }
+  membership_funnel: { stage: string; count: number; pct_of_total: number }[]
 }
 
-type DatePreset = '3m' | '6m' | '12m' | 'ytd' | 'all' | 'custom'
+type DatePreset = 'today' | '7d' | '30d' | 'month' | 'quarter' | 'ytd' | 'all' | 'custom'
 
 const REFRESH_INTERVAL = 30_000 // 30 seconds
 
@@ -89,14 +102,14 @@ function timeAgo(date: Date): string {
   return `${hours}h ago`
 }
 
-function ClaimsPieChart({ data }: { data: Record<string, number> }) {
+const ClaimsPieChart = memo(function ClaimsPieChart({ data }: { data: Record<string, number> }) {
   const entries = Object.entries(data).filter(([, v]) => v > 0)
   if (entries.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No claims data</div>
   const chartData = entries.map(([name, value]) => ({ name, value }))
   return (
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
-        <Pie data={chartData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={3} dataKey="value" label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
+        <Pie data={chartData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={3} dataKey="value" isAnimationActive={false} label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
           {chartData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
         </Pie>
         <Tooltip formatter={(val) => [val, 'Claims']} />
@@ -104,11 +117,51 @@ function ClaimsPieChart({ data }: { data: Record<string, number> }) {
       </PieChart>
     </ResponsiveContainer>
   )
-}
+})
+
+const FUNNEL_COLORS = ['#2563EB', '#3B82F6', '#6D9B3A', '#8BC34A', '#F59E0B', '#10B981']
+
+const MembershipFunnel = memo(function MembershipFunnel({ data }: { data: DashboardData['membership_funnel'] }) {
+  if (!data || data.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No funnel data</div>
+  const maxCount = Math.max(...data.map(d => d.count))
+  return (
+    <div className="space-y-2">
+      {data.map((stage, i) => {
+        const widthPct = maxCount > 0 ? (stage.count / maxCount) * 100 : 0
+        const dropoff = i > 0 ? data[i - 1].count - stage.count : 0
+        const dropoffPct = i > 0 && data[i - 1].count > 0 ? Math.round((dropoff / data[i - 1].count) * 100) : 0
+        return (
+          <div key={stage.stage} className="group">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-gray-700">{stage.stage}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-gray-900">{stage.count.toLocaleString()}</span>
+                <span className="text-gray-400">{stage.pct_of_total}%</span>
+                {i > 0 && dropoff > 0 && (
+                  <span className="text-red-500 font-medium">-{dropoffPct}%</span>
+                )}
+              </div>
+            </div>
+            <div className="mt-1 h-6 overflow-hidden rounded-lg bg-gray-100">
+              <div
+                className="h-full rounded-lg transition-all duration-500 flex items-center pl-2"
+                style={{ width: `${Math.max(widthPct, 2)}%`, backgroundColor: FUNNEL_COLORS[i % FUNNEL_COLORS.length] }}
+              >
+                {widthPct > 20 && (
+                  <span className="text-[10px] font-bold text-white">{stage.pct_of_total}%</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+})
 
 const PIE_COLORS = ['#6D9B3A', '#2563EB', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899', '#14B8A6']
 
-function ContribChart({ data, onMonthClick }: { data: DashboardData['monthly_contributions']; onMonthClick: (month: string) => void }) {
+const ContribChart = memo(function ContribChart({ data, onMonthClick }: { data: DashboardData['monthly_contributions']; onMonthClick: (month: string) => void }) {
   if (data.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No contribution data</div>
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -133,14 +186,14 @@ function ContribChart({ data, onMonthClick }: { data: DashboardData['monthly_con
         <YAxis tick={{ fontSize: 11 }} stroke="#9CA3AF" tickFormatter={(v) => Number(v) >= 1000 ? `${(Number(v) / 1000).toFixed(0)}k` : String(v)} />
         <Tooltip formatter={(val) => formatKes(Number(val))} labelStyle={{ fontWeight: 600 }} />
         <Legend />
-        <Area type="monotone" dataKey="verified" stroke="#6D9B3A" fill="url(#verifiedGrad)" name="Verified" />
-        <Area type="monotone" dataKey="pending" stroke="#F59E0B" fill="url(#pendingGrad)" name="Pending" />
+        <Area type="monotone" dataKey="verified" stroke="#6D9B3A" fill="url(#verifiedGrad)" name="Verified" isAnimationActive={false} />
+        <Area type="monotone" dataKey="pending" stroke="#F59E0B" fill="url(#pendingGrad)" name="Pending" isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
   )
-}
+})
 
-function PackageBarChart({ data }: { data: DashboardData['package_breakdown'] }) {
+const PackageBarChart = memo(function PackageBarChart({ data }: { data: DashboardData['package_breakdown'] }) {
   if (data.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No subscription data</div>
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -149,11 +202,11 @@ function PackageBarChart({ data }: { data: DashboardData['package_breakdown'] })
         <XAxis type="number" tick={{ fontSize: 11 }} stroke="#9CA3AF" />
         <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} stroke="#9CA3AF" />
         <Tooltip />
-        <Bar dataKey="count" fill="#6D9B3A" radius={[0, 6, 6, 0]} name="Active Subs" />
+        <Bar dataKey="count" fill="#6D9B3A" radius={[0, 6, 6, 0]} name="Active Subs" isAnimationActive={false} />
       </BarChart>
     </ResponsiveContainer>
   )
-}
+})
 
 export function AdminDashboard() {
   useHead('Admin Dashboard', undefined, { noindex: true })
@@ -171,7 +224,7 @@ export function AdminDashboard() {
   const [drillLoading, setDrillLoading] = useState(false)
 
   // Date range filter state
-  const [datePreset, setDatePreset] = useState<DatePreset>('12m')
+  const [datePreset, setDatePreset] = useState<DatePreset>('quarter')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
@@ -180,14 +233,21 @@ export function AdminDashboard() {
     const to = now.toISOString().split('T')[0]
     let from: string
     switch (datePreset) {
-      case '3m': {
-        const d = new Date(); d.setMonth(d.getMonth() - 3); from = d.toISOString().split('T')[0]; break
+      case 'today': {
+        from = to; break
       }
-      case '6m': {
-        const d = new Date(); d.setMonth(d.getMonth() - 6); from = d.toISOString().split('T')[0]; break
+      case '7d': {
+        const d = new Date(); d.setDate(d.getDate() - 7); from = d.toISOString().split('T')[0]; break
       }
-      case '12m': {
-        const d = new Date(); d.setMonth(d.getMonth() - 12); from = d.toISOString().split('T')[0]; break
+      case '30d': {
+        const d = new Date(); d.setDate(d.getDate() - 30); from = d.toISOString().split('T')[0]; break
+      }
+      case 'month': {
+        from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`; break
+      }
+      case 'quarter': {
+        const q = Math.floor(now.getMonth() / 3)
+        from = `${now.getFullYear()}-${String(q * 3 + 1).padStart(2, '0')}-01`; break
       }
       case 'ytd': {
         from = `${now.getFullYear()}-01-01`; break
@@ -373,21 +433,33 @@ export function AdminDashboard() {
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>,
     },
     {
+      label: 'Active Members',
+      value: data.active_members ?? data.members,
+      color: 'bg-emerald-50 text-emerald-700',
+      icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    },
+    {
+      label: 'New Members',
+      value: data.new_members_period ?? 0,
+      color: 'bg-blue-50 text-blue-700',
+      icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" /></svg>,
+    },
+    {
       label: 'Active Subscriptions',
       value: data.subscriptions,
-      color: 'bg-blue-50 text-blue-700',
+      color: 'bg-violet-50 text-violet-700',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>,
     },
     {
-      label: 'Total Contributions',
-      value: formatKes(totalContributions),
+      label: 'Confirmed Revenue',
+      value: formatKes(data.verified_contributions ?? totalVerified),
       color: 'bg-emerald-50 text-emerald-700',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
     },
     {
       label: 'Pending Claims',
       value: data.pending_claims,
-      color: 'bg-purple-50 text-purple-700',
+      color: 'bg-amber-50 text-amber-700',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>,
     },
     {
@@ -399,7 +471,7 @@ export function AdminDashboard() {
     {
       label: 'Paid Claims',
       value: data.paid_claims,
-      color: 'bg-amber-50 text-amber-700',
+      color: 'bg-purple-50 text-purple-700',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>,
     },
   ]
@@ -476,12 +548,13 @@ export function AdminDashboard() {
 
       {/* Global Date Range Filter */}
       <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3">
-        <span className="text-sm font-medium text-gray-700">Date Range:</span>
-        <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+        <span className="text-sm font-medium text-gray-700">Date Range:</span>          <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
           {([
-            { value: '3m' as DatePreset, label: '3M' },
-            { value: '6m' as DatePreset, label: '6M' },
-            { value: '12m' as DatePreset, label: '12M' },
+            { value: 'today' as DatePreset, label: 'Today' },
+            { value: '7d' as DatePreset, label: '7D' },
+            { value: '30d' as DatePreset, label: '30D' },
+            { value: 'month' as DatePreset, label: 'Month' },
+            { value: 'quarter' as DatePreset, label: 'Quarter' },
             { value: 'ytd' as DatePreset, label: 'YTD' },
             { value: 'all' as DatePreset, label: 'All' },
             { value: 'custom' as DatePreset, label: 'Custom' },
@@ -503,6 +576,7 @@ export function AdminDashboard() {
               type="date"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
+              aria-label="Custom date from"
               className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 outline-none focus:border-luma-500"
             />
             <span className="text-xs text-gray-400">to</span>
@@ -510,6 +584,7 @@ export function AdminDashboard() {
               type="date"
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
+              aria-label="Custom date to"
               className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 outline-none focus:border-luma-500"
             />
           </div>
@@ -775,8 +850,8 @@ export function AdminDashboard() {
                       <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="#9CA3AF" />
                       <YAxis tick={{ fontSize: 10 }} stroke="#9CA3AF" />
                       <Tooltip />
-                      <Bar dataKey="success" stackId="a" fill="#6D9B3A" name="Success" radius={[0, 0, 0, 0]} />
-                      <Bar dataKey="error" stackId="a" fill="#EF4444" name="Failed" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="success" stackId="a" fill="#6D9B3A" name="Success" radius={[0, 0, 0, 0]} isAnimationActive={false} />
+                      <Bar dataKey="error" stackId="a" fill="#EF4444" name="Failed" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -886,6 +961,186 @@ export function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          PHASE 12: MANAGEMENT INTELLIGENCE SECTIONS
+          ═══════════════════════════════════════════════════════════════════ */}
+
+      {/* Membership Funnel + Member Growth */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        {/* Membership Funnel */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Membership Funnel</h2>
+            <p className="mt-1 text-xs text-gray-500">Member journey from registration to qualification</p>
+          </div>
+          <div className="mt-4">
+            <MembershipFunnel data={data.membership_funnel ?? []} />
+          </div>
+        </div>
+
+        {/* Member Growth Chart */}
+        {data.member_growth && data.member_growth.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Member Growth</h2>
+              <p className="mt-1 text-xs text-gray-500">New members and cumulative growth</p>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-luma-500" /> New Members</div>
+              <div className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Cumulative</div>
+            </div>
+          </div>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.member_growth} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="growthGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6D9B3A" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#6D9B3A" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="#9CA3AF" />
+                <YAxis tick={{ fontSize: 10 }} stroke="#9CA3AF" />
+                <Tooltip />
+                <Area type="monotone" dataKey="new_members" stroke="#6D9B3A" fill="url(#growthGrad)" name="New" isAnimationActive={false} />
+                <Area type="monotone" dataKey="cumulative" stroke="#2563EB" fill="none" name="Cumulative" isAnimationActive={false} strokeDasharray="4 4" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+      </div>
+
+      {/* Payment Health + Outstanding Obligations + Qualifications */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+        {/* Payment Health */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <h2 className="text-base font-bold text-gray-900">Payment Health</h2>
+          <p className="mt-1 text-xs text-gray-500">M-Pesa payment performance</p>
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500">Success Rate</span>
+              <span className={`text-lg font-bold ${data.payment_health.success_rate >= 95 ? 'text-emerald-600' : data.payment_health.success_rate >= 80 ? 'text-amber-600' : 'text-red-600'}`}>
+                {data.payment_health.success_rate}%
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-gray-100">
+              <div className={`h-2 rounded-full transition-all ${data.payment_health.success_rate >= 95 ? 'bg-emerald-500' : data.payment_health.success_rate >= 80 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${data.payment_health.success_rate}%` }} />
+            </div>
+            <div className="grid grid-cols-3 gap-2 pt-2">
+              <div className="rounded-lg bg-emerald-50 p-3 text-center">
+                <div className="text-lg font-bold text-emerald-700">{data.payment_health.completed}</div>
+                <div className="text-[10px] font-medium text-emerald-600">Completed</div>
+              </div>
+              <div className="rounded-lg bg-amber-50 p-3 text-center">
+                <div className="text-lg font-bold text-amber-700">{data.payment_health.pending}</div>
+                <div className="text-[10px] font-medium text-amber-600">Pending</div>
+              </div>
+              <div className="rounded-lg bg-red-50 p-3 text-center">
+                <div className="text-lg font-bold text-red-700">{data.payment_health.failed}</div>
+                <div className="text-[10px] font-medium text-red-600">Failed</div>
+              </div>
+            </div>
+            <div className="pt-2 space-y-1.5 text-xs">
+              <div className="flex justify-between"><span className="text-gray-500">Total Amount</span><span className="font-semibold">{formatKes(data.payment_health.total_amount)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Completed Amount</span><span className="font-semibold text-emerald-700">{formatKes(data.payment_health.completed_amount)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Avg Transaction</span><span className="font-semibold">{formatKes(data.payment_health.avg_amount)}</span></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Outstanding Obligations */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <h2 className="text-base font-bold text-gray-900">Outstanding Obligations</h2>
+          <p className="mt-1 text-xs text-gray-500">Items requiring attention</p>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-amber-800">Approved Claims (Unpaid)</span>
+                <span className="text-lg font-bold text-amber-700">{data.outstanding.approved_unpaid_claims}</span>
+              </div>
+              <div className="text-xs text-amber-600">Value: {formatKes(data.outstanding.approved_unpaid_amount)}</div>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-800">Pending Contributions</span>
+                <span className="text-lg font-bold text-blue-700">{data.outstanding.pending_contributions}</span>
+              </div>
+              <div className="text-xs text-blue-600">Value: {formatKes(data.outstanding.pending_contribution_amount)}</div>
+            </div>
+            {data.outstanding.stale_pending_payments > 0 && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-red-800">Stale Pending Payments</span>
+                  <span className="text-lg font-bold text-red-700">{data.outstanding.stale_pending_payments}</span>
+                </div>
+                <div className="text-xs text-red-600">Value: {formatKes(data.outstanding.stale_pending_amount)} — No callback received</div>
+              </div>
+            )}
+            {data.outstanding.stale_pending_payments === 0 && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center">
+                <div className="text-sm font-medium text-emerald-700">✓ No stale payments</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Qualifications + Retention */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <h2 className="text-base font-bold text-gray-900">Qualifications</h2>
+          <p className="mt-1 text-xs text-gray-500">Member qualification status</p>
+          <div className="mt-4 space-y-2">
+            {data.qualifications.total > 0 ? (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-emerald-50 p-3 text-center">
+                    <div className="text-lg font-bold text-emerald-700">{data.qualifications.qualified}</div>
+                    <div className="text-[10px] font-medium text-emerald-600">Qualified</div>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3 text-center">
+                    <div className="text-lg font-bold text-gray-700">{data.qualifications.not_eligible}</div>
+                    <div className="text-[10px] font-medium text-gray-500">Not Yet</div>
+                  </div>
+                  <div className="rounded-lg bg-amber-50 p-3 text-center">
+                    <div className="text-lg font-bold text-amber-700">{data.qualifications.at_risk}</div>
+                    <div className="text-[10px] font-medium text-amber-600">At Risk</div>
+                  </div>
+                  <div className="rounded-lg bg-red-50 p-3 text-center">
+                    <div className="text-lg font-bold text-red-700">{data.qualifications.revoked}</div>
+                    <div className="text-[10px] font-medium text-red-600">Revoked</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="py-4 text-center text-sm text-gray-400">No qualification data</div>
+            )}
+          </div>
+
+          {/* Contribution Retention */}
+          <div className="mt-5 border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-bold text-gray-900">Contribution Retention</h3>
+            <p className="mt-0.5 text-xs text-gray-500">Month-over-month contributor retention</p>
+            {data.retention && (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Retention Rate</span>
+                  <span className={`text-lg font-bold ${data.retention.retention_rate >= 80 ? 'text-emerald-600' : data.retention.retention_rate >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {data.retention.retention_rate}%
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div><div className="text-sm font-bold text-gray-900">{data.retention.current_month_active}</div><div className="text-[10px] text-gray-500">This Month</div></div>
+                  <div><div className="text-sm font-bold text-gray-900">{data.retention.previous_month_active}</div><div className="text-[10px] text-gray-500">Last Month</div></div>
+                  <div><div className="text-sm font-bold text-luma-700">{data.retention.new_active}</div><div className="text-[10px] text-luma-600">New</div></div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

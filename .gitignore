@@ -13,3 +13,6 @@ lt-output.txt
 supabase/.temp/
 supabase/supabase/
 .vercel
+
+.vercel
+.env*

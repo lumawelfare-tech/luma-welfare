@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
@@ -47,26 +47,34 @@ export function AdminNews() {
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<NewsEvent | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const perPage = 50
 
-  async function load() {
+  const load = useCallback(async (pageNum = 1) => {
     setLoading(true)
     try {
-      let path = '/admin/news'
-      const params = new URLSearchParams()
-      if (filter.type) params.set('type', filter.type)
-      if (filter.status) params.set('status', filter.status)
-      const qs = params.toString()
-      if (qs) path += `?${qs}`
-      const d = await api<{ items: NewsEvent[] }>(path, { auth: true })
+      const qs = new URLSearchParams()
+      if (filter.type) qs.set('type', filter.type)
+      if (filter.status) qs.set('status', filter.status)
+      qs.set('page', String(pageNum))
+      qs.set('per_page', String(perPage))
+      const query = qs.toString()
+      const path = `/admin/news${query ? `?${query}` : ''}`
+      const d = await api<{ items: NewsEvent[]; total: number; page: number; pages: number }>(path, { auth: true })
       setItems(d.items ?? [])
+      setTotalCount(d.total ?? 0)
+      setTotalPages(d.pages ?? 1)
+      setPage(d.page ?? pageNum)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load news.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [filter])
 
-  useEffect(() => { load() }, [filter])
+  useEffect(() => { load(1) }, [load])
 
   function openCreate() {
     setEditing(null)
@@ -140,7 +148,7 @@ export function AdminNews() {
       setShowForm(false)
       setCoverPreview(null)
       if (fileRef.current) fileRef.current.value = ''
-      await load()
+      await load(page)
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Could not save.'
       addToast('error', msg)
@@ -155,7 +163,7 @@ export function AdminNews() {
     try {
       await api(`/admin/news/${item.id}`, { method: 'PATCH', auth: true, body: { is_published: !item.is_published } })
       addToast('success', item.is_published ? 'Unpublished.' : 'Published.')
-      await load()
+      await load(page)
     } catch (err) {
       addToast('error', err instanceof ApiError ? err.message : 'Could not update.')
     } finally {
@@ -168,7 +176,7 @@ export function AdminNews() {
     try {
       await api(`/admin/news/${item.id}`, { method: 'DELETE', auth: true })
       addToast('success', 'Item deleted.')
-      await load()
+      await load(page)
     } catch (err) {
       addToast('error', err instanceof ApiError ? err.message : 'Could not delete.')
     } finally {
@@ -186,7 +194,7 @@ export function AdminNews() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">News & Events</h1>
-          <p className="mt-1 text-sm text-gray-500">{items.length} item{items.length !== 1 ? 's' : ''}</p>
+          <p className="mt-1 text-sm text-gray-500">{totalCount} item{totalCount !== 1 ? 's' : ''}</p>
         </div>
         <button onClick={openCreate} className="rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-colors">
           + New Item
@@ -201,7 +209,7 @@ export function AdminNews() {
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="space-y-3 md:col-span-2">
               <div className="flex gap-3">
-                <select value={form.type} onChange={(e) => setForm(f => ({ ...f, type: e.target.value as 'news' | 'event' }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <select value={form.type} onChange={(e) => setForm(f => ({ ...f, type: e.target.value as 'news' | 'event' }))} aria-label="News type" className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
                   <option value="news">News</option>
                   <option value="event">Event</option>
                 </select>
@@ -210,22 +218,22 @@ export function AdminNews() {
                   Featured
                 </label>
               </div>
-              <input value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title" required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
-              <input value={form.excerpt} onChange={(e) => setForm(f => ({ ...f, excerpt: e.target.value }))} placeholder="Excerpt / summary (optional)" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
-              <textarea value={form.body} onChange={(e) => setForm(f => ({ ...f, body: e.target.value }))} placeholder="Content" rows={8} required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+              <input value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title" aria-label="News title" required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+              <input value={form.excerpt} onChange={(e) => setForm(f => ({ ...f, excerpt: e.target.value }))} placeholder="Excerpt / summary (optional)" aria-label="News excerpt" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+              <textarea value={form.body} onChange={(e) => setForm(f => ({ ...f, body: e.target.value }))} placeholder="Content" rows={8} aria-label="News content" required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
             </div>
 
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Cover Image</label>
-                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect}
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} aria-label="Upload cover image"
                   className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-luma-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-luma-700 hover:file:bg-luma-100" />
                 <p className="mt-1 text-xs text-gray-400">JPG, PNG, WEBP. Max 5MB.</p>
               </div>
               {coverPreview && (
                 <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
                   <img src={coverPreview} alt="Cover preview" className="max-h-40 w-full object-contain" />
-                  <button type="button" onClick={() => { setCoverPreview(null); if (fileRef.current) fileRef.current.value = '' }}
+                  <button type="button" onClick={() => { setCoverPreview(null); if (fileRef.current) fileRef.current.value = '' }} aria-label="Remove cover image preview"
                     className="absolute right-2 top-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70">
                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
@@ -235,9 +243,9 @@ export function AdminNews() {
 
             {form.type === 'event' && (
               <div className="space-y-3">
-                <input type="date" value={form.event_date} onChange={(e) => setForm(f => ({ ...f, event_date: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-                <input type="time" value={form.event_time} onChange={(e) => setForm(f => ({ ...f, event_time: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-                <input value={form.location} onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))} placeholder="Location (optional)" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+                <input type="date" value={form.event_date} onChange={(e) => setForm(f => ({ ...f, event_date: e.target.value }))} aria-label="Event date" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                <input type="time" value={form.event_time} onChange={(e) => setForm(f => ({ ...f, event_time: e.target.value }))} aria-label="Event time" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                <input value={form.location} onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))} placeholder="Location (optional)" aria-label="Event location" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
               </div>
             )}
           </div>
@@ -253,13 +261,13 @@ export function AdminNews() {
 
       {/* Filters */}
       <div className="mt-6 flex flex-wrap gap-3">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-luma-500" />
-        <select value={filter.type ?? ''} onChange={(e) => setFilter(f => ({ ...f, type: e.target.value || undefined }))} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" aria-label="Search news" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-luma-500" />
+        <select value={filter.type ?? ''} onChange={(e) => setFilter(f => ({ ...f, type: e.target.value || undefined }))} aria-label="Filter by type" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
           <option value="">All types</option>
           <option value="news">News</option>
           <option value="event">Events</option>
         </select>
-        <select value={filter.status ?? ''} onChange={(e) => setFilter(f => ({ ...f, status: e.target.value || undefined }))} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+        <select value={filter.status ?? ''} onChange={(e) => setFilter(f => ({ ...f, status: e.target.value || undefined }))} aria-label="Filter by status" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
           <option value="">All statuses</option>
           <option value="published">Published</option>
           <option value="draft">Draft</option>
@@ -317,6 +325,16 @@ export function AdminNews() {
               message={debouncedSearch || filter.type || filter.status ? 'Try adjusting your filters.' : 'Create your first news item or event.'}
             />
           )}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+          <div className="text-sm text-gray-500">Page {page} of {totalPages}</div>
+          <div className="flex gap-2">
+            <button disabled={page <= 1} onClick={() => load(page - 1)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+            <button disabled={page >= totalPages} onClick={() => load(page + 1)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+          </div>
         </div>
       )}
 

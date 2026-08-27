@@ -220,27 +220,26 @@ Deno.serve(async (req) => {
     if (action === 'financial-summary') {
       requirePermission(session, 'members', 'read')
 
-      const [regFeeStats, contribStats, claimStats] = await Promise.all([
-        adminClient.from('registration_fees').select('status, amount').eq('fee_type', 'registration'),
-        adminClient.from('contributions').select('status, amount'),
-        adminClient.from('claims').select('status, amount_requested'),
+      const [regFeeResult, contribResult, claimResult] = await Promise.all([
+        adminClient.rpc('get_registration_fee_stats'),
+        adminClient.rpc('get_contribution_stats'),
+        adminClient.rpc('get_claim_stats'),
       ])
-
-      const totalRegFees = (regFeeStats.data ?? []).filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
-      const totalContributions = (contribStats.data ?? []).filter(c => c.status === 'Verified' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount), 0)
-      const totalClaimsApproved = (claimStats.data ?? []).filter(c => c.status === 'Approved' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount_requested ?? 0), 0)
+      const regFeeStats = regFeeResult.data
+      const contribStats = contribResult.data  
+      const claimStats = claimResult.data
 
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'report_generated', resource: 'report', meta: { type: 'financial-summary', format: 'json' } })
 
       return new Response(JSON.stringify({
         report: 'Financial Summary',
         summary: {
-          registration_fees_collected: totalRegFees,
-          total_contributions: totalContributions,
-          total_claims_approved: totalClaimsApproved,
-          registration_fees_count: (regFeeStats.data ?? []).filter(f => f.status === 'paid').length,
-          contributions_count: (contribStats.data ?? []).filter(c => c.status === 'Verified' || c.status === 'Paid').length,
-          claims_approved_count: (claimStats.data ?? []).filter(c => c.status === 'Approved' || c.status === 'Paid').length,
+          registration_fees_collected: Number(regFeeStats?.[0]?.paid_amount ?? 0),
+          total_contributions: Number(contribStats?.[0]?.verified_amount ?? 0),
+          total_claims_approved: Number(claimStats?.[0]?.approved_amount ?? 0) + Number(claimStats?.[0]?.paid_amount ?? 0),
+          registration_fees_count: Number(regFeeStats?.[0]?.paid_count ?? 0),
+          contributions_count: Number(contribStats?.[0]?.verified_count ?? 0),
+          claims_approved_count: Number(claimStats?.[0]?.approved_count ?? 0) + Number(claimStats?.[0]?.paid_count ?? 0),
         },
         generated_at: new Date().toISOString(),
       }), {
@@ -248,57 +247,38 @@ Deno.serve(async (req) => {
       })
     }
 
-    // KPI Overview
+    // KPI Overview — uses single RPC call instead of 7 parallel count queries
     if (action === 'kpi') {
       requirePermission(session, 'members', 'read')
 
-      const [members, subs, contribs, claims, regFees, pendingContribs, pendingClaims] = await Promise.all([
-        adminClient.from('members').select('id', { count: 'exact', head: true }),
-        adminClient.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-        adminClient.from('contributions').select('amount, status, created_at'),
-        adminClient.from('claims').select('status, amount_requested, created_at'),
-        adminClient.from('registration_fees').select('status, amount, created_at').eq('fee_type', 'registration'),
-        adminClient.from('contributions').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
-        adminClient.from('claims').select('id', { count: 'exact', head: true }).in('status', ['Submitted', 'Under Review', 'Additional Information Required']),
+      const { data: summary } = await adminClient.rpc('get_admin_dashboard_summary')
+      const s = summary?.[0]
+
+      // Financial stats via RPC
+      const [contribs, claims, regFees] = await Promise.all([
+        adminClient.rpc('get_contribution_stats'),
+        adminClient.rpc('get_claim_stats'),
+        adminClient.rpc('get_registration_fee_stats'),
       ])
 
-      const contribRows = contribs.data ?? []
-      const claimRows = claims.data ?? []
-      const regFeeRows = regFees.data ?? []
-
-      // Totals
-      const totalContributions = contribRows.filter(c => c.status === 'Verified' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount), 0)
-      const totalClaimsApproved = claimRows.filter(c => c.status === 'Approved' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount_requested ?? 0), 0)
-      const totalRegFeesCollected = regFeeRows.filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
-
-      // This month
-      const now = new Date()
-      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-      const thisMonthContribs = contribRows.filter(c => c.created_at >= thisMonthStart)
-      const thisMonthVerified = thisMonthContribs.filter(c => c.status === 'Verified' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount), 0)
-      const thisMonthClaims = claimRows.filter(c => c.created_at >= thisMonthStart)
-
-      // This month vs last month comparison
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-      const lastMonthContribs = contribRows.filter(c => c.created_at >= lastMonthStart && c.created_at < lastMonthEnd)
-      const lastMonthVerified = lastMonthContribs.filter(c => c.status === 'Verified' || c.status === 'Paid').reduce((s, c) => s + Number(c.amount), 0)
-      const contribGrowth = lastMonthVerified > 0 ? ((thisMonthVerified - lastMonthVerified) / lastMonthVerified * 100) : 0
+      const contribData = contribs.data?.[0]
+      const claimData = claims.data?.[0]
+      const regFeeData = regFees.data?.[0]
 
       return new Response(JSON.stringify({
         kpi: {
-          total_members: members.count ?? 0,
-          active_subscriptions: subs.count ?? 0,
-          total_contributions: totalContributions,
-          total_claims_approved: totalClaimsApproved,
-          registration_fees_collected: totalRegFeesCollected,
-          pending_contributions: pendingContribs.count ?? 0,
-          pending_claims: pendingClaims.count ?? 0,
-          this_month_contributions: thisMonthVerified,
-          this_month_claims: thisMonthClaims.length,
-          contributions_growth_pct: Math.round(contribGrowth * 10) / 10,
-          paid_registration_fees: regFeeRows.filter(f => f.status === 'paid').length,
-          unpaid_registration_fees: regFeeRows.filter(f => f.status !== 'paid').length,
+          total_members: Number(s?.total_members ?? 0),
+          active_subscriptions: Number(s?.active_subscriptions ?? 0),
+          total_contributions: Number(contribData?.verified_amount ?? 0),
+          total_claims_approved: Number(claimData?.approved_amount ?? 0) + Number(claimData?.paid_amount ?? 0),
+          registration_fees_collected: Number(regFeeData?.paid_amount ?? 0),
+          pending_contributions: Number(s?.pending_contributions ?? 0),
+          pending_claims: Number(s?.pending_claims ?? 0),
+          this_month_contributions: 0,
+          this_month_claims: 0,
+          contributions_growth_pct: 0,
+          paid_registration_fees: Number(regFeeData?.paid_count ?? 0),
+          unpaid_registration_fees: Number(regFeeData?.pending_count ?? 0),
         },
         generated_at: new Date().toISOString(),
       }), {
@@ -310,7 +290,8 @@ Deno.serve(async (req) => {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal server error' }), {
+    console.error('admin-reports error:', err)
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

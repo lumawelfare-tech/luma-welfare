@@ -7,6 +7,8 @@ import { AdminLayout } from './components/AdminLayout'
 import { RequireMember } from './components/RequireMember'
 import { MemberLayout } from './components/MemberLayout'
 import { RequireAdmin } from './components/RequireAdmin'
+import { SWUpdateBanner } from './components/SWUpdateBanner'
+import { SyncStatus } from './components/SyncStatus'
 
 // Public pages — loaded eagerly (small, high-traffic)
 import { Home } from './pages/Home'
@@ -35,6 +37,7 @@ const Family = lazy(() => import('./pages/member/Family').then(m => ({ default: 
 const ReceiptsStatements = lazy(() => import('./pages/member/ReceiptsStatements').then(m => ({ default: m.ReceiptsStatements })))
 const Claims = lazy(() => import('./pages/member/Claims').then(m => ({ default: m.Claims })))
 const Notifications = lazy(() => import('./pages/member/Notifications').then(m => ({ default: m.Notifications })))
+const NotificationPreferences = lazy(() => import('./pages/member/NotificationPreferences').then(m => ({ default: m.NotificationPreferences })))
 
 // Admin pages — lazy loaded (largest, least frequently used)
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })))
@@ -50,6 +53,7 @@ const AdminAuditLogs = lazy(() => import('./pages/admin/AdminAuditLogs').then(m 
 const AdminRegistrationFees = lazy(() => import('./pages/admin/AdminRegistrationFees').then(m => ({ default: m.AdminRegistrationFees })))
 const AdminReports = lazy(() => import('./pages/admin/AdminReports').then(m => ({ default: m.AdminReports })))
 const AdminScheduledReports = lazy(() => import('./pages/admin/AdminScheduledReports').then(m => ({ default: m.AdminScheduledReports })))
+const AdminReconciliation = lazy(() => import('./pages/admin/AdminReconciliation').then(m => ({ default: m.AdminReconciliation })))
 
 function PageLoader() {
   return (
@@ -64,6 +68,8 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
+          <SWUpdateBanner />
+          <SyncStatus />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* ===== PUBLIC WEBSITE ===== */}
@@ -95,6 +101,7 @@ export default function App() {
                   <Route path="/receipts-statements" element={<ReceiptsStatements />} />
                   <Route path="/claims" element={<Claims />} />
                   <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/notification-preferences" element={<NotificationPreferences />} />
                 </Route>
               </Route>
 
@@ -115,6 +122,7 @@ export default function App() {
                   <Route path="scheduled-reports" element={<AdminScheduledReports />} />
                   <Route path="settings" element={<AdminSettings />} />
                   <Route path="audit-logs" element={<AdminAuditLogs />} />
+                  <Route path="reconciliation" element={<AdminReconciliation />} />
                 </Route>
               </Route>
             </Routes>

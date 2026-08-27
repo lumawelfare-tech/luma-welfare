@@ -3,11 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Content Security Policy (fallback for non-Vercel responses) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" />
     <title>Luma Welfare — Community Welfare Platform in Kenya</title>
     <meta name="description" content="Luma Welfare is a community welfare organization in Kenya. Members contribute monthly to support each other through key life events — hospital costs, education, business, building, and more." />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://luma-welfare.vercel.app/" />
     <link rel="icon" type="image/jpeg" href="/brand/luma-icon.jpeg" />
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#6D9B3A" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Luma Welfare" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Luma Welfare — Community Welfare Platform in Kenya" />

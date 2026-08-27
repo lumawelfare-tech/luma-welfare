@@ -4,6 +4,8 @@ import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { ExportDialog } from '../../components/ExportDialog'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 
 type Contribution = {
   id: string
@@ -33,13 +35,23 @@ const filterOptions = [
   { value: '', label: 'All' },
 ]
 
+
 export function AdminContributions() {
   const { addToast } = useToast()
   const [rows, setRows] = useState<Contribution[]>([])
   const [filter, setFilter] = useState('Pending')
+  const [query, setQuery] = useState('')
+  const debouncedQuery = useDebouncedValue(query, 300)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const perPage = 50
+
+  // Export
+  const [showExport, setShowExport] = useState(false)
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -51,23 +63,31 @@ export function AdminContributions() {
   const [showBulkReject, setShowBulkReject] = useState(false)
   const [bulkRejectNotes, setBulkRejectNotes] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pageNum = 1) => {
     setError(null)
     setLoading(true)
     try {
-      const d = await api<{ contributions: Contribution[] }>(
-        `/admin/contributions${filter ? `?status=${filter}` : ''}`,
+      const qs = new URLSearchParams()
+      if (filter) qs.set('status', filter)
+      if (debouncedQuery.trim()) qs.set('q', debouncedQuery.trim())
+      qs.set('page', String(pageNum))
+      qs.set('per_page', String(perPage))
+      const d = await api<{ contributions: Contribution[]; total: number; page: number; pages: number }>(
+        `/admin/contributions?${qs.toString()}`,
         { auth: true },
       )
       setRows(d.contributions ?? [])
+      setTotalCount(d.total ?? 0)
+      setTotalPages(d.pages ?? 1)
+      setPage(d.page ?? pageNum)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load contributions.')
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [filter, debouncedQuery])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(1) }, [load])
 
   async function verify(id: string) {
     setBusyId(id)
@@ -148,31 +168,6 @@ export function AdminContributions() {
     }
     await load()
   }
-
-  function exportCSV() {
-    const headers = ['Member', 'Package', 'Period', 'Amount', 'Method', 'Reference', 'Status', 'Date']
-    const csvRows = rows.map((c) => [
-      c.members?.full_name ?? '',
-      c.packages?.name ?? '',
-      c.period,
-      String(c.amount),
-      (c.payments?.channel ?? 'manual').replace(/_/g, ' '),
-      c.payments?.mpesa_receipt ?? '',
-      c.status,
-      new Date(c.created_at).toLocaleDateString(),
-    ])
-    const csv = [headers, ...csvRows].map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `contributions-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    addToast('success', `Exported ${rows.length} contributions to CSV.`)
-  }
-
-  const pendingCount = rows.filter((r) => r.status === 'Pending').length
 
   const columns: Column<Record<string, unknown>>[] = [
     {
@@ -256,29 +251,38 @@ export function AdminContributions() {
           <h1 className="text-2xl font-bold text-gray-900">Contributions</h1>
           <p className="text-sm text-gray-500 mt-1">Review and verify member contribution payments.</p>
         </div>
-        <button onClick={exportCSV} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        <button onClick={() => setShowExport(true)} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
           Export CSV
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-1 rounded-lg border border-gray-200 bg-white p-1 w-fit">
-        {filterOptions.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              filter === f.value ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            {f.label}
-            {f.value === 'Pending' && pendingCount > 0 && (
-              <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-100 px-1 text-[10px] font-bold text-amber-700">
-                {pendingCount}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* Filters + Search */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex gap-1 rounded-lg border border-gray-200 bg-white p-1">
+          {filterOptions.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setFilter(f.value)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                filter === f.value ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1 min-w-[200px]">
+          <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            aria-label="Search contributions"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search member name, phone, period, receipt #..."
+            className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+          />
+        </div>
       </div>
 
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -350,7 +354,7 @@ export function AdminContributions() {
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
-                <textarea value={rejectNotes} onChange={(e) => setRejectNotes(e.target.value)} placeholder="e.g. Transaction reference not found, amount mismatch…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
+                <textarea value={rejectNotes} onChange={(e) => setRejectNotes(e.target.value)} placeholder="e.g. Transaction reference not found, amount mismatch…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Rejection reason" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
@@ -377,10 +381,43 @@ export function AdminContributions() {
             <p>This will reject {selectedIds.size} selected contribution{selectedIds.size !== 1 ? 's' : ''}.</p>
             <div className="mt-3">
               <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
-              <textarea value={bulkRejectNotes} onChange={(e) => setBulkRejectNotes(e.target.value)} placeholder="e.g. Transaction reference not found…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" />
+              <textarea value={bulkRejectNotes} onChange={(e) => setBulkRejectNotes(e.target.value)} placeholder="e.g. Transaction reference not found…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Bulk rejection reason" />
             </div>
           </>
         }
+      />
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+          <div className="text-sm text-gray-500">
+            {totalCount.toLocaleString()} contribution{totalCount !== 1 ? 's' : ''} · Page {page} of {totalPages}
+          </div>
+          <div className="flex gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => load(page - 1)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => load(page + 1)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ExportDialog
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        exportType="contributions"
+        filters={{ status: filter || undefined, q: debouncedQuery.trim() || undefined }}
+        filterLabels={{ status: 'Status', q: 'Search' }}
       />
     </div>
   )
