@@ -130,6 +130,12 @@ export function AdminSettings() {
     ? settings.filter(s => ['org_contact', 'stats', 'mpesa'].includes(s.key))
     : []
 
+  const keyLabels: Record<string, string> = {
+    org_contact: 'Organization Contact',
+    stats: 'Public Statistics',
+    mpesa: 'M-Pesa Configuration',
+  }
+
   // Hide save button for non-general tabs
   const showSave = tab === 'general'
 
@@ -163,7 +169,7 @@ export function AdminSettings() {
         <div className="space-y-4">
           {filtered.map(s => (
             <div key={s.key} className="rounded-xl border border-gray-200 bg-white p-4">
-              <label className="text-sm font-medium text-gray-700">{s.key}</label>
+              <label className="text-sm font-medium text-gray-700">{keyLabels[s.key] ?? s.key}</label>
               <textarea
                 value={editing[s.key] ?? ''}
                 onChange={(e) => setEditing(ed => ({ ...ed, [s.key]: e.target.value }))}

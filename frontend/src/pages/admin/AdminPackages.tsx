@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
+import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/EmptyState'
@@ -27,6 +28,7 @@ const knownRuleKeys = [
 ]
 
 export function AdminPackages() {
+  useHead('Packages', undefined, { noindex: true })
   const { addToast } = useToast()
   const [packages, setPackages] = useState<Pkg[]>([])
   const [loading, setLoading] = useState(true)

@@ -67,7 +67,7 @@ function SidebarLink({ to, label, icon, onNavigate }: { to: string; label: strin
 export function AdminLayout() {
   const { member, adminRole, logout } = useAuth()
   const location = useLocation()
-  const avatarUrl = (member as any)?.photo_url
+  const avatarUrl = member?.photo_url as string | undefined
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
@@ -220,7 +220,7 @@ export function AdminLayout() {
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { logout, adminRole, member } = useAuth()
-  const avatarUrl = (member as any)?.photo_url
+  const avatarUrl = member?.photo_url as string | undefined
 
   return (
     <div className="flex h-full flex-col bg-white border-r border-gray-200">
@@ -262,10 +262,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       <div className="border-t border-gray-200 p-3">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-luma-700 text-xs font-bold overflow-hidden">
-            {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : 'A'}
+            {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : (member?.full_name?.charAt(0) ?? adminRole?.charAt(0)?.toUpperCase() ?? 'A')}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-900 truncate">Administrator</div>
+            <div className="text-sm font-medium text-gray-900 truncate">{member?.full_name ?? 'Administrator'}</div>
             <div className="text-xs text-gray-500 capitalize">{adminRole ?? 'admin'}</div>
           </div>
           <button

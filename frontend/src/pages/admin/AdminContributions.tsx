@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api, ApiError } from '../../lib/api'
+import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
@@ -66,6 +67,7 @@ const filterOptions = [
 
 
 export function AdminContributions() {
+  useHead('Contributions', undefined, { noindex: true })
   const { addToast } = useToast()
   const [rows, setRows] = useState<Contribution[]>([])
   const [filter, setFilter] = useState('Pending')
@@ -343,22 +345,16 @@ export function AdminContributions() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Total</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Total Contributions</div>
           <div className="mt-1 text-2xl font-bold text-gray-900">{totalCount}</div>
+          <div className="mt-0.5 text-xs text-gray-500">Across all statuses</div>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Pending</div>
-          <div className="mt-1 text-2xl font-bold text-amber-600">{rows.filter(r => r.status === 'Pending').length}</div>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Verified</div>
-          <div className="mt-1 text-2xl font-bold text-emerald-600">{rows.filter(r => r.status === 'Verified').length}</div>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Total Amount</div>
-          <div className="mt-1 text-2xl font-bold text-gray-900">KSh {rows.reduce((s, r) => s + (r.amount ?? 0), 0).toLocaleString('en-KE')}</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Current Filter</div>
+          <div className="mt-1 text-2xl font-bold text-luma-700">{filterOptions.find(f => f.value === filter)?.label ?? 'All'}</div>
+          <div className="mt-0.5 text-xs text-gray-500">{totalCount} matching records</div>
         </div>
       </div>
 

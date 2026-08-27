@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api, ApiError } from '../../lib/api'
+import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
@@ -19,6 +20,7 @@ type Member = {
 
 
 export function AdminMembers() {
+  useHead('Members', undefined, { noindex: true })
   const { addToast } = useToast()
   const [members, setMembers] = useState<Member[]>([])
   const [filter, setFilter] = useState('')

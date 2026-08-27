@@ -263,7 +263,7 @@ function OrphanPaymentsTab() {
     try {
       await api(`/admin/reconciliation?action=link-payment&id=${paymentId}`, {
         method: 'PATCH', auth: true,
-        body: JSON.stringify({ contribution_id: contributionId }),
+        body: { contribution_id: contributionId },
       })
       setPayments(prev => prev.filter(p => p.id !== paymentId))
       setTotal(prev => prev - 1)
@@ -510,7 +510,7 @@ function StalePendingTab() {
     try {
       await api(`/admin/reconciliation?action=mark-failed&id=${paymentId}`, {
         method: 'PATCH', auth: true,
-        body: JSON.stringify({ reason: 'No M-Pesa callback received within 30 minutes' }),
+        body: { reason: 'No M-Pesa callback received within 30 minutes' },
       })
       setPayments(prev => prev.filter(p => p.id !== paymentId))
       setTotal(prev => prev - 1)
@@ -620,7 +620,7 @@ function ExceptionsTab() {
     try {
       await api(`/admin/reconciliation?id=${id}`, {
         method: 'PATCH', auth: true,
-        body: JSON.stringify({ status: newStatus }),
+        body: { status: newStatus },
       })
       setExceptions(prev => prev.filter(e => e.id !== id))
       setTotal(prev => prev - 1)

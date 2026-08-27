@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api, ApiError } from '../../lib/api'
+import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 
@@ -25,6 +26,7 @@ const statusStyles: Record<string, string> = {
 }
 
 export function AdminRegistrationFees() {
+  useHead('Registration Fees', undefined, { noindex: true })
   const { addToast } = useToast()
   const [fees, setFees] = useState<RegistrationFee[]>([])
   const [filter, setFilter] = useState('pending')
@@ -39,7 +41,9 @@ export function AdminRegistrationFees() {
     setError(null)
     setLoading(true)
     try {
-      const url = '/admin/registration-fee'
+      const qs = new URLSearchParams()
+      if (filter) qs.set('status', filter)
+      const url = `/admin/registration-fee${qs.toString() ? `?${qs.toString()}` : ''}`
       const d = await api<{ pending_fees: RegistrationFee[] }>(url, { auth: true })
       setFees(d.pending_fees ?? [])
     } catch (e) {
@@ -47,7 +51,7 @@ export function AdminRegistrationFees() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [filter])
 
   useEffect(() => { load() }, [load])
 

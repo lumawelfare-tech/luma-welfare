@@ -95,7 +95,9 @@ export function AdminSubscriptions() {
   const [approveTarget, setApproveTarget] = useState<Subscription | null>(null)
   const [suspendTarget, setSuspendTarget] = useState<Subscription | null>(null)
   const [cancelTarget, setCancelTarget] = useState<Subscription | null>(null)
-  const [dialogReason, setDialogReason] = useState('')
+  const [approveReason, setApproveReason] = useState('')
+  const [suspendReason, setSuspendReason] = useState('')
+  const [cancelReason, setCancelReason] = useState('')
   const [bulkAction, setBulkAction] = useState<'active' | 'paused' | 'cancelled' | null>(null)
   const [bulkReason, setBulkReason] = useState('')
 
@@ -136,11 +138,11 @@ export function AdminSubscriptions() {
     setBusyId(sub.id)
     try {
       await api(`/admin/subscriptions/${sub.id}`, {
-        method: 'PATCH', auth: true, body: { status: 'active', reason: dialogReason.trim() || undefined },
+        method: 'PATCH', auth: true, body: { status: 'active', reason: approveReason.trim() || undefined },
       })
       addToast('success', `Subscription for ${sub.members?.full_name ?? 'member'} activated.`)
       setApproveTarget(null)
-      setDialogReason('')
+      setApproveReason('')
       await load()
     } catch (e) {
       addToast('error', e instanceof ApiError ? e.message : 'Could not activate subscription.')
@@ -153,11 +155,11 @@ export function AdminSubscriptions() {
     setBusyId(sub.id)
     try {
       await api(`/admin/subscriptions/${sub.id}`, {
-        method: 'PATCH', auth: true, body: { status: 'paused', reason: dialogReason.trim() || undefined },
+        method: 'PATCH', auth: true, body: { status: 'paused', reason: suspendReason.trim() || undefined },
       })
       addToast('success', `Subscription for ${sub.members?.full_name ?? 'member'} suspended.`)
       setSuspendTarget(null)
-      setDialogReason('')
+      setSuspendReason('')
       await load()
     } catch (e) {
       addToast('error', e instanceof ApiError ? e.message : 'Could not suspend subscription.')
@@ -170,11 +172,11 @@ export function AdminSubscriptions() {
     setBusyId(sub.id)
     try {
       await api(`/admin/subscriptions/${sub.id}`, {
-        method: 'PATCH', auth: true, body: { status: 'cancelled', reason: dialogReason.trim() || undefined },
+        method: 'PATCH', auth: true, body: { status: 'cancelled', reason: cancelReason.trim() || undefined },
       })
       addToast('success', `Subscription for ${sub.members?.full_name ?? 'member'} cancelled.`)
       setCancelTarget(null)
-      setDialogReason('')
+      setCancelReason('')
       await load()
     } catch (e) {
       addToast('error', e instanceof ApiError ? e.message : 'Could not cancel subscription.')
@@ -229,9 +231,6 @@ export function AdminSubscriptions() {
       setExporting(null)
     }
   }
-
-  const pendingCount = subs.filter((s) => s.status === 'pending').length
-  const activeCount = subs.filter((s) => s.status === 'active').length
 
   const columns: Column<Record<string, unknown>>[] = [
     {
@@ -288,18 +287,18 @@ export function AdminSubscriptions() {
         return (
           <div className="flex justify-end gap-1.5">
             {s.status === 'pending' && (
-              <button disabled={busyId === s.id} onClick={() => { setApproveTarget(s); setDialogReason('') }} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">Activate</button>
+              <button disabled={busyId === s.id} onClick={() => { setApproveTarget(s); setApproveReason('') }} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">Activate</button>
             )}
             {s.status === 'active' && (
               <>
-                <button disabled={busyId === s.id} onClick={() => { setSuspendTarget(s); setDialogReason('') }} className="rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors">Suspend</button>
-                <button disabled={busyId === s.id} onClick={() => { setCancelTarget(s); setDialogReason('') }} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">Cancel</button>
+                <button disabled={busyId === s.id} onClick={() => { setSuspendTarget(s); setSuspendReason('') }} className="rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors">Suspend</button>
+                <button disabled={busyId === s.id} onClick={() => { setCancelTarget(s); setCancelReason('') }} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">Cancel</button>
               </>
             )}
             {s.status === 'paused' && (
               <>
-                <button disabled={busyId === s.id} onClick={() => { setApproveTarget(s); setDialogReason('') }} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">Reactivate</button>
-                <button disabled={busyId === s.id} onClick={() => { setCancelTarget(s); setDialogReason('') }} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">Cancel</button>
+                <button disabled={busyId === s.id} onClick={() => { setApproveTarget(s); setApproveReason('') }} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">Reactivate</button>
+                <button disabled={busyId === s.id} onClick={() => { setCancelTarget(s); setCancelReason('') }} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">Cancel</button>
               </>
             )}
           </div>
@@ -343,22 +342,16 @@ export function AdminSubscriptions() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Total</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Total Subscriptions</div>
           <div className="mt-1 text-2xl font-bold text-gray-900">{totalCount}</div>
+          <div className="mt-0.5 text-xs text-gray-500">Across all statuses</div>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Active</div>
-          <div className="mt-1 text-2xl font-bold text-emerald-600">{activeCount}</div>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Pending</div>
-          <div className="mt-1 text-2xl font-bold text-amber-600">{pendingCount}</div>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Cancelled</div>
-          <div className="mt-1 text-2xl font-bold text-gray-500">{subs.filter((s) => s.status === 'cancelled').length}</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Current Filter</div>
+          <div className="mt-1 text-2xl font-bold text-luma-700">{filterTabs.find(f => f.value === filter)?.label ?? 'All'}</div>
+          <div className="mt-0.5 text-xs text-gray-500">{totalCount} matching records</div>
         </div>
       </div>
 
@@ -467,18 +460,18 @@ export function AdminSubscriptions() {
                 </div>
                 <div className="flex gap-2 pt-1">
                   {s.status === 'pending' && (
-                    <button disabled={busyId === s.id} onClick={() => { setApproveTarget(s); setDialogReason('') }} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Activate</button>
+                    <button disabled={busyId === s.id} onClick={() => { setApproveTarget(s); setApproveReason('') }} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Activate</button>
                   )}
                   {s.status === 'active' && (
                     <>
-                      <button disabled={busyId === s.id} onClick={() => { setSuspendTarget(s); setDialogReason('') }} className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50">Suspend</button>
-                      <button disabled={busyId === s.id} onClick={() => { setCancelTarget(s); setDialogReason('') }} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Cancel</button>
+                      <button disabled={busyId === s.id} onClick={() => { setSuspendTarget(s); setSuspendReason('') }} className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50">Suspend</button>
+                      <button disabled={busyId === s.id} onClick={() => { setCancelTarget(s); setCancelReason('') }} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Cancel</button>
                     </>
                   )}
                   {s.status === 'paused' && (
                     <>
-                      <button disabled={busyId === s.id} onClick={() => { setApproveTarget(s); setDialogReason('') }} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Reactivate</button>
-                      <button disabled={busyId === s.id} onClick={() => { setCancelTarget(s); setDialogReason('') }} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Cancel</button>
+                      <button disabled={busyId === s.id} onClick={() => { setApproveTarget(s); setApproveReason('') }} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Reactivate</button>
+                      <button disabled={busyId === s.id} onClick={() => { setCancelTarget(s); setCancelReason('') }} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Cancel</button>
                     </>
                   )}
                 </div>
@@ -526,7 +519,7 @@ export function AdminSubscriptions() {
 
       {/* Approve/Reactivate Dialog */}
       {approveTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setApproveTarget(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => { setApproveTarget(null); setApproveReason('') }}>
           <div className="w-full max-w-md rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5">
               <h3 className="text-lg font-semibold text-gray-900">{approveTarget.status === 'paused' ? 'Reactivate' : 'Activate'} Subscription</h3>
@@ -535,11 +528,11 @@ export function AdminSubscriptions() {
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium text-gray-600">Notes (optional)</label>
-                <textarea value={dialogReason} onChange={(e) => setDialogReason(e.target.value)} placeholder="Any notes…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Activation notes" />
+                <textarea value={approveReason} onChange={(e) => setApproveReason(e.target.value)} placeholder="Any notes…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Activation notes" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
-              <button onClick={() => setApproveTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { setApproveTarget(null); setApproveReason('') }} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
               <button onClick={() => approve(approveTarget)} disabled={busyId === approveTarget.id} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                 {busyId === approveTarget.id ? 'Processing…' : 'Confirm'}
               </button>
@@ -550,7 +543,7 @@ export function AdminSubscriptions() {
 
       {/* Suspend Dialog */}
       {suspendTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSuspendTarget(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => { setSuspendTarget(null); setSuspendReason('') }}>
           <div className="w-full max-w-md rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5">
               <h3 className="text-lg font-semibold text-gray-900">Suspend Subscription</h3>
@@ -559,11 +552,11 @@ export function AdminSubscriptions() {
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
-                <textarea value={dialogReason} onChange={(e) => setDialogReason(e.target.value)} placeholder="e.g. Non-payment, policy violation…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Suspension reason" />
+                <textarea value={suspendReason} onChange={(e) => setSuspendReason(e.target.value)} placeholder="e.g. Non-payment, policy violation…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Suspension reason" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
-              <button onClick={() => setSuspendTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { setSuspendTarget(null); setSuspendReason('') }} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
               <button onClick={() => suspend(suspendTarget)} disabled={busyId === suspendTarget.id} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50">
                 {busyId === suspendTarget.id ? 'Suspending…' : 'Suspend'}
               </button>
@@ -574,7 +567,7 @@ export function AdminSubscriptions() {
 
       {/* Cancel Dialog */}
       {cancelTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setCancelTarget(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => { setCancelTarget(null); setCancelReason('') }}>
           <div className="w-full max-w-md rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5">
               <h3 className="text-lg font-semibold text-gray-900">Cancel Subscription</h3>
@@ -583,11 +576,11 @@ export function AdminSubscriptions() {
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
-                <textarea value={dialogReason} onChange={(e) => setDialogReason(e.target.value)} placeholder="e.g. Member request, policy violation…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Cancellation reason" />
+                <textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="e.g. Member request, policy violation…" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Cancellation reason" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
-              <button onClick={() => setCancelTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { setCancelTarget(null); setCancelReason('') }} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
               <button onClick={() => cancel(cancelTarget)} disabled={busyId === cancelTarget.id} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
                 {busyId === cancelTarget.id ? 'Cancelling…' : 'Cancel Subscription'}
               </button>

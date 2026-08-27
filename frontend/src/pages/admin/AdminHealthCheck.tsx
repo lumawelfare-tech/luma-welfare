@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, memo } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { api } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 
@@ -114,7 +114,7 @@ function UptimeBar({ data }: { data: HealthCheck[] }) {
   )
 }
 
-const LatencyChart = memo(function LatencyChart({ data }: { data: HealthCheck[] }) {
+const LatencyChart = function LatencyChart({ data }: { data: HealthCheck[] }) {
   if (data.length === 0) return null
 
   const sorted = [...data].sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime())
@@ -147,7 +147,7 @@ const LatencyChart = memo(function LatencyChart({ data }: { data: HealthCheck[] 
       </div>
     </div>
   )
-})
+}
 
 export function AdminHealthCheck() {
   useHead('Health Checks', undefined, { noindex: true })

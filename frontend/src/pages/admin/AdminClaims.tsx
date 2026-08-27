@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api, ApiError } from '../../lib/api'
+import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
@@ -54,6 +55,7 @@ const filterTabs = [
 
 
 export function AdminClaims() {
+  useHead('Claims', undefined, { noindex: true })
   const { addToast } = useToast()
   const [claims, setClaims] = useState<Claim[]>([])
   const [filter, setFilter] = useState('')
