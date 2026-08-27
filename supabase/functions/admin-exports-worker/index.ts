@@ -114,6 +114,7 @@ function flattenClaim(r: Record<string, unknown>): unknown[] {
     r.claim_number,
     r.claim_type,
     r.amount_requested,
+    r.approved_amount ?? '',
     r.status,
     member.full_name ?? '',
     pkg.name ?? '',
@@ -159,7 +160,7 @@ const TYPE_CONFIGS: Record<ExportType, TypeConfig> = {
   },
   claims: {
     resource: 'claims',
-    columns: 'id, claim_number, claim_type, amount_requested, status, created_at, submitted_at, decided_at, member_id, members(full_name, phone, email), packages(code, name)',
+    columns: 'id, claim_number, claim_type, amount_requested, approved_amount, status, created_at, submitted_at, decided_at, member_id, members(full_name, phone, email), packages(code, name)',
     headerMap: {},
     dateColumn: 'created_at',
     flatten: flattenClaim,
@@ -177,7 +178,7 @@ const HEADERS: Record<ExportType, string[]> = {
   members: ['id', 'membership_number', 'full_name', 'phone', 'email', 'status', 'joined_at', 'created_at'],
   subscriptions: ['id', 'status', 'started_at', 'next_due_date', 'member_id', 'member_name', 'package_name', 'tier_name', 'amount'],
   contributions: ['id', 'period', 'amount', 'status', 'member_name', 'package_name', 'payment_reference', 'created_at'],
-  claims: ['id', 'claim_number', 'claim_type', 'amount_requested', 'status', 'member_name', 'package_name', 'submitted_at', 'decided_at'],
+  claims: ['id', 'claim_number', 'claim_type', 'amount_requested', 'approved_amount', 'status', 'member_name', 'package_name', 'submitted_at', 'decided_at'],
   registration_fees: ['id', 'amount', 'status', 'member_name', 'mpesa_receipt', 'paid_at', 'created_at'],
 }
 

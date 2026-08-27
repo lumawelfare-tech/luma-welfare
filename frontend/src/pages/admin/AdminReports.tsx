@@ -142,6 +142,7 @@ export function AdminReports() {
     active_subscriptions: number
     total_contributions: number
     total_claims_approved: number
+    total_claims_requested: number
     registration_fees_collected: number
     pending_contributions: number
     pending_claims: number
@@ -353,7 +354,18 @@ export function AdminReports() {
           <div className="rounded-2xl border border-gray-100 bg-emerald-50 p-5 transition-all hover:shadow-md">
             <div className="text-2xl font-extrabold text-emerald-700">KSh {kpi.total_claims_approved.toLocaleString()}</div>
             <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-600">Claims Approved</div>
-            <div className="mt-0.5 text-xs text-gray-400">{kpi.this_month_claims} this month</div>
+            <div className="mt-0.5 text-xs text-gray-400">
+              {kpi.total_claims_requested > 0 && kpi.total_claims_approved !== kpi.total_claims_requested ? (
+                <span>
+                  Requested: KSh {kpi.total_claims_requested.toLocaleString()}
+                  <span className={`ml-1 font-semibold ${kpi.total_claims_approved > kpi.total_claims_requested ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    ({kpi.total_claims_approved > kpi.total_claims_requested ? '+' : ''}{(((kpi.total_claims_approved - kpi.total_claims_requested) / kpi.total_claims_requested) * 100).toFixed(0)}%)
+                  </span>
+                </span>
+              ) : (
+                <span>{kpi.this_month_claims} this month</span>
+              )}
+            </div>
           </div>
           <div className="rounded-2xl border border-gray-100 bg-purple-50 p-5 transition-all hover:shadow-md">
             <div className="flex items-baseline gap-2">

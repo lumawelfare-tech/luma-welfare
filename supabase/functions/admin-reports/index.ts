@@ -176,7 +176,7 @@ Deno.serve(async (req) => {
       requirePermission(session, 'claims', 'read')
       let query = adminClient
         .from('claims')
-        .select('id, claim_number, claim_type, amount_requested, status, created_at, submitted_at, decided_at, member_id, members(full_name, phone, email), packages(code, name)')
+        .select('id, claim_number, claim_type, amount_requested, approved_amount, status, created_at, submitted_at, decided_at, member_id, members(full_name, phone, email), packages(code, name)')
         .order('created_at', { ascending: false })
 
       if (status) query = query.eq('status', status)
@@ -237,6 +237,7 @@ Deno.serve(async (req) => {
           registration_fees_collected: Number(regFeeStats?.[0]?.paid_amount ?? 0),
           total_contributions: Number(contribStats?.[0]?.verified_amount ?? 0),
           total_claims_approved: Number(claimStats?.[0]?.approved_amount ?? 0) + Number(claimStats?.[0]?.paid_amount ?? 0),
+          total_claims_requested: Number(claimStats?.[0]?.requested_amount ?? 0),
           registration_fees_count: Number(regFeeStats?.[0]?.paid_count ?? 0),
           contributions_count: Number(contribStats?.[0]?.verified_count ?? 0),
           claims_approved_count: Number(claimStats?.[0]?.approved_count ?? 0) + Number(claimStats?.[0]?.paid_count ?? 0),
@@ -271,6 +272,7 @@ Deno.serve(async (req) => {
           active_subscriptions: Number(s?.active_subscriptions ?? 0),
           total_contributions: Number(contribData?.verified_amount ?? 0),
           total_claims_approved: Number(claimData?.approved_amount ?? 0) + Number(claimData?.paid_amount ?? 0),
+          total_claims_requested: Number(claimData?.requested_amount ?? 0),
           registration_fees_collected: Number(regFeeData?.paid_amount ?? 0),
           pending_contributions: Number(s?.pending_contributions ?? 0),
           pending_claims: Number(s?.pending_claims ?? 0),

@@ -200,8 +200,8 @@ async function queryReportData(
       break
     }
     case 'claims': {
-      query = adminClient.from('claims').select('claim_number, claim_type, amount_requested, status, created_at, submitted_at, decided_at, members(full_name), packages(name)')
-      headers = ['claim_number', 'claim_type', 'amount_requested', 'status', 'created_at', 'submitted_at', 'decided_at', 'member_name', 'package_name']
+      query = adminClient.from('claims').select('claim_number, claim_type, amount_requested, approved_amount, status, created_at, submitted_at, decided_at, members(full_name), packages(name)')
+      headers = ['claim_number', 'claim_type', 'amount_requested', 'approved_amount', 'status', 'created_at', 'submitted_at', 'decided_at', 'member_name', 'package_name']
       break
     }
     case 'registration-fees': {
