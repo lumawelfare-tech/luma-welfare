@@ -28,6 +28,7 @@ import { NotFound } from './pages/NotFound'
 const PackagesPage = lazy(() => import('./pages/Packages').then(m => ({ default: m.PackagesPage })))
 const News = lazy(() => import('./pages/News').then(m => ({ default: m.News })))
 const Gallery = lazy(() => import('./pages/Gallery').then(m => ({ default: m.Gallery })))
+const MediaPage = lazy(() => import('./pages/Media').then(m => ({ default: m.Media })))
 
 // Member pages — lazy loaded
 const Dashboard = lazy(() => import('./pages/member/Dashboard').then(m => ({ default: m.Dashboard })))
@@ -55,6 +56,7 @@ const AdminRegistrationFees = lazy(() => import('./pages/admin/AdminRegistration
 const AdminReports = lazy(() => import('./pages/admin/AdminReports').then(m => ({ default: m.AdminReports })))
 const AdminScheduledReports = lazy(() => import('./pages/admin/AdminScheduledReports').then(m => ({ default: m.AdminScheduledReports })))
 const AdminReconciliation = lazy(() => import('./pages/admin/AdminReconciliation').then(m => ({ default: m.AdminReconciliation })))
+const AdminMedia = lazy(() => import('./pages/admin/AdminMedia').then(m => ({ default: m.AdminMedia })))
 const AdminHealthCheck = lazy(() => import('./pages/admin/AdminHealthCheck').then(m => ({ default: m.AdminHealthCheck })))
 
 function PageLoader() {
@@ -86,6 +88,7 @@ export default function App() {
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/news" element={<News />} />
                 <Route path="/gallery" element={<Gallery />} />
+                <Route path="/media" element={<MediaPage />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -121,6 +124,7 @@ export default function App() {
                   <Route path="subscriptions" element={<AdminSubscriptions />} />
                   <Route path="news" element={<AdminNews />} />
                   <Route path="gallery" element={<AdminGallery />} />
+                  <Route path="media" element={<AdminMedia />} />
                   <Route path="reports" element={<AdminReports />} />
                   <Route path="scheduled-reports" element={<AdminScheduledReports />} />
                   <Route path="settings" element={<AdminSettings />} />

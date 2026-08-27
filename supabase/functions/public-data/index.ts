@@ -59,6 +59,27 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ items: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    if (resource === 'media') {
+      const type = url.searchParams.get('type')
+      const category = url.searchParams.get('category')
+      const page = parseInt(url.searchParams.get('page') || '1')
+      const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '24'), 100)
+
+      let query = adminClient
+        .from('media_items')
+        .select('id, title, description, media_type, file_url, thumbnail_url, mime_type, file_size, duration, category, tags, is_featured, sort_order, created_at', { count: 'exact' })
+        .eq('is_published', true)
+
+      if (type && type !== 'all') query = query.eq('media_type', type)
+      if (category && category !== 'all') query = query.eq('category', category)
+      query = query.order('sort_order', { ascending: true }).order('created_at', { ascending: false })
+      query = query.range((page - 1) * perPage, page * perPage - 1)
+
+      const { data, error, count } = await query
+      if (error) throw new Error(error.message)
+      return new Response(JSON.stringify({ items: data ?? [], total: count ?? 0, page, per_page: perPage, pages: Math.ceil((count ?? 0) / perPage) }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     return new Response(JSON.stringify({ message: 'Unknown resource' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
     console.error('public-data error:', err)

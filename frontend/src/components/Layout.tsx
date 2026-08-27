@@ -9,6 +9,7 @@ const navLinks = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/news', label: 'News & Events' },
   { to: '/gallery', label: 'Gallery' },
+  { to: '/media', label: 'Media' },
   { to: '/contact', label: 'Contact Us' },
 ]
 

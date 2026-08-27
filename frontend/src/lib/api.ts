@@ -221,6 +221,7 @@ function pathToFunctionName(path: string): string | null {
   if (cleanPath.startsWith('admin/reports')) return 'admin-reports'
   if (cleanPath.startsWith('admin/members')) return 'admin-members'
   if (cleanPath.startsWith('admin/packages')) return 'admin-packages'
+  if (cleanPath.startsWith('admin/media')) return 'admin-media'
   if (cleanPath.startsWith('admin/contributions')) return 'admin-contributions'
   if (cleanPath.startsWith('admin/claims')) return 'admin-claims'
   if (cleanPath.startsWith('admin/subscriptions')) return 'admin-subscriptions'
@@ -251,6 +252,7 @@ function pathToFunctionName(path: string): string | null {
   if (cleanPath === 'settings') return 'public-data'
   if (cleanPath === 'news') return 'public-data'
   if (cleanPath === 'gallery') return 'public-data'
+  if (cleanPath === 'media') return 'public-data'
 
   // Unknown path
   return null
