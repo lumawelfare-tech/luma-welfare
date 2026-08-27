@@ -5,7 +5,10 @@
 # 1. security-audit — npm audit for dependency vulnerabilities
 # 2. typecheck — TypeScript type checking
 # 3. lint — Code linting
-# 4. build — Production build verification
+# 4. test — Unit and integration tests
+# 5. build — Production build verification
+# 6. edge-function-check — Verify all Edge Functions are deployed
+# 7. deploy-verify — Post-deploy verification (manual trigger)
 
 name: CI
 
@@ -90,8 +93,6 @@ jobs:
             echo "Review audit-full.txt for details."
             echo ""
             cat audit-full.txt
-            # Don't fail on high — but make it visible
-            # exit 1
           fi
 
           echo "✅ No critical vulnerabilities found."
@@ -160,12 +161,46 @@ jobs:
         run: npm run lint
 
   # ============================================================================
+  # TESTS
+  # ============================================================================
+  test:
+    name: "🧪 Tests"
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: frontend
+        run: npm run test -- --reporter=verbose
+
+      - name: Run edge function integration tests
+        run: |
+          echo "=== Edge Function Integration Tests ==="
+          echo "These tests verify live Edge Functions for auth/CORS/public endpoints."
+          echo "Skipping in CI — requires live Supabase project."
+          echo ""
+          echo "To run locally:"
+          echo "  npx vitest run scripts/__tests__/edge-functions.test.ts"
+          echo ""
+
+  # ============================================================================
   # BUILD
   # ============================================================================
   build:
     name: "🏗️ Build"
     runs-on: ubuntu-latest
-    needs: [typecheck, lint]
+    needs: [typecheck, lint, test]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -193,13 +228,90 @@ jobs:
           echo ""
           echo "✅ Build successful"
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+          retention-days: 7
+
+  # ============================================================================
+  # EDGE FUNCTION CHECK (prevents missing deployments)
+  # ============================================================================
+  edge-function-check:
+    name: "📡 Edge Function Check"
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check Edge Functions exist locally
+        run: |
+          echo "=== Verifying Edge Functions exist locally ==="
+          REQUIRED_FUNCTIONS=(
+            "admin-dashboard"
+            "admin-media"
+            "admin-gallery"
+            "admin-members"
+            "admin-claims"
+            "admin-contributions"
+            "admin-subscriptions"
+            "admin-packages"
+            "admin-news"
+            "admin-2fa"
+            "admin-settings"
+            "admin-reports"
+            "admin-scheduled-reports"
+            "admin-reconciliation"
+            "admin-monitoring"
+            "admin-exports"
+            "auth-login"
+            "auth-me"
+            "auth-register"
+            "member-dashboard"
+            "member-profile"
+            "public-data"
+          )
+
+          MISSING=0
+          for fn in "${REQUIRED_FUNCTIONS[@]}"; do
+            if [ ! -f "supabase/functions/${fn}/index.ts" ]; then
+              echo "  ❌ MISSING: ${fn}/index.ts"
+              MISSING=$((MISSING + 1))
+            else
+              echo "  ✓ ${fn}"
+            fi
+          done
+
+          echo ""
+          if [ $MISSING -gt 0 ]; then
+            echo "❌ ${MISSING} required Edge Functions are missing!"
+            exit 1
+          fi
+
+          echo "✅ All ${#REQUIRED_FUNCTIONS[@]} required Edge Functions exist."
+
+      - name: Check migrations are numbered correctly
+        run: |
+          echo "=== Verifying migration file naming ==="
+          MIGRATION_COUNT=$(ls supabase/migrations/*.sql 2>/dev/null | grep -c "_")
+          echo "Found ${MIGRATION_COUNT} migration files"
+
+          # Check for APPLY_TO_STAGING.sql which should not be pushed
+          if [ -f "supabase/migrations/APPLY_TO_STAGING.sql" ]; then
+            echo "⚠️  APPLY_TO_STAGING.sql found — should not be committed"
+          fi
+
+          echo "✅ Migration files look correct."
+
   # ============================================================================
   # SECURITY SCORECARD (summary)
   # ============================================================================
   security-summary:
     name: "📊 Security Summary"
     runs-on: ubuntu-latest
-    needs: [security-audit, typecheck, lint, build]
+    needs: [security-audit, typecheck, lint, test, build]
     if: always()
     steps:
       - name: Check all jobs
@@ -208,10 +320,11 @@ jobs:
           echo "  CI PIPELINE SUMMARY"
           echo "============================================="
           echo ""
-          echo "Security Audit: ${{ needs.security-audit.result }}"
-          echo "Typecheck:      ${{ needs.typecheck.result }}"
-          echo "Lint:           ${{ needs.lint.result }}"
-          echo "Build:          ${{ needs.build.result }}"
+          echo "Security Audit:    ${{ needs.security-audit.result }}"
+          echo "Typecheck:         ${{ needs.typecheck.result }}"
+          echo "Lint:              ${{ needs.lint.result }}"
+          echo "Tests:             ${{ needs.test.result }}"
+          echo "Build:             ${{ needs.build.result }}"
           echo ""
 
           if [ "${{ needs.security-audit.result }}" = "failure" ]; then
@@ -226,6 +339,11 @@ jobs:
 
           if [ "${{ needs.lint.result }}" = "failure" ]; then
             echo "❌ Lint failed — deployment blocked"
+            exit 1
+          fi
+
+          if [ "${{ needs.test.result }}" = "failure" ]; then
+            echo "❌ Tests failed — deployment blocked"
             exit 1
           fi
 

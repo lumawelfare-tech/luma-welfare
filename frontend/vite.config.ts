@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -6,6 +7,18 @@ import { pwaIcons } from './vite-plugin-pwa-icons.js'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), pwaIcons()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      include: ['src/lib/**', 'src/hooks/**', 'src/context/**'],
+      exclude: ['src/**/*.test.*', 'src/**/*.d.ts'],
+    },
+  },
   server: {
     proxy: {
       '/api': {

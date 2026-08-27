@@ -15,7 +15,9 @@
     "audit": "npm audit",
     "audit:fix": "npm audit fix",
     "audit:security": "npx tsx backend/src/tests/dependency-audit.ts",
-    "security:check": "npm audit && npm run audit:security"
+    "security:check": "npm audit && npm run audit:security",
+    "verify:deploy": "bash scripts/verify-deploy.sh",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -23,8 +25,15 @@
   "allowScripts": {
     "esbuild@0.28.2": true
   },
+  "lint-staged": {
+    "frontend/src/**/*.{ts,tsx}": [
+      "bash -c 'cd frontend && npx tsc --noEmit --project tsconfig.app.json'"
+    ]
+  },
   "devDependencies": {
     "@vercel/node": "^7.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.4.1",
     "pg": "^8.23.0"
   }
 }
