@@ -4,8 +4,8 @@ import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { ExportDialog } from '../../components/ExportDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { exportMemberRecordsCSV, exportMemberRecordsExcel, exportMemberRecordsPDF, type MemberRecord } from '../../lib/exports'
 
 type Member = {
   id: string
@@ -42,7 +42,7 @@ export function AdminMembers() {
   const [deleteBusy, setDeleteBusy] = useState(false)
 
   // Export
-  const [showExport, setShowExport] = useState(false)
+  const [exporting, setExporting] = useState<'csv' | 'excel' | 'pdf' | null>(null)
 
   // CSV Import
   const [showImport, setShowImport] = useState(false)
@@ -80,6 +80,40 @@ export function AdminMembers() {
   }, [filter, debouncedQuery])
 
   useEffect(() => { load(1) }, [load])
+
+  function normalizeMember(m: Member): MemberRecord {
+    return {
+      member_full_name: m.full_name ?? 'Not provided',
+      member_phone: m.phone ?? 'Not provided',
+      member_email: m.email ?? 'Not provided',
+      membership_number: m.membership_number ?? '—',
+      status: m.status ?? 'Unknown',
+      joined_at: m.joined_at ?? '',
+    }
+  }
+
+  function handleExport(format: 'csv' | 'excel' | 'pdf') {
+    if (members.length === 0) {
+      addToast('info', 'No member records available for export.')
+      return
+    }
+    setExporting(format)
+    try {
+      const records = members.map(normalizeMember)
+      const parts: string[] = []
+      if (filter) parts.push(`Status: ${filter}`)
+      if (debouncedQuery.trim()) parts.push(`Search: ${debouncedQuery.trim()}`)
+      const filterSummary = parts.length > 0 ? `Filters: ${parts.join(' | ')}` : 'All members'
+      if (format === 'csv') exportMemberRecordsCSV(records)
+      else if (format === 'excel') exportMemberRecordsExcel(records, filterSummary)
+      else exportMemberRecordsPDF(records, filterSummary)
+      addToast('success', `Export complete — ${records.length} member${records.length !== 1 ? 's' : ''}`)
+    } catch {
+      addToast('error', 'Export failed. Please try again.')
+    } finally {
+      setExporting(null)
+    }
+  }
 
   async function viewMember(member: Member) {
     setDetailMember(member)
@@ -296,9 +330,29 @@ export function AdminMembers() {
           <p className="mt-1 text-sm text-gray-500">{totalCount} member{totalCount !== 1 ? 's' : ''} found</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowExport(true)} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-            Export CSV
-          </button>
+          <span className="text-xs text-gray-400 mr-1">Export:</span>
+          {([
+            ['csv', 'CSV'],
+            ['excel', 'Excel'],
+            ['pdf', 'PDF'],
+          ] as const).map(([fmt, label]) => (
+            <button
+              key={fmt}
+              onClick={() => handleExport(fmt)}
+              disabled={exporting !== null || loading}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {exporting === fmt ? (
+                <>
+                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Generating…
+                </>
+              ) : label}
+            </button>
+          ))}
           <button onClick={() => { setShowImport(true); setImportFile(null); setImportResults(null) }} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 transition-colors">
             Import CSV
           </button>
@@ -591,14 +645,6 @@ export function AdminMembers() {
           </div>
         </div>
       )}
-
-      <ExportDialog
-        open={showExport}
-        onClose={() => setShowExport(false)}
-        exportType="members"
-        filters={{ status: filter || undefined, q: debouncedQuery.trim() || undefined }}
-        filterLabels={{ status: 'Status', q: 'Search' }}
-      />
 
       {/* Member Detail Drawer */}
       {detailMember && (

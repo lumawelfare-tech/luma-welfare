@@ -5,7 +5,6 @@ import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { ExportDialog } from '../../components/ExportDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { exportSubscriptionsCSV, exportSubscriptionsExcel, exportSubscriptionsPDF, type SubscriptionRecord } from '../../lib/exports'
 
@@ -86,7 +85,6 @@ export function AdminSubscriptions() {
   const perPage = 50
 
   // Export
-  const [showExport, setShowExport] = useState(false)
   const [exporting, setExporting] = useState<'csv' | 'excel' | 'pdf' | null>(null)
 
   // Selection
@@ -618,14 +616,6 @@ export function AdminSubscriptions() {
             )}
           </>
         }
-      />
-
-      <ExportDialog
-        open={showExport}
-        onClose={() => setShowExport(false)}
-        exportType="subscriptions"
-        filters={{ status: filter || undefined }}
-        filterLabels={{ status: 'Status' }}
       />
     </div>
   )

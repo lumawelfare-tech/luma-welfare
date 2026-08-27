@@ -447,3 +447,189 @@ export async function exportSubscriptionsPDF(records: SubscriptionRecord[], filt
   const today = new Date().toISOString().slice(0, 10)
   downloadPDF(doc, `luma-welfare-subscriptions-${today}.pdf`)
 }
+
+// ─── Exports: Member Records (Admin page) ───────────────────
+
+export type MemberRecord = {
+  member_full_name: string
+  member_phone: string
+  member_email: string
+  membership_number: string
+  status: string
+  joined_at: string
+}
+
+export function exportMemberRecordsCSV(records: MemberRecord[]) {
+  downloadCSV(
+    `luma-welfare-members-${new Date().toISOString().slice(0, 10)}.csv`,
+    ['Member Full Name', 'Phone Number', 'Email', 'Membership Number', 'Status', 'Joined At'],
+    records.map(r => [
+      r.member_full_name,
+      r.member_phone,
+      r.member_email,
+      r.membership_number,
+      r.status,
+      r.joined_at ? new Date(r.joined_at).toLocaleDateString('en-KE') : '—',
+    ]),
+  )
+}
+
+export async function exportMemberRecordsExcel(records: MemberRecord[], filterSummary?: string) {
+  const today = new Date().toISOString().slice(0, 10)
+  await downloadExcel(
+    `luma-welfare-members-${today}.xlsx`,
+    'Members',
+    ['Member Full Name', 'Phone Number', 'Email', 'Membership Number', 'Status', 'Joined At'],
+    records.map(r => [
+      r.member_full_name,
+      r.member_phone,
+      r.member_email,
+      r.membership_number,
+      r.status,
+      r.joined_at ? new Date(r.joined_at).toLocaleDateString('en-KE') : '—',
+    ]),
+    { filterSummary },
+  )
+}
+
+export async function exportMemberRecordsPDF(records: MemberRecord[], filterSummary?: string) {
+  const { autoTable } = await loadPDFLib()
+  const doc = await createPDF('Members Report')
+  let startY = 50
+
+  if (filterSummary) {
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100)
+    doc.text(filterSummary, 14, startY)
+    startY += 6
+  }
+
+  doc.setFontSize(8)
+  doc.setTextColor(130)
+  doc.text(`Total: ${records.length} member${records.length !== 1 ? 's' : ''}`, 14, startY)
+  startY += 6
+
+  autoTable(doc, {
+    startY,
+    head: [['Member', 'Phone', 'Email', 'Membership #', 'Status', 'Joined']],
+    body: records.map(r => [
+      r.member_full_name,
+      r.member_phone,
+      r.member_email,
+      r.membership_number,
+      r.status,
+      r.joined_at ? new Date(r.joined_at).toLocaleDateString('en-KE') : '—',
+    ]),
+    styles: { fontSize: 7 },
+    headStyles: { fillColor: [109, 155, 58] },
+    margin: { left: 14, right: 14 },
+  })
+
+  const today = new Date().toISOString().slice(0, 10)
+  downloadPDF(doc, `luma-welfare-members-${today}.pdf`)
+}
+
+// ─── Exports: Claim Records (Admin page) ────────────────────
+
+export type ClaimRecord = {
+  member_full_name: string
+  member_phone: string
+  member_email: string
+  claim_number: string
+  claim_type: string
+  amount_requested: number | null
+  approved_amount: number | null
+  status: string
+  package_name: string
+  submitted_at: string | null
+  decided_at: string | null
+  created_at: string
+}
+
+export function exportClaimRecordsCSV(records: ClaimRecord[]) {
+  downloadCSV(
+    `luma-welfare-claims-${new Date().toISOString().slice(0, 10)}.csv`,
+    ['Member Full Name', 'Phone Number', 'Email', 'Claim Number', 'Claim Type', 'Package', 'Amount Requested', 'Approved Amount', 'Status', 'Submitted At', 'Decided At', 'Created At'],
+    records.map(r => [
+      r.member_full_name,
+      r.member_phone,
+      r.member_email,
+      r.claim_number,
+      r.claim_type,
+      r.package_name,
+      r.amount_requested != null ? `KSh ${r.amount_requested.toLocaleString('en-KE')}` : '—',
+      r.approved_amount != null ? `KSh ${r.approved_amount.toLocaleString('en-KE')}` : '—',
+      r.status,
+      r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-KE') : '—',
+      r.decided_at ? new Date(r.decided_at).toLocaleDateString('en-KE') : '—',
+      r.created_at ? new Date(r.created_at).toLocaleDateString('en-KE') : '—',
+    ]),
+  )
+}
+
+export async function exportClaimRecordsExcel(records: ClaimRecord[], filterSummary?: string) {
+  const today = new Date().toISOString().slice(0, 10)
+  await downloadExcel(
+    `luma-welfare-claims-${today}.xlsx`,
+    'Claims',
+    ['Member Full Name', 'Phone Number', 'Email', 'Claim Number', 'Claim Type', 'Package', 'Amount Requested', 'Approved Amount', 'Status', 'Submitted At', 'Decided At', 'Created At'],
+    records.map(r => [
+      r.member_full_name,
+      r.member_phone,
+      r.member_email,
+      r.claim_number,
+      r.claim_type,
+      r.package_name,
+      r.amount_requested != null ? `KSh ${r.amount_requested.toLocaleString('en-KE')}` : '—',
+      r.approved_amount != null ? `KSh ${r.approved_amount.toLocaleString('en-KE')}` : '—',
+      r.status,
+      r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-KE') : '—',
+      r.decided_at ? new Date(r.decided_at).toLocaleDateString('en-KE') : '—',
+      r.created_at ? new Date(r.created_at).toLocaleDateString('en-KE') : '—',
+    ]),
+    { filterSummary },
+  )
+}
+
+export async function exportClaimRecordsPDF(records: ClaimRecord[], filterSummary?: string) {
+  const { autoTable } = await loadPDFLib()
+  const doc = await createPDF('Claims Report')
+  let startY = 50
+
+  if (filterSummary) {
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100)
+    doc.text(filterSummary, 14, startY)
+    startY += 6
+  }
+
+  doc.setFontSize(8)
+  doc.setTextColor(130)
+  doc.text(`Total: ${records.length} claim${records.length !== 1 ? 's' : ''}`, 14, startY)
+  startY += 6
+
+  autoTable(doc, {
+    startY,
+    head: [['Member', 'Phone', 'Claim #', 'Type', 'Package', 'Requested', 'Approved', 'Status', 'Submitted']],
+    body: records.map(r => [
+      r.member_full_name,
+      r.member_phone,
+      r.claim_number,
+      r.claim_type,
+      r.package_name,
+      r.amount_requested != null ? formatKes(r.amount_requested) : '—',
+      r.approved_amount != null ? formatKes(r.approved_amount) : '—',
+      r.status,
+      r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-KE') : '—',
+    ]),
+    styles: { fontSize: 7 },
+    headStyles: { fillColor: [109, 155, 58] },
+    columnStyles: { 5: { halign: 'right' }, 6: { halign: 'right' } },
+    margin: { left: 14, right: 14 },
+  })
+
+  const today = new Date().toISOString().slice(0, 10)
+  downloadPDF(doc, `luma-welfare-claims-${today}.pdf`)
+}

@@ -4,8 +4,8 @@ import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { ExportDialog } from '../../components/ExportDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { exportClaimRecordsCSV, exportClaimRecordsExcel, exportClaimRecordsPDF, type ClaimRecord } from '../../lib/exports'
 
 type Claim = {
   id: string
@@ -68,7 +68,7 @@ export function AdminClaims() {
   const perPage = 50
 
   // Export
-  const [showExport, setShowExport] = useState(false)
+  const [exporting, setExporting] = useState<'csv' | 'excel' | 'pdf' | null>(null)
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -115,6 +115,46 @@ export function AdminClaims() {
   }, [filter, debouncedQuery])
 
   useEffect(() => { load(1) }, [load])
+
+  function normalizeClaim(c: Claim): ClaimRecord {
+    return {
+      member_full_name: c.members?.full_name ?? 'Not provided',
+      member_phone: c.members?.phone ?? 'Not provided',
+      member_email: c.members?.email ?? 'Not provided',
+      claim_number: c.claim_number ?? '—',
+      claim_type: c.claim_type ?? '—',
+      amount_requested: c.amount_requested,
+      approved_amount: c.approved_amount,
+      status: c.status ?? 'Unknown',
+      package_name: c.packages?.name ?? 'Not provided',
+      submitted_at: c.submitted_at,
+      decided_at: c.decided_at,
+      created_at: c.created_at,
+    }
+  }
+
+  function handleExport(format: 'csv' | 'excel' | 'pdf') {
+    if (claims.length === 0) {
+      addToast('info', 'No claim records available for export.')
+      return
+    }
+    setExporting(format)
+    try {
+      const records = claims.map(normalizeClaim)
+      const parts: string[] = []
+      if (filter) parts.push(`Status: ${filter}`)
+      if (debouncedQuery.trim()) parts.push(`Search: ${debouncedQuery.trim()}`)
+      const filterSummary = parts.length > 0 ? `Filters: ${parts.join(' | ')}` : 'All claims'
+      if (format === 'csv') exportClaimRecordsCSV(records)
+      else if (format === 'excel') exportClaimRecordsExcel(records, filterSummary)
+      else exportClaimRecordsPDF(records, filterSummary)
+      addToast('success', `Export complete — ${records.length} claim${records.length !== 1 ? 's' : ''}`)
+    } catch {
+      addToast('error', 'Export failed. Please try again.')
+    } finally {
+      setExporting(null)
+    }
+  }
 
   async function viewDetail(claim: Claim) {
     setDetail(claim)
@@ -327,9 +367,31 @@ export function AdminClaims() {
           <h1 className="text-2xl font-bold text-gray-900">Claims</h1>
           <p className="text-sm text-gray-500 mt-1">Review member claims. Approved claims are recorded for future payout processing.</p>
         </div>
-        <button onClick={() => setShowExport(true)} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-          Export CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 mr-1">Export:</span>
+          {([
+            ['csv', 'CSV'],
+            ['excel', 'Excel'],
+            ['pdf', 'PDF'],
+          ] as const).map(([fmt, label]) => (
+            <button
+              key={fmt}
+              onClick={() => handleExport(fmt)}
+              disabled={exporting !== null || loading}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {exporting === fmt ? (
+                <>
+                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Generating…
+                </>
+              ) : label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Filters + Search */}
@@ -679,14 +741,6 @@ export function AdminClaims() {
           </div>
         </div>
       )}
-
-      <ExportDialog
-        open={showExport}
-        onClose={() => setShowExport(false)}
-        exportType="claims"
-        filters={{ status: filter || undefined, q: debouncedQuery.trim() || undefined }}
-        filterLabels={{ status: 'Status', q: 'Search' }}
-      />
     </div>
   )
 }
