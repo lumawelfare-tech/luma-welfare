@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     const rangeStartStr = rangeStart.toISOString()
 
     // ── Core KPIs: single RPC call replaces 7 sequential count queries ──
-    const { data: summary } = await adminClient.rpc('get_admin_dashboard_summary')
+    const { data: summary } = await adminClient.rpc('get_admin_dashboard_summary', { p_from: rangeStartStr, p_to: rangeEnd.toISOString() })
 
     // ── Platform settings ──
     const { data: settings } = await adminClient

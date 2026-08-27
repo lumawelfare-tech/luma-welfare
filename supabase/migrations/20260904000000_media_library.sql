@@ -31,6 +31,7 @@ CREATE INDEX IF NOT EXISTS idx_media_items_category    ON media_items (category)
 CREATE INDEX IF NOT EXISTS idx_media_items_featured    ON media_items (is_featured);
 CREATE INDEX IF NOT EXISTS idx_media_items_created     ON media_items (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_media_items_sort        ON media_items (sort_order);
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX IF NOT EXISTS idx_media_items_title_trgm  ON media_items USING gin (title gin_trgm_ops);
 
 -- 3. RLS
