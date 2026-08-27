@@ -258,11 +258,13 @@ async function downloadExcel(filename: string, sheetName: string, headers: strin
 export type ContributionRecord = {
   member_full_name: string
   member_phone: string
+  member_email: string
   period: string
   amount: number
   status: string
   package_name: string
   receipt_number: string
+  reference_number: string
   created_at: string
   member_id: string
 }
@@ -270,17 +272,19 @@ export type ContributionRecord = {
 export function exportContributionRecordsCSV(records: ContributionRecord[]) {
   downloadCSV(
     `luma-welfare-contributions-${new Date().toISOString().slice(0, 10)}.csv`,
-    ['Member Full Name', 'Phone Number', 'Period', 'Amount', 'Status', 'Package', 'Receipt / Reference', 'Created At', 'Member ID'],
+    ['Member Full Name', 'Phone Number', 'Email', 'Member ID', 'Package', 'Period', 'Amount', 'Status', 'Receipt Number', 'Reference Number', 'Created At'],
     records.map(r => [
       r.member_full_name,
       r.member_phone,
+      r.member_email,
+      r.member_id,
+      r.package_name,
       r.period,
       `KSh ${r.amount.toLocaleString('en-KE')}`,
       r.status,
-      r.package_name,
       r.receipt_number,
+      r.reference_number,
       r.created_at ? new Date(r.created_at).toLocaleDateString('en-KE') : '—',
-      r.member_id,
     ]),
   )
 }
@@ -290,17 +294,19 @@ export async function exportContributionRecordsExcel(records: ContributionRecord
   await downloadExcel(
     `luma-welfare-contributions-${today}.xlsx`,
     'Contributions',
-    ['Member Full Name', 'Phone Number', 'Period', 'Amount', 'Status', 'Package', 'Receipt / Reference', 'Created At', 'Member ID'],
+    ['Member Full Name', 'Phone Number', 'Email', 'Member ID', 'Package', 'Period', 'Amount', 'Status', 'Receipt Number', 'Reference Number', 'Created At'],
     records.map(r => [
       r.member_full_name,
       r.member_phone,
+      r.member_email,
+      r.member_id,
+      r.package_name,
       r.period,
       `KSh ${r.amount.toLocaleString('en-KE')}`,
       r.status,
-      r.package_name,
       r.receipt_number,
+      r.reference_number,
       r.created_at ? new Date(r.created_at).toLocaleDateString('en-KE') : '—',
-      r.member_id,
     ]),
     { filterSummary },
   )
@@ -326,20 +332,22 @@ export async function exportContributionRecordsPDF(records: ContributionRecord[]
 
   autoTable(doc, {
     startY,
-    head: [['Member', 'Phone', 'Period', 'Amount', 'Status', 'Package', 'Reference', 'Date']],
+    head: [['Member', 'Phone', 'Email', 'Package', 'Period', 'Amount', 'Status', 'Receipt', 'Reference', 'Date']],
     body: records.map(r => [
       r.member_full_name,
       r.member_phone,
+      r.member_email,
+      r.package_name,
       r.period,
       formatKes(r.amount),
       r.status,
-      r.package_name,
       r.receipt_number,
+      r.reference_number,
       r.created_at ? new Date(r.created_at).toLocaleDateString('en-KE') : '—',
     ]),
     styles: { fontSize: 7 },
     headStyles: { fillColor: [109, 155, 58] },
-    columnStyles: { 3: { halign: 'right' } },
+    columnStyles: { 5: { halign: 'right' } },
     margin: { left: 14, right: 14 },
   })
 

@@ -4,8 +4,8 @@ import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { ExportDialog } from '../../components/ExportDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { exportContributionRecordsCSV, exportContributionRecordsExcel, exportContributionRecordsPDF, type ContributionRecord } from '../../lib/exports'
 
 type Contribution = {
   id: string
@@ -18,6 +18,35 @@ type Contribution = {
   members: { full_name: string | null; phone: string | null; email: string | null; membership_number: string | null } | null
   packages: { code: string; name: string } | null
   payments: { mpesa_receipt: string | null; channel: string | null } | null
+}
+
+function normalizeContribution(c: Contribution): ContributionRecord {
+  return {
+    member_full_name: c.members?.full_name ?? 'Not provided',
+    member_phone: c.members?.phone ?? 'Not provided',
+    member_email: c.members?.email ?? 'Not provided',
+    period: c.period ?? '—',
+    amount: c.amount ?? 0,
+    status: c.status ?? 'Unknown',
+    package_name: c.packages?.name ?? 'Not provided',
+    receipt_number: c.payments?.mpesa_receipt ?? '—',
+    reference_number: c.payments?.mpesa_receipt ?? '—',
+    created_at: c.created_at,
+    member_id: c.member_id ?? '—',
+  }
+}
+
+function buildFilterSummary(args: { filter: string; query: string; dateFrom: string; dateTo: string; packageId: string; packages: { id: string; name: string }[] }): string {
+  const parts: string[] = []
+  if (args.filter) parts.push(`Status: ${args.filter}`)
+  if (args.query) parts.push(`Search: ${args.query}`)
+  if (args.dateFrom) parts.push(`From: ${args.dateFrom}`)
+  if (args.dateTo) parts.push(`To: ${args.dateTo}`)
+  if (args.packageId) {
+    const pkg = args.packages.find(p => p.id === args.packageId)
+    parts.push(`Package: ${pkg?.name ?? args.packageId}`)
+  }
+  return parts.length > 0 ? `Filters: ${parts.join(' | ')}` : 'All contributions'
 }
 
 const statusStyles: Record<string, string> = {
@@ -55,7 +84,7 @@ export function AdminContributions() {
   const perPage = 50
 
   // Export
-  const [showExport, setShowExport] = useState(false)
+  const [exporting, setExporting] = useState<'csv' | 'excel' | 'pdf' | null>(null)
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -183,6 +212,26 @@ export function AdminContributions() {
     await load()
   }
 
+  function handleExport(format: 'csv' | 'excel' | 'pdf') {
+    if (rows.length === 0) {
+      addToast('info', 'No contribution records available for export.')
+      return
+    }
+    setExporting(format)
+    try {
+      const records = rows.map(normalizeContribution)
+      const filterSummary = buildFilterSummary({ filter, query: debouncedQuery, dateFrom, dateTo, packageId, packages })
+      if (format === 'csv') exportContributionRecordsCSV(records)
+      else if (format === 'excel') exportContributionRecordsExcel(records, filterSummary)
+      else exportContributionRecordsPDF(records, filterSummary)
+      addToast('success', `Export complete — ${records.length} record${records.length !== 1 ? 's' : ''}`)
+    } catch {
+      addToast('error', 'Export failed. Please try again.')
+    } finally {
+      setExporting(null)
+    }
+  }
+
   const columns: Column<Record<string, unknown>>[] = [
     {
       key: 'member_name',
@@ -192,7 +241,8 @@ export function AdminContributions() {
         return (
           <div>
             <div className="font-medium text-gray-900">{c.members?.full_name ?? 'Unknown'}</div>
-            <div className="text-xs text-gray-500">{c.members?.email ?? c.members?.phone ?? ''}</div>
+            <div className="text-xs text-gray-500">{c.members?.phone ?? '—'}</div>
+            {c.members?.email && <div className="text-xs text-gray-400">{c.members.email}</div>}
           </div>
         )
       },
@@ -263,11 +313,53 @@ export function AdminContributions() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Contributions</h1>
-          <p className="text-sm text-gray-500 mt-1">Review and verify member contribution payments.</p>
+          <p className="text-sm text-gray-500 mt-1">Review, verify, and manage member contribution records.</p>
         </div>
-        <button onClick={() => setShowExport(true)} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-          Export CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 mr-1">Export:</span>
+          {([
+            ['csv', 'CSV'],
+            ['excel', 'Excel'],
+            ['pdf', 'PDF'],
+          ] as const).map(([fmt, label]) => (
+            <button
+              key={fmt}
+              onClick={() => handleExport(fmt)}
+              disabled={exporting !== null || loading}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {exporting === fmt ? (
+                <>
+                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Generating…
+                </>
+              ) : label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Total</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{totalCount}</div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Pending</div>
+          <div className="mt-1 text-2xl font-bold text-amber-600">{rows.filter(r => r.status === 'Pending').length}</div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Verified</div>
+          <div className="mt-1 text-2xl font-bold text-emerald-600">{rows.filter(r => r.status === 'Verified').length}</div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Total Amount</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">KSh {rows.reduce((s, r) => s + (r.amount ?? 0), 0).toLocaleString('en-KE')}</div>
+        </div>
       </div>
 
       {/* Filters + Search */}
@@ -374,6 +466,7 @@ export function AdminContributions() {
                     {c.status}
                   </span>
                 </div>
+                <div className="text-xs text-gray-500">{c.members?.phone ?? '—'} {c.members?.email ? `· ${c.members.email}` : ''}</div>
                 <div className="text-xs text-gray-500">{c.packages?.name ?? '—'} · {c.period}</div>
                 <div className="text-sm font-medium text-gray-900">KSh {c.amount.toLocaleString('en-KE')}</div>
                 {c.payments?.mpesa_receipt && <div className="text-xs text-gray-400 font-mono">{c.payments.mpesa_receipt}</div>}
@@ -469,13 +562,6 @@ export function AdminContributions() {
         </div>
       )}
 
-      <ExportDialog
-        open={showExport}
-        onClose={() => setShowExport(false)}
-        exportType="contributions"
-        filters={{ status: filter || undefined, q: debouncedQuery.trim() || undefined }}
-        filterLabels={{ status: 'Status', q: 'Search' }}
-      />
     </div>
   )
 }
