@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useHead } from '../../lib/seo'
 import { api, ApiError } from '../../lib/api'
 import { supabase } from '../../lib/supabase'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 
 type Schedule = {
   id: string; name: string; report_type: string; filters: Record<string, string>
@@ -579,6 +580,7 @@ export function AdminScheduledReports() {
   const [activeTab, setActiveTab] = useState<'schedules' | 'history' | 'calendar'>('schedules')
   const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return d.getMonth() })
   const [calYear, setCalYear] = useState(() => new Date().getFullYear())
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
 
   // Create form
   const [formName, setFormName] = useState('')
@@ -659,9 +661,14 @@ export function AdminScheduledReports() {
   }
 
   async function deleteSchedule(id: string, name: string) {
-    if (!confirm(`Delete scheduled report "${name}"?`)) return
-    try { await api(`/admin/scheduled-reports?id=${id}`, { method: 'DELETE', auth: true }); setNotice(`Deleted "${name}".`); await load() }
+    setDeleteTarget({ id, name })
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    try { await api(`/admin/scheduled-reports?id=${deleteTarget.id}`, { method: 'DELETE', auth: true }); setNotice(`Deleted "${deleteTarget.name}".`); await load() }
     catch (e) { setError(e instanceof ApiError ? e.message : 'Failed to delete') }
+    setDeleteTarget(null)
   }
 
   async function generateNow(id: string) {
@@ -938,6 +945,17 @@ export function AdminScheduledReports() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete Scheduled Report"
+        variant="danger"
+        confirmLabel="Delete"
+        message={`Are you sure you want to delete "${deleteTarget?.name}"? This cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

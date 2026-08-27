@@ -42,7 +42,13 @@ type Options = {
   method?: string
   body?: unknown
   auth?: boolean
+  retry?: boolean // enable retry for transient failures (default: true for GET, false for mutations)
 }
+
+const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+const RETRYABLE_STATUSES = new Set([408, 429, 502, 503, 504])
+const MAX_RETRIES = 2
+const BASE_DELAY_MS = 500
 
 export class ApiError extends Error {
   status: number
@@ -55,9 +61,36 @@ export class ApiError extends Error {
 }
 
 /**
- * Make an API call to a Supabase Edge Function.
+ * Make an API call to a Supabase Edge Function with optional retry for transient failures.
  */
 export async function api<T = unknown>(
+  path: string,
+  options: Options = {},
+): Promise<T> {
+  const { method = 'GET', body, auth = false } = options
+  const shouldRetry = options.retry ?? RETRYABLE_METHODS.has(method.toUpperCase())
+  let lastError: ApiError | null = null
+
+  for (let attempt = 0; attempt <= (shouldRetry ? MAX_RETRIES : 0); attempt++) {
+    try {
+      return await apiInternal<T>(path, { method, body, auth })
+    } catch (e) {
+      lastError = e instanceof ApiError ? e : new ApiError(0, String(e), 'NETWORK')
+      const isTransient = RETRYABLE_STATUSES.has(lastError.status) || lastError.status === 0
+      if (!shouldRetry || !isTransient || attempt >= MAX_RETRIES) {
+        throw lastError
+      }
+      // Exponential backoff: 500ms, 1000ms
+      await new Promise(r => setTimeout(r, BASE_DELAY_MS * Math.pow(2, attempt)))
+    }
+  }
+  throw lastError!
+}
+
+/**
+ * Internal API call implementation (no retry).
+ */
+async function apiInternal<T = unknown>(
   path: string,
   options: Options = {},
 ): Promise<T> {

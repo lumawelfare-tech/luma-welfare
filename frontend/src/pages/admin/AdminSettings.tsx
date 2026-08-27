@@ -136,6 +136,34 @@ export function AdminSettings() {
     mpesa: 'M-Pesa Configuration',
   }
 
+  const keyDescriptions: Record<string, string> = {
+    org_contact: 'Email, phone, and address displayed on the public website.',
+    stats: 'Controls which statistics are shown publicly on the homepage.',
+    mpesa: 'M-Pesa payment integration settings (STK Push, business number, etc.).',
+  }
+
+  // Determine input type based on value content
+  function getInputType(value: string): 'textarea' | 'json-fields' {
+    try {
+      const parsed = JSON.parse(value)
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return 'json-fields'
+      }
+    } catch { /* not JSON */ }
+    return 'textarea'
+  }
+
+  const jsonFieldLabels: Record<string, Record<string, string>> = {
+    org_contact: { email: 'Email Address', phone: 'Phone Number', address: 'Physical Address', website: 'Website URL' },
+    mpesa: { shortcode: 'Business Shortcode', passkey: 'Passkey', consumer_key: 'Consumer Key', consumer_secret: 'Consumer Secret', TillNumber: 'Till Number', paybill: 'Paybill Number', callback_url: 'Callback URL' },
+    stats: { total_members: 'Show Total Members', active_members: 'Show Active Members', total_packages: 'Show Total Packages' },
+  }
+
+  const jsonFieldTypes: Record<string, Record<string, string>> = {
+    org_contact: { email: 'email', phone: 'tel', website: 'url' },
+    mpesa: { callback_url: 'url', consumer_key: 'password', consumer_secret: 'password', passkey: 'password' },
+  }
+
   // Hide save button for non-general tabs
   const showSave = tab === 'general'
 
@@ -170,12 +198,63 @@ export function AdminSettings() {
           {filtered.map(s => (
             <div key={s.key} className="rounded-xl border border-gray-200 bg-white p-4">
               <label className="text-sm font-medium text-gray-700">{keyLabels[s.key] ?? s.key}</label>
-              <textarea
-                value={editing[s.key] ?? ''}
-                onChange={(e) => setEditing(ed => ({ ...ed, [s.key]: e.target.value }))}
-                rows={4}
-                className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs outline-none focus:border-luma-500"
-              />
+              {keyDescriptions[s.key] && <p className="mt-0.5 text-xs text-gray-400">{keyDescriptions[s.key]}</p>}
+              {getInputType(editing[s.key] ?? '') === 'json-fields' ? (
+                <div className="mt-3 space-y-3">
+                  {Object.entries(JSON.parse(editing[s.key] || '{}')).map(([fieldKey, fieldValue]) => {
+                    const fieldLabel = jsonFieldLabels[s.key]?.[fieldKey] ?? fieldKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                    const fieldType = jsonFieldTypes[s.key]?.[fieldKey] ?? 'text'
+                    const isBoolean = typeof fieldValue === 'boolean' || fieldValue === 'true' || fieldValue === 'false'
+                    const isSensitive = fieldType === 'password'
+
+                    if (isBoolean) {
+                      const boolVal = fieldValue === true || fieldValue === 'true'
+                      return (
+                        <div key={fieldKey} className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+                          <label className="text-sm text-gray-700">{fieldLabel}</label>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={boolVal}
+                            onClick={() => {
+                              const parsed = JSON.parse(editing[s.key] || '{}')
+                              parsed[fieldKey] = !boolVal
+                              setEditing(ed => ({ ...ed, [s.key]: JSON.stringify(parsed, null, 2) }))
+                            }}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${boolVal ? 'bg-luma-600' : 'bg-gray-300'}`}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${boolVal ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div key={fieldKey}>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel}</label>
+                        <input
+                          type={isSensitive ? 'password' : fieldType}
+                          value={String(fieldValue ?? '')}
+                          onChange={(e) => {
+                            const parsed = JSON.parse(editing[s.key] || '{}')
+                            parsed[fieldKey] = e.target.value
+                            setEditing(ed => ({ ...ed, [s.key]: JSON.stringify(parsed, null, 2) }))
+                          }}
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500"
+                          placeholder={fieldLabel}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <textarea
+                  value={editing[s.key] ?? ''}
+                  onChange={(e) => setEditing(ed => ({ ...ed, [s.key]: e.target.value }))}
+                  rows={4}
+                  className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs outline-none focus:border-luma-500"
+                />
+              )}
             </div>
           ))}
           {filtered.length === 0 && <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-gray-500">No settings in this section.</div>}

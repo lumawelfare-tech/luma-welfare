@@ -32,6 +32,7 @@ type AuthState = {
   adminRole: string | null
   registrationFeePaid: boolean
   loading: boolean
+  twoFaVerified: boolean
   login: (email: string, password: string) => Promise<LoginResult>
   signInWithGoogle: () => Promise<void>
   register: (input: {
@@ -42,6 +43,7 @@ type AuthState = {
     idNumber?: string
   }) => Promise<void>
   logout: () => void
+  setTwoFaVerified: (v: boolean) => void
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -68,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRole, setAdminRole] = useState<string | null>(null)
   const [registrationFeePaid, setRegistrationFeePaid] = useState(false)
+  const [twoFaVerified, setTwoFaVerified] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // Fetch member profile and admin status from the server
@@ -144,6 +147,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAdmin(profile.isAdmin)
         setAdminRole(profile.adminRole)
         setRegistrationFeePaid(profile.registrationFeePaid)
+
+        // After OAuth sign-in, redirect admins to admin dashboard
+        if (session?.user && session.user.app_metadata?.provider !== 'email' && profile.isAdmin) {
+          window.location.href = '/admin/dashboard'
+          return
+        }
       }
     })
 
@@ -209,8 +218,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAdmin(false)
     setAdminRole(null)
     setRegistrationFeePaid(false)
-  }    return (
-    <AuthContext.Provider value={{ member, isAdmin, adminRole, registrationFeePaid, loading, login, signInWithGoogle, register, logout }}>
+    setTwoFaVerified(false)
+  }
+  return (
+    <AuthContext.Provider value={{ member, isAdmin, adminRole, registrationFeePaid, twoFaVerified, loading, login, signInWithGoogle, register, logout, setTwoFaVerified }}>
       {children}
     </AuthContext.Provider>
   )

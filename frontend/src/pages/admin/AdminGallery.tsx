@@ -41,12 +41,13 @@ export function AdminGallery() {
   const [totalCount, setTotalCount] = useState(0)
   const perPage = 50
 
-  const load = useCallback(async (pageNum = 1) => {
+  const load = useCallback(async (pageNum = 1, searchQuery?: string) => {
     setLoading(true)
     try {
       const qs = new URLSearchParams()
       qs.set('page', String(pageNum))
       qs.set('per_page', String(perPage))
+      if (searchQuery?.trim()) qs.set('q', searchQuery.trim())
       const query = qs.toString()
       const path = `/admin/gallery${query ? `?${query}` : ''}`
       const d = await api<{ items: GalleryItem[]; total: number; page: number; pages: number }>(path, { auth: true })
@@ -60,6 +61,8 @@ export function AdminGallery() {
       setLoading(false)
     }
   }, [])
+
+  useEffect(() => { load(1, debouncedSearch) }, [debouncedSearch])
 
   useEffect(() => { load(1) }, [load])
 
@@ -184,9 +187,7 @@ export function AdminGallery() {
     }
   }
 
-  const filtered = debouncedSearch
-    ? items.filter(i => (i.title?.toLowerCase().includes(debouncedSearch.toLowerCase())) || (i.caption?.toLowerCase().includes(debouncedSearch.toLowerCase())))
-    : items
+  const filtered = items
 
   return (
     <div className="py-6">
@@ -303,8 +304,9 @@ export function AdminGallery() {
         <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
           <div className="text-sm text-gray-500">Page {page} of {totalPages}</div>
           <div className="flex gap-2">
-            <button disabled={page <= 1} onClick={() => load(page - 1)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
-            <button disabled={page >= totalPages} onClick={() => load(page + 1)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+            <button disabled={page <= 1} onClick={() => load(page - 1, debouncedSearch)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+            <span className="text-sm text-gray-500">Page {page} of {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => load(page + 1, debouncedSearch)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
           </div>
         </div>
       )}
