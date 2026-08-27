@@ -1,4 +1,4 @@
-import { type JSX } from 'react'
+import { type JSX, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { StatBar } from '../components/StatBar'
 import { useHead } from '../lib/seo'
@@ -56,16 +56,56 @@ const offerIcons: Record<string, JSX.Element> = {
   ),
 }
 
+const whyChooseUs = [
+  { title: 'Transparent Operations', description: 'Every contribution, waiting period, and payout is tracked and visible to you. No hidden terms.', icon: '🔍' },
+  { title: 'M-Pesa Integration', description: 'Pay contributions directly via M-Pesa. Fast, secure, and familiar.', icon: '📱' },
+  { title: '12 Welfare Packages', description: 'Choose from hospital, education, business, building, bereavement, wedding, and more.', icon: '📦' },
+  { title: 'Community First', description: 'Members help each other. Your contributions directly support families in need.', icon: '🤝' },
+]
+
+const trustFeatures = [
+  { title: 'Secure Payments', description: 'All transactions are processed through encrypted channels. Your money is handled with care.', icon: '🔒' },
+  { title: 'Audit Trail', description: 'Every financial transaction is recorded in an immutable ledger for complete accountability.', icon: '📋' },
+  { title: 'Data Protection', description: 'Your personal information is encrypted and never shared with third parties.', icon: '🛡️' },
+  { title: 'Verified Claims', description: 'Every claim is reviewed and verified before approval. Fair and consistent process.', icon: '✅' },
+]
+
+const faqItems = [
+  { q: 'What is Luma Welfare?', a: 'Luma Welfare is a community welfare organisation that helps members support each other through key life events — hospital bills, education costs, business support, and more.' },
+  { q: 'How do I join?', a: 'Click "Join Now", create a free account, verify your email, pay the KSh 300 activation fee, then choose a welfare package that suits your needs.' },
+  { q: 'How do contributions work?', a: 'Each package has a monthly contribution amount. Pay via M-Pesa. Your payments are tracked automatically and you can see your history anytime.' },
+  { q: 'When can I submit a claim?', a: 'Each package has a waiting period. Once you have made enough contributions and the waiting period has passed, you become eligible to submit claims.' },
+  { q: 'Is my money safe?', a: 'Yes. All payments are processed through secure M-Pesa integration. Every transaction is recorded in an immutable audit ledger.' },
+  { q: 'Can I have multiple packages?', a: 'Yes. You can subscribe to multiple welfare packages simultaneously. Each package tracks contributions and eligibility independently.' },
+]
+
+function FaqItem({ q, a }: { q: string; a: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-b border-gray-200 last:border-0">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between py-4 text-left"
+        aria-expanded={open}
+      >
+        <span className="text-sm font-semibold text-gray-900 pr-4">{q}</span>
+        <svg className={`h-5 w-5 flex-shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && <p className="pb-4 text-sm leading-relaxed text-gray-600">{a}</p>}
+    </div>
+  )
+}
+
 export function Home() {
   useHead('Home', 'Luma Welfare is a community welfare organization in Kenya. Members contribute monthly to support each other through key life events.')
   return (
     <div>
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-luma-800 via-luma-700 to-luma-900">
-        {/* Decorative shapes */}
         <div className="absolute -right-20 -top-20 h-96 w-96 rounded-full bg-luma-600/20" />
         <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-luma-500/10" />
-
         <div className="container-luma relative grid items-center gap-10 py-16 lg:grid-cols-2 lg:py-24">
           <div className="relative z-10">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-medium text-white/90 backdrop-blur-sm">
@@ -88,7 +128,7 @@ export function Home() {
                 to="/register"
                 className="rounded-xl bg-white px-8 py-3.5 text-sm font-bold text-luma-800 shadow-lg hover:bg-gray-100 hover:shadow-xl transition-all"
               >
-                Join Now
+                Join Luma — It&apos;s Free to Start
               </Link>
               <Link
                 to="/packages"
@@ -102,17 +142,16 @@ export function Home() {
                 <svg className="h-5 w-5 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="text-sm font-medium text-white/80">Trusted</span>
+                <span className="text-sm font-medium text-white/80">Trusted by Kenyan families</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="h-5 w-5 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
-                <span className="text-sm font-medium text-white/80">Secure • Transparent</span>
+                <span className="text-sm font-medium text-white/80">Secure &amp; Transparent</span>
               </div>
             </div>
           </div>
-
           <div className="hidden justify-center lg:flex">
             <div className="relative">
               <img
@@ -120,7 +159,6 @@ export function Home() {
                 alt="Luma Welfare — Community Welfare Organization"
                 className="max-h-80 rounded-3xl object-contain shadow-2xl"
               />
-              {/* Decorative badge */}
               <div className="absolute -bottom-4 -left-4 rounded-2xl bg-white px-4 py-3 shadow-xl">
                 <div className="text-2xl font-bold text-luma-700">12+</div>
                 <div className="text-xs font-medium text-gray-500">Welfare Packages</div>
@@ -146,7 +184,6 @@ export function Home() {
               View All Packages →
             </Link>
           </div>
-
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {offerCodes.map((code) => (
               <Link
@@ -165,7 +202,6 @@ export function Home() {
               </Link>
             ))}
           </div>
-
           <div className="mt-10 text-center sm:hidden">
             <Link to="/packages" className="rounded-lg bg-luma-700 px-6 py-3 text-sm font-semibold text-white hover:bg-luma-800">
               View all packages
@@ -182,11 +218,10 @@ export function Home() {
             <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Four Simple Steps</h2>
             <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-luma-500" />
           </div>
-
           <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { step: '01', title: 'Register', text: 'Create your account with your name, email and phone number.' },
-              { step: '02', title: 'Join a Package', text: 'Choose from 12 welfare packages that fit your family needs.' },
+              { step: '01', title: 'Register', text: 'Create your account with your name, email and phone number. It\'s free.' },
+              { step: '02', title: 'Choose a Package', text: 'Browse 12 welfare packages and pick the ones that fit your family needs.' },
               { step: '03', title: 'Contribute Monthly', text: 'Pay your monthly contribution via M-Pesa. Each package is tracked separately.' },
               { step: '04', title: 'Access Benefits', text: 'Once your waiting period is met, submit a claim and receive support.' },
             ].map((s) => (
@@ -202,29 +237,100 @@ export function Home() {
         </div>
       </section>
 
+      {/* Why Choose Luma */}
+      <section className="bg-gray-50 py-16 lg:py-20">
+        <div className="container-luma">
+          <div className="text-center">
+            <span className="text-sm font-semibold uppercase tracking-wider text-luma-600">Why Luma</span>
+            <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Why Choose Luma Welfare</h2>
+            <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-luma-500" />
+            <p className="mx-auto mt-4 max-w-2xl text-gray-500">We combine community values with modern technology to deliver welfare services you can trust.</p>
+          </div>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {whyChooseUs.map((item) => (
+              <div key={item.title} className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg hover:-translate-y-1">
+                <div className="mb-4 text-3xl">{item.icon}</div>
+                <h3 className="text-lg font-bold text-gray-900">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-500">{item.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Trust & Security */}
+      <section className="bg-white py-16 lg:py-20">
+        <div className="container-luma">
+          <div className="grid items-center gap-12 lg:grid-cols-2">
+            <div>
+              <span className="text-sm font-semibold uppercase tracking-wider text-luma-600">Your Security</span>
+              <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Built on Trust &amp; Security</h2>
+              <div className="mt-3 h-1 w-12 rounded-full bg-luma-500" />
+              <p className="mt-4 text-gray-500 leading-relaxed">
+                Your contributions and personal data are protected by industry-standard security.
+                Every transaction is recorded in an immutable audit ledger. No shortcuts, no compromises.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {trustFeatures.map((item) => (
+                <div key={item.title} className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                  <div className="mb-2 text-2xl">{item.icon}</div>
+                  <h3 className="text-sm font-bold text-gray-900">{item.title}</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">{item.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="bg-gray-50 py-16 lg:py-20">
+        <div className="container-luma">
+          <div className="grid gap-12 lg:grid-cols-2">
+            <div>
+              <span className="text-sm font-semibold uppercase tracking-wider text-luma-600">FAQ</span>
+              <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Frequently Asked Questions</h2>
+              <div className="mt-3 h-1 w-12 rounded-full bg-luma-500" />
+              <p className="mt-4 text-gray-500">Everything you need to know about joining and using Luma Welfare.</p>
+              <Link to="/faq" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-luma-600 hover:text-luma-700">
+                View all FAQs →
+              </Link>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+              {faqItems.map((item) => (
+                <FaqItem key={item.q} q={item.q} a={item.a} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="bg-luma-700 py-16 lg:py-20">
         <div className="container-luma text-center">
           <h2 className="text-3xl font-bold text-white sm:text-4xl">
-            Ready to Secure Your Family's Future?
+            Ready to Secure Your Family&apos;s Future?
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-white/80">
-            Join thousands of Kenyan families who trust Luma Welfare for affordable, transparent community support.
+            Join Kenyan families who trust Luma Welfare for affordable, transparent community support.
+            Registration is free — pay only when you choose a package.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
               to="/register"
               className="rounded-xl bg-white px-8 py-3.5 text-sm font-bold text-luma-800 shadow-lg hover:bg-gray-100 transition-all"
             >
-              Join Now — KSh 300 Activation Fee
+              Join Now — Free Registration
             </Link>
             <Link
-              to="/contact"
+              to="/packages"
               className="rounded-xl border-2 border-white/30 px-8 py-3.5 text-sm font-bold text-white hover:bg-white/10 transition-all"
             >
-              Contact Us
+              Explore Packages
             </Link>
           </div>
+          <p className="mt-4 text-xs text-white/60">One-time KSh 300 activation fee after registration</p>
         </div>
       </section>
     </div>
