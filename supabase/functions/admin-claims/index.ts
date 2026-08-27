@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
 
       const updates: Record<string, unknown> = { status: statusMap[decision], admin_notes: adminNotes, reviewed_at: new Date().toISOString() }
       if (decision === 'approve' || decision === 'reject') { updates.decided_at = new Date().toISOString(); updates.decided_by = session.id }
-      if (amount) updates.amount_requested = amount
+      if (amount) updates.approved_amount = amount
 
       const { data, error } = await adminClient.from('claims').update(updates).eq('id', claimId).select('*, members(full_name)').single()
       if (error) throw new Error('Claim not found')

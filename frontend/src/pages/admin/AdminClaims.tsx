@@ -12,6 +12,7 @@ type Claim = {
   claim_number: string
   claim_type: string | null
   amount_requested: number | null
+  approved_amount: number | null
   description: string | null
   status: string
   admin_notes: string | null
@@ -252,7 +253,15 @@ export function AdminClaims() {
       header: 'Amount',
       render: (row) => {
         const cl = row as unknown as Claim
-        return <span className="font-medium text-gray-900">{cl.amount_requested != null ? `KSh ${cl.amount_requested.toLocaleString('en-KE')}` : '—'}</span>
+        const hasApproved = (cl.status === 'Approved' || cl.status === 'Paid') && cl.approved_amount != null
+        return (
+          <div>
+            <span className="font-medium text-gray-900">{cl.amount_requested != null ? `KSh ${cl.amount_requested.toLocaleString('en-KE')}` : '—'}</span>
+            {hasApproved && cl.approved_amount !== cl.amount_requested && (
+              <div className="text-xs text-emerald-600 font-medium">→ KSh {cl.approved_amount!.toLocaleString('en-KE')}</div>
+            )}
+          </div>
+        )
       },
     },
     {
@@ -462,6 +471,28 @@ export function AdminClaims() {
                     {detail.amount_requested != null ? `KSh ${detail.amount_requested.toLocaleString('en-KE')}` : '—'}
                   </div>
                 </div>
+                {(detail.status === 'Approved' || detail.status === 'Paid') && detail.approved_amount != null && (
+                  <div>
+                    <span className="text-gray-400 text-xs">Approved Amount</span>
+                    <div className="font-medium text-emerald-700">
+                      KSh {detail.approved_amount.toLocaleString('en-KE')}
+                    </div>
+                    {detail.amount_requested != null && detail.approved_amount !== detail.amount_requested && (
+                      <div className="mt-1">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          detail.approved_amount > detail.amount_requested
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {detail.approved_amount > detail.amount_requested ? '↑' : '↓'}
+                          {' '}
+                          {Math.abs(((detail.approved_amount - detail.amount_requested) / detail.amount_requested) * 100).toFixed(0)}%
+                          {' '}{detail.approved_amount > detail.amount_requested ? 'above' : 'below'} requested
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               {detail.description && (
                 <div>
@@ -518,9 +549,27 @@ export function AdminClaims() {
                 Approve <strong>{approveTarget.claim_number}</strong> from <strong>{approveTarget.members?.full_name ?? 'member'}</strong>?
               </p>
               <div className="mt-4 space-y-3">
+                {approveTarget.amount_requested != null && (
+                  <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                    Requested: <span className="font-medium text-gray-700">KSh {approveTarget.amount_requested.toLocaleString('en-KE')}</span>
+                  </div>
+                )}
                 <div>
                   <label className="text-xs font-medium text-gray-600">Payout Amount (KSh)</label>
                   <input type="number" aria-label="Payout amount" value={approveAmount} onChange={(e) => setApproveAmount(e.target.value)} placeholder={approveTarget.amount_requested != null ? String(approveTarget.amount_requested) : 'e.g. 100000'} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500" />
+                  {approveAmount && approveTarget.amount_requested != null && Number(approveAmount) !== approveTarget.amount_requested && (
+                    <div className="mt-1">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        Number(approveAmount) > approveTarget.amount_requested
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {Number(approveAmount) > approveTarget.amount_requested ? '↑' : '↓'}
+                        {' '}{Math.abs(((Number(approveAmount) - approveTarget.amount_requested) / approveTarget.amount_requested) * 100).toFixed(0)}%
+                        {' '}{Number(approveAmount) > approveTarget.amount_requested ? 'above' : 'below'} requested
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600">Admin Notes (optional)</label>

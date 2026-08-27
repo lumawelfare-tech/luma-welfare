@@ -21,12 +21,23 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && !subId) {
       requirePermission(session, 'members', 'read')
       const status = url.searchParams.get('status')
+      const q = url.searchParams.get('q')
+      const dateFrom = url.searchParams.get('date_from')
+      const dateTo = url.searchParams.get('date_to')
+      const packageId = url.searchParams.get('package_id')
       const page = parseInt(url.searchParams.get('page') || '1')
       const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '50'), 200)
       let query = adminClient
-        .from('subscriptions').select('id, status, started_at, next_due_date, member_id, members(full_name, phone, membership_number), packages(code, name), package_tiers(name, amount)', { count: 'exact' })
+        .from('subscriptions').select('id, status, started_at, next_due_date, cancelled_at, created_at, member_id, members(full_name, phone, membership_number), packages(code, name), package_tiers(name, amount)', { count: 'exact' })
         .order('created_at', { ascending: false })
       if (status) query = query.eq('status', status)
+      if (packageId) query = query.eq('package_id', packageId)
+      if (dateFrom) query = query.gte('created_at', dateFrom)
+      if (dateTo) query = query.lt('created_at', new Date(new Date(dateTo).getTime() + 86400000).toISOString())
+      if (q && q.trim()) {
+        const search = q.trim()
+        query = query.or(`members.full_name.ilike.%${search}%,members.phone.ilike.%${search}%,members.membership_number.ilike.%${search}%,packages.name.ilike.%${search}%`)
+      }
       query = query.range((page - 1) * perPage, page * perPage - 1)
       const { data, error, count } = await query
       if (error) throw new Error(error.message)
