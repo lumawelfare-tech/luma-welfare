@@ -274,8 +274,10 @@ Deno.serve(async (req) => {
     })
   } catch (err) {
     console.error('admin-members error:', err)
-    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const message = err instanceof Error ? err.message : 'An unexpected error occurred.'
+    const status = message.includes('not found') || message.includes('Not found') ? 404 : 500
+    return new Response(JSON.stringify({ message, code: 'INTERNAL' }), {
+      status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })

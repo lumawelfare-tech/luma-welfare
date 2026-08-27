@@ -184,6 +184,7 @@ function pathToFunctionName(path: string): string | null {
 
   // Admin routes
   if (cleanPath === 'admin/dashboard') return 'admin-dashboard'
+  if (cleanPath.startsWith('admin/monitoring') || cleanPath.startsWith('admin/health')) return 'admin-monitoring'
   if (cleanPath.startsWith('admin/reports')) return 'admin-reports'
   if (cleanPath.startsWith('admin/members')) return 'admin-members'
   if (cleanPath.startsWith('admin/packages')) return 'admin-packages'

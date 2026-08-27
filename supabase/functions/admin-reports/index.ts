@@ -293,7 +293,8 @@ Deno.serve(async (req) => {
     })
   } catch (err) {
     console.error('admin-reports error:', err)
-    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), {
+    const message = err instanceof Error ? err.message : 'An unexpected error occurred.'
+    return new Response(JSON.stringify({ message, code: 'INTERNAL' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

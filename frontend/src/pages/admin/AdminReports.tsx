@@ -185,7 +185,7 @@ export function AdminReports() {
       if (status !== 'all') params.set('status', status)
       if (packageId !== 'all') params.set('package', packageId)
 
-      const result = await api<{ data: ReportRow[]; summary?: Record<string, number> }>(`/admin/reports?${params}`)
+      const result = await api<{ data: ReportRow[]; summary?: Record<string, number> }>(`/admin/reports?${params}`, { auth: true })
       setData(result.data ?? [])
       setGenerated(true)
     } catch (err: unknown) {

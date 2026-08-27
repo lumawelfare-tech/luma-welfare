@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useHead } from '../lib/seo'
 
 type Tier = { id: string; package_id: string; name: string; amount: number }
 type RuleMap = Record<string, unknown>
@@ -27,6 +28,7 @@ function waitingLabel(p: Package): string {
 }
 
 export function PackagesPage() {
+  useHead('Packages', 'Explore Luma Welfare packages — affordable community welfare plans for hospital costs, education, business, building, and more.')
   const [packages, setPackages] = useState<Package[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

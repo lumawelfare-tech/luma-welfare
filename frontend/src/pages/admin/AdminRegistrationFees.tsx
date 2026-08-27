@@ -39,8 +39,7 @@ export function AdminRegistrationFees() {
     setError(null)
     setLoading(true)
     try {
-      let url = '/admin/registration-fee/pending'
-      if (filter === 'all') url = '/admin/registration-fee/pending'
+      const url = '/admin/registration-fee'
       const d = await api<{ pending_fees: RegistrationFee[] }>(url, { auth: true })
       setFees(d.pending_fees ?? [])
     } catch (e) {
@@ -48,7 +47,7 @@ export function AdminRegistrationFees() {
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [])
 
   useEffect(() => { load() }, [load])
 

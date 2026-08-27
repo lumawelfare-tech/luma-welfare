@@ -125,8 +125,6 @@ Deno.serve(async (req) => {
         emailButtonText: 'Explore Packages',
         emailButtonUrl: 'https://luma-welfare.vercel.app/join',
       })
-        await sendEmail(member.email, notifSubject, emailHtml)
-      }
 
       return new Response(JSON.stringify({ message: 'Registration fee confirmed', status: 'paid' }), {
         status: 200,
