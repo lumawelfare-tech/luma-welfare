@@ -7,6 +7,7 @@ import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { ExportDialog } from '../../components/ExportDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { exportSubscriptionsCSV, exportSubscriptionsExcel, exportSubscriptionsPDF, type SubscriptionRecord } from '../../lib/exports'
 
 type Subscription = {
   id: string
@@ -19,6 +20,33 @@ type Subscription = {
   members: { full_name: string | null; phone: string | null; email: string | null; membership_number: string | null } | null
   packages: { code: string | null; name: string | null } | null
   package_tiers: { name: string | null; amount: number | null } | null
+}
+
+function normalizeSubscription(sub: Subscription): SubscriptionRecord {
+  return {
+    member_full_name: sub.members?.full_name ?? '—',
+    member_phone: sub.members?.phone ?? '—',
+    member_email: sub.members?.email ?? '—',
+    package_name: sub.packages?.name ?? '—',
+    status: sub.status,
+    started_at: sub.started_at,
+    next_due_date: sub.next_due_date,
+    created_at: sub.created_at,
+    amount: sub.package_tiers?.amount ?? null,
+  }
+}
+
+function buildFilterSummary(args: { filter: string; query: string; dateFrom: string; dateTo: string; packageId: string; packages: { id: string; name: string }[] }): string {
+  const parts: string[] = []
+  if (args.filter) parts.push(`Status: ${args.filter}`)
+  if (args.query) parts.push(`Search: ${args.query}`)
+  if (args.dateFrom) parts.push(`From: ${args.dateFrom}`)
+  if (args.dateTo) parts.push(`To: ${args.dateTo}`)
+  if (args.packageId) {
+    const pkg = args.packages.find(p => p.id === args.packageId)
+    parts.push(`Package: ${pkg?.name ?? args.packageId}`)
+  }
+  return parts.length > 0 ? `Filters: ${parts.join(' | ')}` : 'All subscriptions'
 }
 
 const statusStyles: Record<string, string> = {
@@ -59,6 +87,7 @@ export function AdminSubscriptions() {
 
   // Export
   const [showExport, setShowExport] = useState(false)
+  const [exporting, setExporting] = useState<'csv' | 'excel' | 'pdf' | null>(null)
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -183,6 +212,26 @@ export function AdminSubscriptions() {
     await load()
   }
 
+  function handleExport(format: 'csv' | 'excel' | 'pdf') {
+    if (subs.length === 0) {
+      addToast('info', 'No subscription records available for export.')
+      return
+    }
+    setExporting(format)
+    try {
+      const records = subs.map(normalizeSubscription)
+      const filterSummary = buildFilterSummary({ filter, query: debouncedQuery, dateFrom, dateTo, packageId, packages })
+      if (format === 'csv') exportSubscriptionsCSV(records)
+      else if (format === 'excel') exportSubscriptionsExcel(records, filterSummary)
+      else exportSubscriptionsPDF(records, filterSummary)
+      addToast('success', `Export complete — ${records.length} record${records.length !== 1 ? 's' : ''}`)
+    } catch {
+      addToast('error', 'Export failed. Please try again.')
+    } finally {
+      setExporting(null)
+    }
+  }
+
   const pendingCount = subs.filter((s) => s.status === 'pending').length
   const activeCount = subs.filter((s) => s.status === 'active').length
 
@@ -266,11 +315,33 @@ export function AdminSubscriptions() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Subscriptions</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage member package subscriptions.</p>
+          <p className="text-sm text-gray-500 mt-1">Manage member package subscriptions, status, dates, and membership activity.</p>
         </div>
-        <button onClick={() => setShowExport(true)} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-          Export CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 mr-1">Export:</span>
+          {([
+            ['csv', 'CSV'],
+            ['excel', 'Excel'],
+            ['pdf', 'PDF'],
+          ] as const).map(([fmt, label]) => (
+            <button
+              key={fmt}
+              onClick={() => handleExport(fmt)}
+              disabled={exporting !== null || loading}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {exporting === fmt ? (
+                <>
+                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Generating…
+                </>
+              ) : label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Stats */}
@@ -391,7 +462,8 @@ export function AdminSubscriptions() {
                     {s.status}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500">{s.packages?.name ?? '—'} · {s.package_tiers?.name ?? '—'}</div>
+                <div className="text-xs text-gray-500">{s.members?.phone ?? '—'} {s.members?.email ? `· ${s.members.email}` : ''}</div>
+                <div className="text-xs text-gray-500">{s.packages?.name ?? '—'}{s.package_tiers?.name ? ` · ${s.package_tiers.name}` : ''}</div>
                 <div className="text-sm font-medium text-gray-900">
                   {s.package_tiers?.amount != null ? `KSh ${s.package_tiers.amount.toLocaleString('en-KE')}` : '—'}
                 </div>

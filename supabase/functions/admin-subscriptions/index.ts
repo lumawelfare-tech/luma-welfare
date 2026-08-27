@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
       const page = parseInt(url.searchParams.get('page') || '1')
       const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '50'), 200)
       let query = adminClient
-        .from('subscriptions').select('id, status, started_at, next_due_date, cancelled_at, created_at, member_id, members(full_name, phone, membership_number), packages(code, name), package_tiers(name, amount)', { count: 'exact' })
+        .from('subscriptions').select('id, status, started_at, next_due_date, cancelled_at, created_at, member_id, members(full_name, phone, email, membership_number), packages(code, name), package_tiers(name, amount)', { count: 'exact' })
         .order('created_at', { ascending: false })
       if (status) query = query.eq('status', status)
       if (packageId) query = query.eq('package_id', packageId)
