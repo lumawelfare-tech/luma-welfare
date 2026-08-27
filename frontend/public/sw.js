@@ -562,7 +562,7 @@ self.addEventListener('notificationclick', (event) => {
 
 /**
  * Notification close event — log for analytics
- */\self.addEventListener('notificationclose', (event) => {
+ */ self.addEventListener('notificationclose', (event) => {
   // Optional: track notification dismissal
 })
 
