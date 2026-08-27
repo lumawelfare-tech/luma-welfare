@@ -23,12 +23,18 @@ Deno.serve(async (req) => {
       requirePermission(session, 'contributions', 'read')
       const status = url.searchParams.get('status')
       const q = url.searchParams.get('q')
+      const dateFrom = url.searchParams.get('date_from')
+      const dateTo = url.searchParams.get('date_to')
+      const packageId = url.searchParams.get('package_id')
       const page = parseInt(url.searchParams.get('page') || '1')
       const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '50'), 200)
 
       const { data, error } = await adminClient.rpc('admin_search_contributions', {
         p_q: q || null,
         p_status: status || null,
+        p_date_from: dateFrom || null,
+        p_date_to: dateTo || null,
+        p_package_id: packageId || null,
         p_page: page,
         p_per_page: perPage,
       })

@@ -1,6 +1,59 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
 
+// ── Webhook Payload Builders ───────────────────────────────────────────────
+
+function buildWebhookPayload(event: string, type: string, data: Record<string, unknown>): Record<string, unknown> {
+  const base = {
+    event,
+    timestamp: new Date().toISOString(),
+    source: 'luma-welfare',
+    ...data,
+  }
+
+  if (type === 'slack') {
+    const statusEmoji = event.includes('unhealthy') ? '🔴' : event.includes('degraded') ? '🟡' : '🟢'
+    return {
+      text: `${statusEmoji} *Luma Welfare* — ${data.message ?? event}`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `${statusEmoji} *Luma Welfare Health Alert*
+
+${data.message ?? event}
+
+• Status: *${data.overall ?? 'unknown'}*
+• Time: ${base.timestamp}`,
+          },
+        },
+      ],
+    }
+  }
+
+  if (type === 'discord') {
+    const color = event.includes('unhealthy') ? 0xdc2626 : event.includes('degraded') ? 0xca8a04 : 0x16a34a
+    return {
+      embeds: [
+        {
+          title: `Luma Welfare — ${data.message ?? event}`,
+          description: data.message ?? event,
+          color,
+          fields: [
+            { name: 'Status', value: String(data.overall ?? 'unknown'), inline: true },
+            { name: 'Time', value: base.timestamp, inline: true },
+          ],
+          footer: { text: 'Luma Welfare Health Check' },
+        },
+      ],
+    }
+  }
+
+  // Custom webhook — flat JSON payload
+  return base
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
@@ -58,6 +111,105 @@ Deno.serve(async (req) => {
       if (error) throw new Error(error.message)
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'updated_setting', resource: 'platform_settings', resource_id: body.key })
       return new Response(JSON.stringify({ setting: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // ========================================================================
+    // WEBHOOKS — System alert webhook management
+    // ========================================================================
+
+    // GET /admin-settings?resource=webhooks
+    if (req.method === 'GET' && (resource === 'webhooks' || resourceParam === 'webhooks')) {
+      requirePermission(session, 'members', 'read')
+      const { data, error } = await adminClient.rpc('get_system_webhooks')
+      if (error) throw new Error(error.message)
+      return new Response(JSON.stringify({ webhooks: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // POST /admin-settings?action=create-webhook
+    if (req.method === 'POST' && action === 'create-webhook') {
+      requirePermission(session, 'members', 'update')
+      const body = await req.json()
+      if (!body?.name || !body?.url || !body?.type) {
+        return new Response(JSON.stringify({ message: 'Send { name, url, type, events? }' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const { data, error } = await adminClient.from('system_webhooks').insert({
+        name: body.name,
+        url: body.url,
+        type: body.type,
+        events: body.events ?? ['health.unhealthy', 'health.degraded'],
+        enabled: body.enabled ?? true,
+      }).select().single()
+      if (error) throw new Error(error.message)
+      await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'webhook_created', resource: 'system_webhooks', resource_id: data.id })
+      return new Response(JSON.stringify({ webhook: data }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // PATCH /admin-settings?action=update-webhook&id={id}
+    if (req.method === 'PATCH' && action === 'update-webhook') {
+      requirePermission(session, 'members', 'update')
+      const webhookId = url.searchParams.get('id')
+      if (!webhookId) {
+        return new Response(JSON.stringify({ message: 'Missing webhook id' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const body = await req.json()
+      const updates: Record<string, unknown> = {}
+      if (body.name !== undefined) updates.name = body.name
+      if (body.url !== undefined) updates.url = body.url
+      if (body.type !== undefined) updates.type = body.type
+      if (body.events !== undefined) updates.events = body.events
+      if (body.enabled !== undefined) updates.enabled = body.enabled
+      updates.updated_at = new Date().toISOString()
+      const { data, error } = await adminClient.from('system_webhooks').update(updates).eq('id', webhookId).select().single()
+      if (error) throw new Error('Webhook not found')
+      await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'webhook_updated', resource: 'system_webhooks', resource_id: webhookId })
+      return new Response(JSON.stringify({ webhook: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // DELETE /admin-settings?action=delete-webhook&id={id}
+    if (req.method === 'DELETE' && action === 'delete-webhook') {
+      requirePermission(session, 'members', 'update')
+      const webhookId = url.searchParams.get('id')
+      if (!webhookId) {
+        return new Response(JSON.stringify({ message: 'Missing webhook id' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const { error } = await adminClient.from('system_webhooks').delete().eq('id', webhookId)
+      if (error) throw new Error('Webhook not found')
+      await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'webhook_deleted', resource: 'system_webhooks', resource_id: webhookId })
+      return new Response(JSON.stringify({ message: 'Webhook deleted' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // POST /admin-settings?action=test-webhook&id={id}
+    if (req.method === 'POST' && action === 'test-webhook') {
+      requirePermission(session, 'members', 'update')
+      const webhookId = url.searchParams.get('id')
+      if (!webhookId) {
+        return new Response(JSON.stringify({ message: 'Missing webhook id' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const { data: webhook, error: fetchError } = await adminClient.from('system_webhooks').select('*').eq('id', webhookId).single()
+      if (fetchError || !webhook) {
+        return new Response(JSON.stringify({ message: 'Webhook not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      // Send test payload
+      const testPayload = buildWebhookPayload('test', webhook.type, {
+        message: 'Test alert from Luma Welfare',
+        timestamp: new Date().toISOString(),
+      })
+      try {
+        const resp = await fetch(webhook.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(testPayload),
+        })
+        await adminClient.from('system_webhooks').update({ last_sent: new Date().toISOString(), last_status: resp.status, updated_at: new Date().toISOString() }).eq('id', webhookId)
+        return new Response(JSON.stringify({ message: resp.ok ? 'Test sent successfully' : `Test failed: HTTP ${resp.status}`, status: resp.status }), {
+          status: resp.ok ? 200 : 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      } catch (err) {
+        return new Response(JSON.stringify({ message: `Test failed: ${err instanceof Error ? err.message : 'Network error'}` }), {
+          status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     return new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

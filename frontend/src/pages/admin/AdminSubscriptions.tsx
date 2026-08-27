@@ -6,6 +6,7 @@ import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { ExportDialog } from '../../components/ExportDialog'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 
 type Subscription = {
   id: string
@@ -42,6 +43,8 @@ export function AdminSubscriptions() {
   const { addToast } = useToast()
   const [subs, setSubs] = useState<Subscription[]>([])
   const [filter, setFilter] = useState('')
+  const [query, setQuery] = useState('')
+  const debouncedQuery = useDebouncedValue(query, 300)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -71,6 +74,7 @@ export function AdminSubscriptions() {
     try {
       const qs = new URLSearchParams()
       if (filter) qs.set('status', filter)
+      if (debouncedQuery.trim()) qs.set('q', debouncedQuery.trim())
       qs.set('page', String(pageNum))
       qs.set('per_page', String(perPage))
       const d = await api<{ subscriptions: Subscription[]; total: number; page: number; pages: number }>(`/admin/subscriptions?${qs.toString()}`, { auth: true })
@@ -83,7 +87,7 @@ export function AdminSubscriptions() {
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [filter, debouncedQuery])
 
   useEffect(() => { load(1) }, [load])
 
@@ -275,13 +279,27 @@ export function AdminSubscriptions() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-white p-1">
-        {filterTabs.map((f) => (
-          <button key={f.value} onClick={() => setFilter(f.value)} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${filter === f.value ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'}`}>
-            {f.label}
-          </button>
-        ))}
+      {/* Filters + Search */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-white p-1">
+          {filterTabs.map((f) => (
+            <button key={f.value} onClick={() => setFilter(f.value)} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${filter === f.value ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1 min-w-[200px]">
+          <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            aria-label="Search subscriptions"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search member name, phone, package..."
+            className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+          />
+        </div>
       </div>
 
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}

@@ -168,9 +168,7 @@ export function recordSlowQuery(endpoint: string, query: string, durationMs: num
  * Perform a health check against the Supabase database.
  * Returns a health status object without exposing sensitive information.
  */
-export async function healthCheck(adminClient: {
-  from: (table: string) => { select: (cols: string) => { limit: (n: number) => Promise<{ error: unknown }> }
-}): Promise<HealthStatus> {
+export async function healthCheck(adminClient: any): Promise<HealthStatus> {
   const checks: HealthStatus['checks'] = {}
 
   // Database connectivity check

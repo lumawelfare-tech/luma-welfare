@@ -347,6 +347,170 @@ async function sendAlertEmail(
 
 // ── Record Results ─────────────────────────────────────────────────────────
 
+// ── Webhook Alert Sending ────────────────────────────────────────────────
+
+interface Webhook {
+  id: string
+  name: string
+  url: string
+  type: string
+}
+
+async function getActiveWebhooks(
+  supabaseUrl: string,
+  serviceKey: string,
+  event: string,
+): Promise<Webhook[]> {
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/rpc/get_active_webhooks_for_event?p_event=${encodeURIComponent(event)}`,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_event: event }),
+      },
+    )
+    if (!res.ok) return []
+    return await res.json() as Webhook[]
+  } catch {
+    return []
+  }
+}
+
+function buildSlackPayload(overall: string, results: HealthCheckResult[]): Record<string, unknown> {
+  const statusEmoji = overall === 'unhealthy' ? '🔴' : '🟡'
+  const checks = results.map(r => {
+    const emoji = r.status === 'healthy' ? '✅' : r.status === 'degraded' ? '⚠️' : '❌'
+    return `${emoji} ${r.name}: ${r.status} (${r.latencyMs}ms)${r.error ? ` — ${r.error}` : ''}`
+  }).join('\n')
+
+  const warnings = results
+    .filter(r => r.status === 'degraded')
+    .flatMap(r => (r.details?.warnings as string[]) ?? [])
+    .map(w => `⚠️ ${w}`)
+    .join('\n')
+
+  return {
+    text: `${statusEmoji} *Luma Welfare Health Check* — ${overall.toUpperCase()}`,
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${statusEmoji} *Luma Welfare Health Alert*
+
+*Status:* ${overall.toUpperCase()}
+*Time:* ${new Date().toISOString()}
+
+*Checks:*
+${checks}${warnings ? `\n\n*Warnings:*\n${warnings}` : ''}`,
+        },
+      },
+    ],
+  }
+}
+
+function buildDiscordPayload(overall: string, results: HealthCheckResult[]): Record<string, unknown> {
+  const color = overall === 'unhealthy' ? 0xdc2626 : 0xca8a04
+  const checks = results.map(r => {
+    const emoji = r.status === 'healthy' ? '✅' : r.status === 'degraded' ? '⚠️' : '❌'
+    return `${emoji} **${r.name}**: ${r.status} (${r.latencyMs}ms)${r.error ? ` — ${r.error}` : ''}`
+  }).join('\n')
+
+  return {
+    embeds: [
+      {
+        title: `Luma Welfare — ${overall.toUpperCase()}`,
+        description: checks,
+        color,
+        fields: [
+          { name: 'Status', value: overall.toUpperCase(), inline: true },
+          { name: 'Time', value: new Date().toISOString(), inline: true },
+        ],
+        footer: { text: 'Luma Welfare Health Check' },
+      },
+    ],
+  }
+}
+
+function buildCustomPayload(overall: string, results: HealthCheckResult[]): Record<string, unknown> {
+  return {
+    event: `health.${overall}`,
+    source: 'luma-welfare',
+    timestamp: new Date().toISOString(),
+    overall,
+    checks: results.map(r => ({
+      name: r.name,
+      status: r.status,
+      latencyMs: r.latencyMs,
+      error: r.error,
+    })),
+  }
+}
+
+async function sendWebhookAlerts(
+  results: HealthCheckResult[],
+  overall: string,
+  supabaseUrl: string,
+  serviceKey: string,
+): Promise<number> {
+  // Fetch webhooks for both unhealthy and degraded events
+  const event = overall === 'unhealthy' ? 'health.unhealthy' : 'health.degraded'
+  const webhooks = await getActiveWebhooks(supabaseUrl, serviceKey, event)
+
+  if (webhooks.length === 0) {
+    console.log('[HEALTH-CHECK] No active webhooks for event:', event)
+    return 0
+  }
+
+  let sent = 0
+  for (const webhook of webhooks) {
+    try {
+      let payload: Record<string, unknown>
+      switch (webhook.type) {
+        case 'slack': payload = buildSlackPayload(overall, results); break
+        case 'discord': payload = buildDiscordPayload(overall, results); break
+        default: payload = buildCustomPayload(overall, results); break
+      }
+
+      const resp = await fetch(webhook.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      // Record delivery status
+      await fetch(
+        `${supabaseUrl}/rest/v1/rpc/record_webhook_delivery`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': serviceKey,
+            'Authorization': `Bearer ${serviceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ p_webhook_id: webhook.id, p_status: resp.status }),
+        },
+      )
+
+      if (resp.ok) {
+        console.log(`[HEALTH-CHECK] Webhook sent to ${webhook.name} (${webhook.type}): ${resp.status}`)
+        sent++
+      } else {
+        console.error(`[HEALTH-CHECK] Webhook ${webhook.name} failed: HTTP ${resp.status}`)
+      }
+    } catch (err) {
+      console.error(`[HEALTH-CHECK] Webhook ${webhook.name} error:`, err)
+    }
+  }
+
+  return sent
+}
+
 async function recordResults(
   supabaseUrl: string,
   serviceKey: string,
@@ -454,7 +618,12 @@ export default async function handler(
     // Send alerts if unhealthy or degraded
     let alertsSent = 0
     if (overall !== 'healthy') {
+      // Send email alert
       alertsSent = await sendAlertEmail(results, overall, supabaseUrl)
+
+      // Send webhook alerts
+      const webhookAlerts = await sendWebhookAlerts(results, overall, supabaseUrl, serviceKey)
+      alertsSent += webhookAlerts
     }
 
     // Record results in database

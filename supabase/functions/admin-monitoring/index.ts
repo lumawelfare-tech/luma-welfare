@@ -10,6 +10,7 @@
  * GET /admin-monitoring?action=reconciliation  — Financial reconciliation status
  * GET /admin-monitoring?action=security        — Security monitoring
  * GET /admin-monitoring?action=slo             — SLO compliance
+ * GET /admin-monitoring?action=health-history  — Health check history and uptime trends
  *
  * Admin-only. Requires active admin session.
  */
@@ -362,6 +363,47 @@ Deno.serve(async (req) => {
           failed: failed.count ?? 0,
           stale: staleJobs ?? [],
           status: (staleJobs?.length ?? 0) > 0 || (failed.count ?? 0) > 5 ? 'warning' : 'healthy',
+        },
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // ========================================================================
+    // HEALTH HISTORY — Automated health check results and uptime trends
+    // ========================================================================
+    if (action === 'health-history') {
+      const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '30'), 100)
+      const days = Math.min(parseInt(url.searchParams.get('days') ?? '7'), 90)
+
+      const [historyResult, summaryResult] = await Promise.all([
+        adminClient
+          .from('health_check_history')
+          .select('id, checked_at, overall, duration_ms, checks, alerts_sent, metadata')
+          .gte('checked_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
+          .order('checked_at', { ascending: false })
+          .limit(limit),
+        adminClient.rpc('get_health_check_summary', { p_days: days }),
+      ])
+
+      const summary = summaryResult.data?.[0] ?? {
+        total_checks: 0, healthy_count: 0, degraded_count: 0, unhealthy_count: 0,
+        avg_duration_ms: 0, last_check_at: null, last_check_overall: null, uptime_pct: 100,
+      }
+
+      return new Response(JSON.stringify({
+        health_history: {
+          checks: historyResult.data ?? [],
+          summary: {
+            total_checks: Number(summary.total_checks ?? 0),
+            healthy_count: Number(summary.healthy_count ?? 0),
+            degraded_count: Number(summary.degraded_count ?? 0),
+            unhealthy_count: Number(summary.unhealthy_count ?? 0),
+            avg_duration_ms: Number(summary.avg_duration_ms ?? 0),
+            last_check_at: summary.last_check_at,
+            last_check_overall: summary.last_check_overall,
+            uptime_pct: Number(summary.uptime_pct ?? 100),
+          },
         },
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

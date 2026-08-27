@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
+import { WebhookSettings } from '../../components/WebhookSettings'
 
 type Setting = { key: string; value: unknown; description: string | null }
 
@@ -124,10 +125,13 @@ export function AdminSettings() {
     }
   }
 
-  const tabs = ['general', 'security']
+  const tabs = ['general', 'security', 'webhooks']
   const filtered = tab === 'general'
     ? settings.filter(s => ['org_contact', 'stats', 'mpesa'].includes(s.key))
     : []
+
+  // Hide save button for non-general tabs
+  const showSave = tab === 'general'
 
   return (
     <div className="space-y-6">
@@ -136,7 +140,7 @@ export function AdminSettings() {
           <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
           <p className="text-sm text-gray-500 mt-1">Manage platform configuration and security.</p>
         </div>
-        {tab === 'general' && (
+        {showSave && (
           <button onClick={save} disabled={saving} className="rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-60 transition-colors">
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
@@ -169,6 +173,13 @@ export function AdminSettings() {
             </div>
           ))}
           {filtered.length === 0 && <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-gray-500">No settings in this section.</div>}
+        </div>
+      )}
+
+      {/* Webhooks */}
+      {tab === 'webhooks' && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6">
+          <WebhookSettings />
         </div>
       )}
 

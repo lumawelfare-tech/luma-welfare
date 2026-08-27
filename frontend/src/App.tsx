@@ -54,6 +54,7 @@ const AdminRegistrationFees = lazy(() => import('./pages/admin/AdminRegistration
 const AdminReports = lazy(() => import('./pages/admin/AdminReports').then(m => ({ default: m.AdminReports })))
 const AdminScheduledReports = lazy(() => import('./pages/admin/AdminScheduledReports').then(m => ({ default: m.AdminScheduledReports })))
 const AdminReconciliation = lazy(() => import('./pages/admin/AdminReconciliation').then(m => ({ default: m.AdminReconciliation })))
+const AdminHealthCheck = lazy(() => import('./pages/admin/AdminHealthCheck').then(m => ({ default: m.AdminHealthCheck })))
 
 function PageLoader() {
   return (
@@ -123,6 +124,7 @@ export default function App() {
                   <Route path="settings" element={<AdminSettings />} />
                   <Route path="audit-logs" element={<AdminAuditLogs />} />
                   <Route path="reconciliation" element={<AdminReconciliation />} />
+                  <Route path="health" element={<AdminHealthCheck />} />
                 </Route>
               </Route>
             </Routes>

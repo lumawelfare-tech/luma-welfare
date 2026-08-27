@@ -50,6 +50,11 @@ export function AdminMembers() {
   const [importing, setImporting] = useState(false)
   const [importResults, setImportResults] = useState<{ row: number; email: string; status: string; message: string }[] | null>(null)
 
+  // Member detail
+  const [detailMember, setDetailMember] = useState<Member | null>(null)
+  const [detailData, setDetailData] = useState<{ member: Record<string, unknown>; subscriptions: Record<string, unknown>[]; family_members: Record<string, unknown>[]; contributions: Record<string, unknown>[] } | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+
   // Bulk dialogs
   const [bulkAction, setBulkAction] = useState<'active' | 'suspended' | 'closed' | null>(null)
 
@@ -75,6 +80,20 @@ export function AdminMembers() {
   }, [filter, debouncedQuery])
 
   useEffect(() => { load(1) }, [load])
+
+  async function viewMember(member: Member) {
+    setDetailMember(member)
+    setDetailData(null)
+    setLoadingDetail(true)
+    try {
+      const d = await api<{ member: Record<string, unknown>; subscriptions: Record<string, unknown>[]; family_members: Record<string, unknown>[]; contributions: Record<string, unknown>[] }>(`/admin/members/${member.id}`, { auth: true })
+      setDetailData(d)
+    } catch {
+      addToast('warning', 'Could not load member details.')
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
 
   async function setStatus(id: string, status: 'active' | 'suspended' | 'closed') {
     setBusyId(id)
@@ -194,11 +213,11 @@ export function AdminMembers() {
       header: 'Member',
       sortable: true,
       render: (m) => (
-        <div>
+        <button onClick={() => viewMember(m)} className="text-left hover:underline">
           <div className="font-medium text-gray-900">{m.full_name}</div>
           <div className="text-xs text-gray-500">{m.email ?? ''}</div>
           {m.membership_number && <div className="text-xs text-gray-400">#{m.membership_number}</div>}
-        </div>
+        </button>
       ),
     },
     { key: 'phone', header: 'Phone', sortable: true },
@@ -580,6 +599,94 @@ export function AdminMembers() {
         filters={{ status: filter || undefined, q: debouncedQuery.trim() || undefined }}
         filterLabels={{ status: 'Status', q: 'Search' }}
       />
+
+      {/* Member Detail Drawer */}
+      {detailMember && (
+        <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/40" onClick={() => setDetailMember(null)}>
+          <div className="h-full w-full max-w-lg bg-white shadow-2xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{detailMember.full_name}</h3>
+                <p className="text-sm text-gray-500">{detailMember.email ?? detailMember.phone}</p>
+              </div>
+              <button onClick={() => setDetailMember(null)} aria-label="Close" className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {loadingDetail ? (
+              <div className="p-12 text-center text-gray-400">Loading member details…</div>
+            ) : detailData ? (
+              <div className="p-6 space-y-6">
+                {/* Member Info */}
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Member Info</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><span className="text-gray-400">Status</span><div className="font-medium capitalize">{String(detailData.member.status ?? '')}</div></div>
+                    <div><span className="text-gray-400">Phone</span><div className="font-medium">{String(detailData.member.phone ?? '')}</div></div>
+                    <div><span className="text-gray-400">Email</span><div className="font-medium">{String(detailData.member.email ?? '—')}</div></div>
+                    <div><span className="text-gray-400">Membership #</span><div className="font-medium">{String(detailData.member.membership_number ?? '—')}</div></div>
+                    <div><span className="text-gray-400">Joined</span><div className="font-medium">{detailData.member.joined_at ? new Date(String(detailData.member.joined_at)).toLocaleDateString() : '—'}</div></div>
+                  </div>
+                </div>
+
+                {/* Subscriptions */}
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Subscriptions ({detailData.subscriptions.length})</h4>
+                  {detailData.subscriptions.length === 0 ? (
+                    <p className="text-sm text-gray-400">No subscriptions</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {detailData.subscriptions.map((sub: Record<string, unknown>) => (
+                        <div key={String(sub.id)} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+                          <div>
+                            <div className="text-sm font-medium">{String((sub.packages as Record<string, unknown>)?.name ?? '—')}</div>
+                            <div className="text-xs text-gray-500">{String((sub.package_tiers as Record<string, unknown>)?.name ?? '')}</div>
+                          </div>
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${sub.status === 'active' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>{String(sub.status)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recent Contributions */}
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Contributions ({detailData.contributions.length})</h4>
+                  {detailData.contributions.length === 0 ? (
+                    <p className="text-sm text-gray-400">No contributions</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {detailData.contributions.slice(0, 10).map((c: Record<string, unknown>) => (
+                        <div key={String(c.id)} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-100 last:border-0">
+                          <span className="text-gray-600">{String(c.period)}</span>
+                          <span className="font-medium">KSh {Number(c.amount ?? 0).toLocaleString()}</span>
+                          <span className={`text-xs font-medium ${c.status === 'Verified' || c.status === 'Paid' ? 'text-emerald-600' : c.status === 'Pending' ? 'text-amber-600' : 'text-red-600'}`}>{String(c.status)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Family Members */}
+                {detailData.family_members.length > 0 && (
+                  <div className="rounded-xl border border-gray-200 p-4">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Family Members ({detailData.family_members.length})</h4>
+                    <div className="space-y-1">
+                      {detailData.family_members.map((f: Record<string, unknown>) => (
+                        <div key={String(f.id)} className="text-sm py-1.5 border-b border-gray-100 last:border-0">
+                          <span className="font-medium">{String(f.full_name ?? '')}</span>
+                          <span className="text-gray-400 ml-2">{String(f.relationship ?? '')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

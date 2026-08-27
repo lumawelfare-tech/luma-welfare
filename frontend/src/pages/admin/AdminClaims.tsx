@@ -48,6 +48,7 @@ const filterTabs = [
   { value: 'Additional Information Required', label: 'Info Needed' },
   { value: 'Approved', label: 'Approved' },
   { value: 'Rejected', label: 'Rejected' },
+  { value: 'Paid', label: 'Paid' },
 ]
 
 
