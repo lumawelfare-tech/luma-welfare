@@ -25,9 +25,9 @@ export function RequireAdmin() {
 
     async function check2fa() {
       try {
-        const d = await api<{ two_factor_enabled: boolean; two_factor_verified: boolean }>('/admin/2fa', { auth: true })
+        const d = await api<{ two_factor_enabled: boolean }>('/admin/2fa', { auth: true })
         if (cancelled) return
-        if (d.two_factor_enabled && !d.two_factor_verified) {
+        if (d.two_factor_enabled) {
           setRequires2fa(true)
         } else {
           setTwoFaVerified(true)
@@ -84,10 +84,20 @@ function TwoFaVerification({ onVerified }: { onVerified: () => void }) {
     setLoading(true)
     setError(null)
     try {
-      await api('/admin/2fa/verify', { method: 'POST', auth: true, body: { code } })
+      await api('/admin/2fa?action=verify', { method: 'POST', auth: true, body: { code } })
       onVerified()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Invalid code. Please try again.')
+      if (e instanceof ApiError) {
+        if (e.status === 401) {
+          setError('Incorrect verification code. Please check your authenticator app and try again.')
+        } else if (e.status === 400) {
+          setError('This verification request has expired. Please try again.')
+        } else {
+          setError('Two-factor authentication is temporarily unavailable. Please try again or contact the system administrator.')
+        }
+      } else {
+        setError('Two-factor authentication is temporarily unavailable. Please try again or contact the system administrator.')
+      }
     } finally {
       setLoading(false)
     }
