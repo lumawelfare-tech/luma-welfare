@@ -143,6 +143,12 @@ test.describe('Error Handling', () => {
   })
 
   test('invalid login shows user-friendly error', async ({ page }) => {
+    // The gotoAndWaitForInput helper may need up to ~55 s when Vercel's
+    // Security Checkpoint triggers (10 s first attempt + 30 s cooldown +
+    // 15 s retry).  Increase the per-test timeout so Playwright doesn't
+    // kill the test before the retry can complete.
+    test.setTimeout(90_000)
+
     // Navigate to login and wait for the actual form input to appear.
     // Uses a retry helper because in CI (workers=1) many sequential page
     // hits can trigger Vercel's Security Checkpoint which blocks the page.
