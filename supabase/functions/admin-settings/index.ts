@@ -76,9 +76,23 @@ Deno.serve(async (req) => {
     // GET /admin-settings/audit-logs
     if (req.method === 'GET' && (resource === 'audit-logs' || resourceParam === 'audit_logs')) {
       requirePermission(session, 'audit_logs', 'read')
-      const { data, error } = await adminClient.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100)
+      const pageParam = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1)
+      const perPage = Math.min(200, Math.max(1, parseInt(url.searchParams.get('per_page') ?? '50', 10) || 50))
+      const q = url.searchParams.get('q')?.trim()
+      const actionFilter = url.searchParams.get('action')?.trim()
+      const from = (pageParam - 1) * perPage
+      const to = from + perPage - 1
+      let query = adminClient.from('audit_logs').select('*', { count: 'exact' })
+      if (actionFilter) query = query.eq('action', actionFilter)
+      if (q) {
+        query = query.or(`action.ilike.%${q}%,resource.ilike.%${q}%,actor_role.ilike.%${q}%,resource_id.ilike.%${q}%`)
+      }
+      query = query.order('created_at', { ascending: false }).range(from, to)
+      const { data, error, count } = await query
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ audit_logs: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      const total = count ?? (data?.length ?? 0)
+      const pages = Math.max(1, Math.ceil(total / perPage))
+      return new Response(JSON.stringify({ items: data ?? [], total, pages }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // GET /admin-settings/open-questions
