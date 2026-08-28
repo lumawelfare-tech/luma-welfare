@@ -14,9 +14,35 @@
  * They verify that the deployed functions behave correctly.
  */
 
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 const BASE = process.env.BASE_URL || 'https://luma-welfare.vercel.app'
+
+/**
+ * Helper: navigate to a URL and wait for the actual page content (an input
+ * element) to be visible.  If Vercel's Security Checkpoint intercepts the
+ * first request — which happens in CI when workers=1 causes many sequential
+ * page hits — we wait for the checkpoint's rate-limit window to expire, then
+ * retry once.
+ */
+async function gotoAndWaitForInput(page: Page, url: string, inputSelector: string) {
+  await page.goto(url, { waitUntil: 'domcontentloaded' })
+
+  const found = await page
+    .locator(inputSelector)
+    .first()
+    .waitFor({ timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false)
+
+  if (found) return
+
+  // Security Checkpoint detected — wait for the rate-limit window to expire,
+  // then retry once.
+  await page.waitForTimeout(30_000)
+  await page.goto(url, { waitUntil: 'domcontentloaded' })
+  await page.locator(inputSelector).first().waitFor({ timeout: 15_000 })
+}
 
 // ============================================================================
 // EDGE FUNCTION AUTH ENFORCEMENT
@@ -117,21 +143,22 @@ test.describe('Error Handling', () => {
   })
 
   test('invalid login shows user-friendly error', async ({ page }) => {
-    await page.goto(`${BASE}/login`)
+    // Navigate to login and wait for the actual form input to appear.
+    // Uses a retry helper because in CI (workers=1) many sequential page
+    // hits can trigger Vercel's Security Checkpoint which blocks the page.
+    const emailSelector = '#login-email, input[type="email"], input[name="email"], input[placeholder*="email" i]'
+    await gotoAndWaitForInput(page, `${BASE}/login`, emailSelector)
 
     // Fill in invalid credentials
-    const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]')
-    await emailInput.first().fill('test@test.com')
-
-    const passwordInput = page.locator('input[type="password"]')
-    await passwordInput.first().fill('wrongpassword')
+    await page.locator(emailSelector).first().fill('test@test.com')
+    await page.locator('#login-password, input[type="password"]').first().fill('wrongpassword')
 
     // Submit
     const loginButton = page.locator('button[type="submit"], button:has-text("Sign In"), button:has-text("Log In"), button:has-text("Login")')
     await loginButton.first().click()
 
     // Wait for error message
-    await page.waitForTimeout(3000)
+    await page.waitForTimeout(5000)
 
     // Should show an error (toast or inline) — not a raw stack trace
     const pageText = await page.locator('body').textContent()
