@@ -66,7 +66,7 @@ export function Terms() {
 
           <Section number={5} title="Email Verification">
             <p>
-              New accounts require email verification. You must verify your email address before you can access full platform features. The verification link is sent to the email address you provided during registration.
+              New accounts require email verification. You must verify your email address before you can access full platform features. A one-time passcode (OTP) is sent to the email address you provided during registration — enter this code on the verification page to confirm your address.
             </p>
           </Section>
 
@@ -78,7 +78,7 @@ export function Terms() {
 
           <Section number={7} title="Membership Activation">
             <p>
-              After registration and email verification, a one-time activation fee of KSh 300 is required to activate your membership and access welfare packages. This fee is separate from package contributions and is non-recurring.
+              After registration and email verification (via a one-time passcode), a one-time activation fee of KSh 300 is required to activate your membership and access welfare packages. This fee is separate from package contributions and is non-recurring.
             </p>
           </Section>
 

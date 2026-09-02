@@ -145,8 +145,9 @@ Deno.serve(async (req) => {
         .update({ status: 'closed', updated_at: new Date().toISOString() })
         .eq('id', resourceId)
         .select('id, full_name, email')
-        .single()
-      if (error) throw new Error('Member not found')
+        .maybeSingle()
+      if (error) throw new Error('Update failed: ' + error.message)
+      if (!member) throw new Error('Member not found')
 
       await logAudit(adminClient, {
         actor_id: session.id,

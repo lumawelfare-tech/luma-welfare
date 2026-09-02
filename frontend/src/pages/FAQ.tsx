@@ -17,15 +17,15 @@ const categories: FAQCategory[] = [
       },
       {
         q: 'How does Luma Welfare work?',
-        a: 'You register an account, confirm your email, sign in, pay a one-time KSh 300 activation fee, then choose one or more welfare packages. Each package has its own monthly contribution amount and waiting period. Once you qualify, you can submit claims according to the rules of that package.',
+        a: 'You register an account and verify your email with a one-time passcode (OTP) sent to your inbox. Once verified, sign in and pay the one-time KSh 300 activation fee, then choose one or more welfare packages. Each package has its own monthly contribution amount and waiting period. Once you qualify, you can submit claims according to the rules of that package.',
       },
       {
         q: 'Who can join?',
-        a: 'Anyone can register for a Luma Welfare account. After registration, email verification, and payment of the KSh 300 activation fee, you can explore and subscribe to available welfare packages.',
+        a: 'Anyone can register for a Luma Welfare account. After registration, you verify your email using a one-time passcode (OTP) sent to your inbox. Once verified and after payment of the KSh 300 activation fee, you can explore and subscribe to available welfare packages.',
       },
       {
         q: 'How do I create an account?',
-        a: 'Click "Join Now" on the website, fill in your name, email, phone number, and create a password. You will receive an email to confirm your address. Once confirmed, sign in and complete the one-time KSh 300 activation fee to unlock package access.',
+        a: 'Click "Join Now" on the website and fill in your name, email, phone number, and create a password. After registering, you will receive a one-time passcode (OTP) via email. Enter this code on the verification page to confirm your address. Once verified, sign in and complete the one-time KSh 300 activation fee to unlock package access.',
       },
       {
         q: 'Is registration free?',
@@ -33,7 +33,7 @@ const categories: FAQCategory[] = [
       },
       {
         q: 'How do I confirm my email?',
-        a: 'After registering, Supabase sends a confirmation email to the address you provided. Click the link in that email to verify your account. If you do not see the email, check your spam or junk folder.',
+        a: 'After registering, a one-time passcode (OTP) is sent to your registered email address. Enter this 6-digit code on the verification page to confirm your account. The code expires after 10 minutes. If it expires, use the resend link on the verification page to request a new one. Check your spam folder if you do not see the email.',
       },
       {
         q: 'Can I use Google to sign in?',

@@ -10,10 +10,10 @@ manage members, verify payments, review claims, and run payouts.
 | Layer        | Choice                                        |
 | ------------ | --------------------------------------------- |
 | Frontend     | React + TypeScript + Vite + Tailwind CSS      |
-| Backend      | Node.js + TypeScript + Hono                   |
-| Auth / DB    | Supabase (`@supabase/server` for server auth) |
+| Backend      | Supabase Edge Functions (Deno)                 |
+| Auth / DB    | Supabase (email OTP for registration)          |
 | File storage | Supabase Storage                              |
-| Payments     | M-Pesa (Paybill 522522, account 454545#)      |
+| Payments     | M-Pesa (disabled — PAYMENTS_ENABLED=false)    |
 
 ## Repo layout
 
@@ -24,7 +24,7 @@ backend/
   src/lib/dashboard.ts    Per-package member dashboard builder
   src/lib/rbac.ts         Admin RBAC (roles/permissions)
   src/lib/audit.ts        Audit log writer
-  src/routes/             public, auth, member, contributions, admin
+  src/routes/             public, member, contributions, admin
   db/schema.sql           PostgreSQL schema (run in Supabase SQL editor)
   db/seed.sql             The 12 packages, rules, roles, settings
 frontend/
@@ -62,7 +62,7 @@ frontend/
 
 ## How the flow works
 
-Registration → admin approval → select package(s) → monthly contributions →
+Registration → email OTP verification → select package(s) → monthly contributions →
 system tracks per-package → waiting period evaluated → eligible → claim →
 review → approved → payout.
 

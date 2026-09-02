@@ -17,7 +17,7 @@ This guide helps you navigate Luma Welfare, your community welfare management pl
    - Email address
    - Phone number (07XX or 01XX format)
    - Password (minimum 8 characters, must include letters and numbers)
-4. Check your email and confirm your address
+4. Check your email — a 6-digit verification code will be sent. Enter it on the verification page to confirm your address.
 5. Sign in to your account
 
 ### Activation Fee
