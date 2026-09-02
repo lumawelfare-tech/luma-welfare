@@ -62,10 +62,12 @@ echo "============================================="
 
 # All functions that need deploying
 ALL_FUNCTIONS=(
+  admin-2fa
   admin-claims
   admin-contributions
   admin-dashboard
   admin-gallery
+  admin-media
   admin-members
   admin-monitoring
   admin-news
@@ -93,6 +95,7 @@ ALL_FUNCTIONS=(
   member-notification-prefs
   member-notifications
   member-profile
+  member-push-subscriptions
   member-receipts
   member-registration-fee
   member-subscriptions

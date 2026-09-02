@@ -146,13 +146,7 @@ export function isSyncSupported(): boolean {
 export async function syncFetch(url: string, options: RequestInit = {}): Promise<Response> {
   // If online, try normal fetch first
   if (navigator.onLine) {
-    try {
-      return await fetch(url, options)
-    } catch (err) {
-      // Network error while online — might be transient
-      // The service worker will handle queuing if needed
-      throw err
-    }
+    return await fetch(url, options)
   }
 
   // Offline — the service worker will queue this via background sync

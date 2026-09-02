@@ -18,7 +18,7 @@ export function ForgotPassword() {
       })
       if (resetError) throw resetError
       setSent(true)
-    } catch (err) {
+    } catch {
       // Show neutral message even on error to prevent email enumeration
       setSent(true)
     } finally {
