@@ -2,15 +2,23 @@
  * Shared email helper for Luma Welfare Edge Functions.
  * Sends emails via Resend API using the RESEND_API_KEY secret.
  *
- * Sender: Luma Welfare <noreply@luma-welfare.vercel.app>
+ * Sender: configurable via EMAIL_FROM (defaults to the Luma Welfare
+ *   no-reply address). Must be a "Name <addr>" pair on a Resend-verified
+ *   domain (or onboarding@resend.dev for testing only).
  * Test mode: set EMAIL_TEST_MODE=true to force all mail to delivered@resend.dev
  * (sandbox testing). Default (unset/false) delivers to real recipients.
  */
 
-const SENDER = 'Luma Welfare <noreply@luma-welfare.vercel.app>'
+const DEFAULT_SENDER = 'Luma Welfare <noreply@luma-welfare.vercel.app>'
 const TEST_RECIPIENT = 'delivered@resend.dev'
 const MAX_SUBJECT = 200
 const MAX_HTML = 100_000
+
+/** Returns the configured sender from EMAIL_FROM, or the production default. */
+export function getSender(): string {
+  const from = Deno.env.get('EMAIL_FROM')
+  return from && from.trim() ? from.trim() : DEFAULT_SENDER
+}
 
 export interface EmailAttachment {
   filename: string
@@ -59,7 +67,7 @@ export async function sendEmail(
 
   try {
     const payload: Record<string, unknown> = {
-      from: SENDER,
+      from: getSender(),
       to: [recipient],
       subject,
       html,
