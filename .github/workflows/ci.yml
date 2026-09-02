@@ -306,6 +306,7 @@ jobs:
             "auth-login"
             "auth-me"
             "auth-register"
+            "auth-verify-email"
             "member-dashboard"
             "member-profile"
             "public-data"

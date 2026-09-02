@@ -157,6 +157,31 @@ test.describe('Forgot Password Page', () => {
 })
 
 // ============================================================================
+// VERIFY EMAIL PAGE
+// ============================================================================
+
+test.describe('Verify Email Page', () => {
+  test('loads directly with the email-entry form when no email is provided', async ({ page }) => {
+    await page.goto(`${BASE}/verify-email`)
+    await expect(page).toHaveTitle(/Luma Welfare/)
+    await page.waitForSelector('#root, #app, main', { timeout: 15000 })
+
+    // Direct visit renders the email-entry fallback (no OTP boxes yet)
+    const emailInput = page.locator('input[type="email"]')
+    await expect(emailInput.first()).toBeVisible({ timeout: 15000 })
+  })
+
+  test('renders OTP boxes when an email is passed via query string', async ({ page }) => {
+    await page.goto(`${BASE}/verify-email?email=ci%40luma-welfare.test`)
+    await page.waitForSelector('#root, #app, main', { timeout: 15000 })
+
+    // Six OTP digit inputs
+    const digits = page.locator('input[aria-label^="Digit "]')
+    await expect(digits).toHaveCount(6, { timeout: 15000 })
+  })
+})
+
+// ============================================================================
 // PROTECTED ROUTES — UNAUTHENTICATED ACCESS
 // ============================================================================
 

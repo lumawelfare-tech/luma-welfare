@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../lib/api'
 
 export function Register() {
   const { register } = useAuth()
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -14,7 +15,6 @@ export function Register() {
     confirm: '',
   })
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
   const [busy, setBusy] = useState(false)
 
   function set<K extends keyof typeof form>(key: K, value: string) {
@@ -47,35 +47,16 @@ export function Register() {
         idNumber: form.idNumber.trim() || undefined,
         password: form.password,
       })
-      setDone(true)
+      // Registration succeeded — continue to the OTP verification screen.
+      navigate('/verify-email', {
+        state: { email: form.email.trim() },
+        replace: true,
+      })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
     } finally {
       setBusy(false)
     }
-  }
-
-  if (done) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center py-16">
-        <div className="w-full max-w-md px-4">
-          <div className="rounded-3xl border border-luma-200 bg-luma-50 p-8 text-center shadow-xl">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-luma-100 text-luma-600">
-              <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h1 className="mt-4 text-xl font-bold text-gray-900">Account Created!</h1>
-            <p className="mt-3 text-sm leading-relaxed text-gray-600">
-              Check your email to confirm your address. Once your email is confirmed, you can sign in and complete your KSh 300 one-time activation fee to access available welfare packages.
-            </p>
-            <Link to="/login" className="mt-6 inline-block rounded-xl bg-luma-700 px-6 py-3 text-sm font-bold text-white hover:bg-luma-800 transition-all">
-              Go to Sign In
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (

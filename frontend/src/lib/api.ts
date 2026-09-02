@@ -53,10 +53,12 @@ const BASE_DELAY_MS = 500
 export class ApiError extends Error {
   status: number
   code: string
-  constructor(status: number, message: string, code = 'ERROR') {
+  retryAfter: number | null
+  constructor(status: number, message: string, code = 'ERROR', retryAfter: number | null = null) {
     super(message)
     this.status = status
     this.code = code
+    this.retryAfter = retryAfter
   }
 }
 
@@ -170,7 +172,7 @@ async function apiInternal<T = unknown>(
   })
 
   const data = (await res.json().catch(() => null)) as
-    | ({ message?: string; code?: string } & T)
+    | ({ message?: string; code?: string; retry_after?: number } & T)
     | null
 
   if (!res.ok) {
@@ -178,6 +180,7 @@ async function apiInternal<T = unknown>(
       res.status,
       data?.message ?? 'Something went wrong. Try again.',
       data?.code ?? 'ERROR',
+      typeof data?.retry_after === 'number' ? data.retry_after : null,
     )
   }
   return data as T
@@ -203,6 +206,7 @@ function pathToFunctionName(path: string): string | null {
   // Auth routes
   if (cleanPath === 'auth/register') return 'auth-register'
   if (cleanPath === 'auth/login') return 'auth-login'
+  if (cleanPath === 'auth/verify-email') return 'auth-verify-email'
   if (cleanPath === 'auth/me') return 'auth-me'
   if (cleanPath === 'auth/oauth-provision') return 'auth-oauth-provision'
   if (cleanPath === 'auth/google-authorize') return 'auth-google-authorize'

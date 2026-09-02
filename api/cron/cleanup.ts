@@ -21,6 +21,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 const BATCH_SIZE_NOTIFICATIONS = 1000
 const BATCH_SIZE_AUDIT_LOGS = 1000
 const BATCH_SIZE_EXPORT_JOBS = 100
+const BATCH_SIZE_EMAIL_VERIFICATIONS = 500
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,22 @@ async function cleanupExportJobs(
   }
 }
 
+async function cleanupEmailVerifications(
+  url: string,
+  key: string,
+): Promise<CleanupResult> {
+  const start = performance.now()
+  const { data, error } = await rpc(url, key, 'cleanup_old_email_verifications', {
+    p_batch_size: BATCH_SIZE_EMAIL_VERIFICATIONS,
+  })
+  return {
+    task: 'email_verifications',
+    deleted: data,
+    durationMs: Math.round(performance.now() - start),
+    error,
+  }
+}
+
 async function getRetentionStats(
   url: string,
   key: string,
@@ -182,6 +199,11 @@ export default async function handler(
     results.push(await cleanupExportJobs(supabaseUrl, serviceKey))
     console.log(
       `[CLEANUP] Export jobs: ${results[results.length - 1].deleted ?? 'error'} deleted in ${results[results.length - 1].durationMs}ms`,
+    )
+
+    results.push(await cleanupEmailVerifications(supabaseUrl, serviceKey))
+    console.log(
+      `[CLEANUP] Email verifications: ${results[results.length - 1].deleted ?? 'error'} deleted in ${results[results.length - 1].durationMs}ms`,
     )
 
     // 3. Get retention stats after cleanup

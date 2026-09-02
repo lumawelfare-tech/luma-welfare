@@ -3,7 +3,8 @@
  * Sends emails via Resend API using the RESEND_API_KEY secret.
  *
  * Sender: Luma Welfare <noreply@luma-welfare.vercel.app>
- * Test mode: recipient locked to delivered@resend.dev
+ * Test mode: set EMAIL_TEST_MODE=true to force all mail to delivered@resend.dev
+ * (sandbox testing). Default (unset/false) delivers to real recipients.
  */
 
 const SENDER = 'Luma Welfare <noreply@luma-welfare.vercel.app>'
@@ -26,7 +27,7 @@ export interface EmailResult {
 /**
  * Send an email via Resend, optionally with file attachments.
  *
- * @param to - Original recipient email (overridden in test mode)
+ * @param to - Recipient email (overridden only when EMAIL_TEST_MODE=true)
  * @param subject - Email subject line
  * @param html - HTML email body
  * @param attachments - Optional array of file attachments
@@ -53,10 +54,13 @@ export async function sendEmail(
     return { success: false, error: 'Invalid HTML body' }
   }
 
+  const testMode = (Deno.env.get('EMAIL_TEST_MODE') ?? '').toLowerCase() === 'true'
+  const recipient = testMode ? TEST_RECIPIENT : to
+
   try {
     const payload: Record<string, unknown> = {
       from: SENDER,
-      to: [TEST_RECIPIENT], // Test mode
+      to: [recipient],
       subject,
       html,
     }
@@ -160,6 +164,51 @@ export function buildEmailTemplate(
     </div>
     <div style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
       <p style="margin:0;color:#9ca3af;font-size:12px;">This is an automated notification from Luma Welfare. Do not reply to this email.</p>
+    </div>
+  </div>
+</body>
+</html>`
+}
+
+/**
+ * Build the branded OTP verification email.
+ * Renders the 6-digit code prominently with expiry and safety notices.
+ */
+export function buildOtpEmail(code: string, expiresInMinutes: number): string {
+  const digits = code
+    .split('')
+    .map((d) =>
+      `<td align="center" style="padding:0 4px;"><div style="width:52px;height:64px;line-height:64px;background:#f0f5ec;border:1px solid #cfe0c3;border-radius:10px;font-family:'Courier New',monospace;font-size:30px;font-weight:700;color:#1f2937;">${d}</div></td>`
+    )
+    .join('')
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="max-width:600px;margin:40px auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <div style="background:#6D9B3A;padding:24px 32px;">
+      <h1 style="margin:0;color:white;font-size:20px;font-weight:700;">Luma Welfare</h1>
+      <p style="margin:4px 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Community Welfare Society</p>
+    </div>
+    <div style="padding:32px;">
+      <h2 style="margin:0 0 16px;color:#111827;font-size:18px;font-weight:600;">Verify Your Email</h2>
+      <p style="margin:0 0 20px;color:#4b5563;font-size:15px;line-height:1.6;">
+        Your verification code is:
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 20px;">
+        <tr>${digits}</tr>
+      </table>
+      <p style="margin:0 0 8px;color:#4b5563;font-size:14px;line-height:1.6;">
+        This code expires in <strong>${expiresInMinutes} minutes</strong>.
+      </p>
+      <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;">
+        If you did not request this code, please ignore this email.
+      </p>
+    </div>
+    <div style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+      <p style="margin:0 0 4px;color:#9ca3af;font-size:12px;">This is an automated notification from Luma Welfare. Do not reply to this email.</p>
+      <p style="margin:0;color:#9ca3af;font-size:12px;">&copy; Luma Welfare</p>
     </div>
   </div>
 </body>

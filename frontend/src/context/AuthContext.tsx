@@ -5,7 +5,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { api, setSession, clearSession } from '../lib/api'
+import { api, setSession, clearSession, ApiError } from '../lib/api'
 import { supabase } from '../lib/supabase'
 
 export type Member = {
@@ -173,7 +173,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(email: string, password: string): Promise<LoginResult> {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      throw new Error(error.message)
+      const supabaseCode = (error as { code?: string }).code ?? ''
+      const msg = (error.message ?? '').toLowerCase()
+      if (
+        supabaseCode === 'email_not_confirmed' ||
+        msg.includes('not confirmed') ||
+        msg.includes('confirm your email') ||
+        msg.includes("email isn't confirmed")
+      ) {
+        throw new ApiError(403, 'Please verify your email address before signing in.', 'EMAIL_NOT_CONFIRMED')
+      }
+      throw new ApiError(400, error.message, 'LOGIN_FAILED')
     }
 
     if (data.session?.access_token) {

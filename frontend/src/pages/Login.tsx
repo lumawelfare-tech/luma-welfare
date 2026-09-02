@@ -16,6 +16,10 @@ export function Login() {
   const [googleBusy, setGoogleBusy] = useState(false)
   const [searchParams] = useSearchParams()
   const passwordReset = searchParams.get('passwordReset') === 'true' || (location.state as Record<string, unknown>)?.passwordReset === true
+  const justVerified = (location.state as { verified?: boolean } | null)?.verified === true
+
+  // Unverified email — surfaced by AuthContext as EMAIL_NOT_CONFIRMED
+  const [needsVerification, setNeedsVerification] = useState(false)
 
   // 2FA state
   const [requires2fa, setRequires2fa] = useState(false)
@@ -34,6 +38,7 @@ export function Login() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setNeedsVerification(false)
     setBusy(true)
     try {
       const result = await login(email.trim(), password)
@@ -42,13 +47,25 @@ export function Login() {
         setBusy(false)
         return
       }
+      // Pending (unverified) accounts can only reach here when Supabase
+      // confirmations are disabled in the hosted project. Either way, route
+      // them to the verification screen so the OTP flow can activate them.
+      if (result.member && result.member.status === 'pending_approval') {
+        navigate('/verify-email', { state: { email: email.trim() }, replace: true })
+        return
+      }
       if (result.isAdmin) {
         navigate('/admin', { replace: true })
       } else {
         navigate(from, { replace: true })
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
+      if (err instanceof ApiError && err.code === 'EMAIL_NOT_CONFIRMED') {
+        setNeedsVerification(true)
+        setError(null)
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
+      }
     } finally {
       setBusy(false)
     }
@@ -184,7 +201,29 @@ export function Login() {
                   </div>
                 )}
 
-                {error && (
+                {justVerified && (
+                  <div className="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">
+                    Email verified successfully. You can now sign in to your account.
+                  </div>
+                )}
+
+                {needsVerification && (
+                  <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <p className="font-medium">Your email isn&apos;t verified yet.</p>
+                    <p className="mt-1 text-xs">
+                      Enter the 6-digit code we sent to {email.trim()} or request a new one.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/verify-email', { state: { email: email.trim() } })}
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-900 hover:underline"
+                    >
+                      Verify your email →
+                    </button>
+                  </div>
+                )}
+
+                {error && !needsVerification && (
                   <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error}
                   </div>
