@@ -1,0 +1,55 @@
+# Luma Welfare — Manual Edge Function Deployment
+#
+# Trigger this workflow manually from the GitHub Actions tab.
+# Required secrets (set in repo Settings → Secrets → Actions):
+#   SUPABASE_ACCESS_TOKEN — Personal access token from Supabase dashboard
+#                          (https://supabase.com/dashboard/account/tokens)
+#
+# This is manual because Edge Function deployment requires a personal access token
+# that cannot be safely stored in a public repository. After setting the secret,
+# go to Actions → Deploy Edge Functions → Run workflow.
+
+name: Deploy Edge Functions
+
+on:
+  workflow_dispatch:
+    inputs:
+      function_name:
+        description: 'Function to deploy (leave empty for all)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy Edge Functions
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Supabase CLI
+        run: npm install -g supabase
+
+      - name: Deploy Edge Functions
+        run: |
+          if [ -n "${{ inputs.function_name }}" ]; then
+            echo "Deploying: ${{ inputs.function_name }}"
+            supabase functions deploy ${{ inputs.function_name }} --project-ref mkbxigxmhqdhxmptanqr --no-verify-jwt
+          else
+            echo "Deploying all functions..."
+            npm run deploy:functions
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Verify deployment
+        run: npm run verify:deploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

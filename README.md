@@ -18,47 +18,93 @@ manage members, verify payments, review claims, and run payouts.
 ## Repo layout
 
 ```
+supabase/
+  functions/          Supabase Edge Functions (Deno)
+    shared/           Shared helpers (auth, email, OTP, RLS, CORS, etc.)
+    admin-*/         Admin panel Edge Functions
+    member-*/        Member portal Edge Functions
+    auth-*/          Authentication Edge Functions
+  migrations/         Database migrations (run in order)
+  config.toml         Edge Function JWT settings
+
 backend/
-  src/index.ts            Hono app entry (API server on :3001)
-  src/lib/qualify.ts      Qualification engine (Section 5)
-  src/lib/dashboard.ts    Per-package member dashboard builder
-  src/lib/rbac.ts         Admin RBAC (roles/permissions)
-  src/lib/audit.ts        Audit log writer
+  src/index.ts            Hono app entry (local dev only — not deployed)
+  src/lib/rbac.ts        Admin RBAC (roles/permissions)
+  src/lib/audit.ts       Audit log writer
   src/routes/             public, member, contributions, admin
-  db/schema.sql           PostgreSQL schema (run in Supabase SQL editor)
-  db/seed.sql             The 12 packages, rules, roles, settings
+  db/schema.sql          PostgreSQL schema (run in Supabase SQL editor)
+  db/seed.sql            The 12 packages, rules, roles, settings
+
 frontend/
-  src/                    React app (Vite dev server on :5173)
-  src/pages/              public pages, member portal, admin panel
+  src/                   React app (Vite dev server on :5173)
+  src/pages/             public pages, member portal, admin panel
 ```
 
 ## Getting started
 
-1. **Apply the database schema.** In the Supabase dashboard (SQL Editor), run
-   `backend/db/schema.sql` then `backend/db/seed.sql`. The seed creates the
-   twelve confirmed packages, contribution tiers, qualification rules, roles
-   and permissions, and the Section 9 open-question flags.
+### 1. Apply database schema
 
-2. **Environment.** Copy `.env.example` to `.env` in `backend/` and `frontend/`
-   and fill in the real values. The Supabase **secret key is required** for the
-   admin routes (`supabaseAdmin`); the key shown in the original setup message
-   was masked, so replace the placeholder before going live. Never commit `.env`.
+In the Supabase dashboard (SQL Editor), run `backend/db/schema.sql` then `backend/db/seed.sql`.
+The seed creates the twelve confirmed packages, contribution tiers, qualification rules, roles and permissions.
 
-3. **Run locally.**
-   ```
-   npm install
-   npm run dev           # frontend on http://localhost:5173
-   npm run dev:backend   # API on http://localhost:3001
-   ```
+### 2. Environment
 
-4. **Create an admin.** After the schema is applied, insert the first admin
-   into the `admins` table using the Supabase SQL editor, referencing a user
-   created via the site registration flow:
-   ```sql
-   insert into admins (id, display_name, role_id, is_superadmin)
-   select id, full_name, (select id from roles where name = 'superadmin'), true
-   from members where email = 'you@example.com';
-   ```
+- `backend/.env` — Supabase URL and secret key (for local Hono dev server)
+- `frontend/.env` — Supabase publishable key (Vite public)
+- `supabase/` — linked to the Supabase project automatically via `supabase link`
+
+Never commit `.env` files. All are in `.gitignore`.
+
+### 3. Run locally
+
+```
+npm install
+npm run dev           # frontend on http://localhost:5173
+npm run dev:backend   # Hono API on http://localhost:3001 (local dev only)
+```
+
+### 4. Provision the first admin
+
+After registering a user through the site, promote them to admin via the Supabase SQL editor:
+
+```sql
+insert into admins (id, display_name, role_id, is_superadmin, is_active)
+select id, full_name, (select id from roles where name = 'superadmin'), true, true
+from members where email = 'your-email@example.com';
+```
+
+Or use the bootstrap script (requires `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `ADMIN_BOOTSTRAP_PASSWORD`):
+
+```
+npx tsx backend/src/_admin-bootstrap.ts
+```
+
+### 5. Deploy Edge Functions
+
+After cloning, install deps and link the project:
+
+```
+supabase link --project-ref <your-project-ref>
+export SUPABASE_ACCESS_TOKEN=<your-personal-access-token>  # from supabase.com/dashboard/account/tokens
+npm run deploy:functions    # deploy all functions
+```
+
+Or deploy a single function:
+
+```
+./scripts/deploy-edge-functions.sh admin-members
+```
+
+Set required secrets in **Supabase Dashboard → Project Settings → Edge Functions**:
+
+| Secret | Description |
+|---|---|
+| `RESEND_API_KEY` | Resend API key for transactional email |
+| `OTP_HASH_SECRET` | 32+ char random secret for HMAC-SHA256 OTP hashing |
+| `EMAIL_FROM` | Sender address (e.g. `Luma Welfare <onboarding@resend.dev>`) |
+| `EMAIL_TEST_MODE` | Set to `true` to route all email to `delivered@resend.dev` |
+
+M-Pesa secrets (`MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`, etc.) are only needed when `PAYMENTS_ENABLED=true`.
 
 ## How the flow works
 
@@ -84,12 +130,9 @@ Change a rule, save, and re-run evaluation — no redeploy required.
 
 ## Payments
 
-Contribution amounts match the M-Pesa Paybill 522522 / account 454545#. The
-`payments` table carries `package_id` through the whole payment chain so a
-callback can attribute a payment to the right package when a member holds
-several — the member never has to type a transaction code. The STK Push
-integration is phase 2; until then members record a Pending contribution that a
-finance admin verifies.
+M-Pesa integration is intentionally **disabled** for this phase (`PAYMENTS_ENABLED=false`).
+Contributions are recorded by members and verified manually by finance admins.
+When enabled, STK Push will use Paybill 522522 / account 454545#.
 
 ## Open items to resolve with Luma (Section 9)
 
@@ -111,8 +154,13 @@ confirmation", never as made-up numbers.
 ## Scripts
 
 ```
-npm run build          # build frontend + backend
-npm run typecheck      # typecheck both workspaces
-npm run dev            # frontend dev server
-npm run dev:backend    # API dev server
+npm run build             # build frontend
+npm run typecheck         # typecheck frontend
+npm run lint              # lint frontend
+npm run test              # unit tests (frontend)
+npm run test:e2e          # Playwright E2E tests
+npm run verify:deploy     # smoke-test all deployed Edge Functions
+npm run deploy:functions  # deploy all Edge Functions to Supabase (requires SUPABASE_ACCESS_TOKEN)
+npm run dev               # frontend dev server
+npm run dev:backend       # Hono API dev server (local only)
 ```

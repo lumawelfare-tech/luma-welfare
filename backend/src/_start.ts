@@ -6,7 +6,6 @@ import { AuthError } from '@supabase/server'
 import { withSupabase } from '@supabase/server/adapters/hono'
 
 import { publicRoutes } from './routes/public.js'
-import { authRoutes } from './routes/auth.js'
 import { memberRoutes } from './routes/member.js'
 import { contributionRoutes } from './routes/contributions.js'
 import { paymentRoutes } from './routes/payments.js'
@@ -28,7 +27,6 @@ app.use('*', cors({
 app.get('/health', (c) => c.json({ status: 'ok' }))
 
 app.route('/api', publicRoutes)
-app.route('/api/auth', authRoutes)
 app.route('/api/member', memberRoutes)
 app.route('/api/contributions', contributionRoutes)
 app.route('/api/payments', paymentRoutes)
