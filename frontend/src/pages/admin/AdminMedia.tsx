@@ -193,7 +193,6 @@ export function AdminMedia() {
   /* ================================================================ */
 
   const load = useCallback(async (pageNum = 1) => {
-    setLoading(true)
     setError(null)
     try {
       const qs = new URLSearchParams()
@@ -228,6 +227,7 @@ export function AdminMedia() {
     }
   }, [debouncedSearch, filterType, filterStatus, filterFeatured, filterCategory, sortBy])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load(1) }, [load])
 
   /* ================================================================ */

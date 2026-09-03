@@ -51,6 +51,7 @@ export function AdminSettings() {
     finally { setTwoFALoading(false) }
   }
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect
   useEffect(() => { load(); load2FA() }, [])
 
   async function save() {

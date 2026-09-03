@@ -21,6 +21,7 @@ export function Family() {
     }
   }
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load() }, [])
 
   async function add(e: React.FormEvent) {

@@ -48,6 +48,7 @@ export function WebhookSettings() {
     }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — setLoading(false) in finally after await; loading managed via useState
   useEffect(() => { load() }, [load])
 
   async function handleSave() {

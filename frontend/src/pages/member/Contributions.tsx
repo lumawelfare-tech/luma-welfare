@@ -87,6 +87,7 @@ export function Contributions() {
     }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { loadPage(1, true) }, [loadPage])
 
   // Realtime: subscribe to contribution status changes (e.g. admin verifies payment)

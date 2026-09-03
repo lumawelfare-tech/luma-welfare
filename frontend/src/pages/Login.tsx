@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { api, ApiError } from '../lib/api'
@@ -11,7 +11,14 @@ export function Login() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(() => {
+    const googleError = sessionStorage.getItem('google_auth_error')
+    if (googleError) {
+      sessionStorage.removeItem('google_auth_error')
+      return googleError
+    }
+    return null
+  })
   const [busy, setBusy] = useState(false)
   const [googleBusy, setGoogleBusy] = useState(false)
   const [searchParams] = useSearchParams()
@@ -25,15 +32,6 @@ export function Login() {
   const [requires2fa, setRequires2fa] = useState(false)
   const [totpCode, setTotpCode] = useState('')
   const [verifying2fa, setVerifying2fa] = useState(false)
-
-  // Check for Google OAuth authorization error (set by AuthContext)
-  useEffect(() => {
-    const googleError = sessionStorage.getItem('google_auth_error')
-    if (googleError) {
-      setError(googleError)
-      sessionStorage.removeItem('google_auth_error')
-    }
-  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()

@@ -65,6 +65,7 @@ export function NotificationBell() {
   // Load notifications when dropdown opens
   useEffect(() => {
     if (!open) return
+    // eslint-disable-next-line oxc/react/set-state-in-effect — setLoading(true) guards against stale renders when dropdown opens; API call follows
     setLoading(true)
     api<{ notifications: Notification[] }>('/member/notifications', { auth: true })
       .then((d) => {

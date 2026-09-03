@@ -84,6 +84,7 @@ export function AdminLayout() {
 
   // Close mobile sidebar on route change
   useEffect(() => {
+    // eslint-disable-next-line oxc/react/set-state-in-effect — router pathname sync: close sidebar on navigation
     setSidebarOpen(false)
   }, [location.pathname])
 

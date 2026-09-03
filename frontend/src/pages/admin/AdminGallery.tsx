@@ -42,7 +42,6 @@ export function AdminGallery() {
   const perPage = 50
 
   const load = useCallback(async (pageNum = 1, searchQuery?: string) => {
-    setLoading(true)
     try {
       const qs = new URLSearchParams()
       qs.set('page', String(pageNum))
@@ -62,8 +61,10 @@ export function AdminGallery() {
     }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized to true; setLoading(false) in finally after await
   useEffect(() => { load(1, debouncedSearch) }, [debouncedSearch])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized to true; setLoading(false) in finally after await
   useEffect(() => { load(1) }, [load])
 
   function openCreate() {

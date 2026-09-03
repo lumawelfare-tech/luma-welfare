@@ -146,14 +146,18 @@ export function AdminDashboard() {
   }, [getDateRange])
 
   // Initial load + refetch on date range change
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => {
     mountedRef.current = true
+    // eslint-disable-next-line oxc/react/set-state-in-effect — loading already true; setLoading(false) in finally after await
     fetchData()
     return () => { mountedRef.current = false }
   }, [fetchData])
 
   // Refetch when date range changes
+  // eslint-disable-next-line oxc/react/set-state-in-effect — setRefreshing(true) only on silent fetch; loading stays true until data arrives
   useEffect(() => {
+    // eslint-disable-next-line oxc/react/set-state-in-effect — loading already true; setRefreshing only
     fetchData(true)
   }, [datePreset, customFrom, customTo])
 

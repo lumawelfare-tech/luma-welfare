@@ -97,6 +97,7 @@ export function Claims() {
     }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load() }, [load])
 
   // Focus management for form

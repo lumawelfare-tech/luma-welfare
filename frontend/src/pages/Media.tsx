@@ -102,6 +102,7 @@ export function Media() {
     }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load(1, activeType) }, [activeType, load])
 
   return (

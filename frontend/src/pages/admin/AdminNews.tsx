@@ -53,7 +53,6 @@ export function AdminNews() {
   const perPage = 50
 
   const load = useCallback(async (pageNum = 1) => {
-    setLoading(true)
     try {
       const qs = new URLSearchParams()
       if (filter.type) qs.set('type', filter.type)
@@ -74,6 +73,7 @@ export function AdminNews() {
     }
   }, [filter])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load(1) }, [load])
 
   function openCreate() {

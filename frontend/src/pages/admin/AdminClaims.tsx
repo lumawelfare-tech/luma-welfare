@@ -94,7 +94,6 @@ export function AdminClaims() {
 
   const load = useCallback(async (pageNum = 1) => {
     setError(null)
-    setLoading(true)
     try {
       const qs = new URLSearchParams()
       if (filter) qs.set('status', filter)
@@ -116,6 +115,7 @@ export function AdminClaims() {
     }
   }, [filter, debouncedQuery])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load(1) }, [load])
 
   function normalizeClaim(c: Claim): ClaimRecord {

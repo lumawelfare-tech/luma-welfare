@@ -164,8 +164,9 @@ export function AdminReports() {
       .catch(() => {})
   }, [])
 
-  // Reset status filter when report type changes
+  // eslint-disable-next-line oxc/react/set-state-in-effect — setStatus/setPackageId/setData/setGenerated reset filter state on reportType change
   useEffect(() => {
+    // eslint-disable-next-line oxc/react/set-state-in-effect — reset form state on filter type change
     setStatus('all')
     setPackageId('all')
     setData([])

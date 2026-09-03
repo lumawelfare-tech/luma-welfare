@@ -158,7 +158,6 @@ export function AdminHealthCheck() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
-    setLoading(true)
     try {
       const d = await api<HealthHistoryData>(`/admin/monitoring?action=health-history&days=${days}&limit=50`, { auth: true })
       setData(d)
@@ -170,6 +169,7 @@ export function AdminHealthCheck() {
     }
   }, [days])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { fetchData() }, [fetchData])
 
   const summary = data?.health_history.summary

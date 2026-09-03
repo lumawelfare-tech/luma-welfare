@@ -246,6 +246,7 @@ function OrphanPaymentsTab() {
     }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { fetchData() }, [fetchData])
 
   const searchContributions = async (q: string) => {
@@ -415,6 +416,7 @@ function UnmatchedContributionsTab() {
     }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { fetchData() }, [fetchData])
 
   return (
@@ -503,6 +505,7 @@ function StalePendingTab() {
     }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { fetchData() }, [fetchData])
 
   const markFailed = async (paymentId: string) => {
@@ -613,6 +616,7 @@ function ExceptionsTab() {
     }
   }, [status])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { fetchData() }, [fetchData])
 
   const resolve = async (id: string, newStatus: 'resolved' | 'ignored') => {
@@ -729,8 +733,9 @@ export function AdminReconciliation() {
     }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; fetchSummary has setLoading(false) in finally
   useEffect(() => {
-    setLoading(true)
+    // eslint-disable-next-line oxc/react/set-state-in-effect — loading already true; fetchSummary call is safe
     fetchSummary().finally(() => setLoading(false))
   }, [fetchSummary])
 

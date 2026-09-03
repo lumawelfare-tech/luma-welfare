@@ -31,7 +31,6 @@ export function AdminAuditLogs() {
   const [uniqueActions, setUniqueActions] = useState<string[]>([])
 
   const load = useCallback(async () => {
-    setLoading(true)
     setError(null)
     try {
       const qs = new URLSearchParams()
@@ -55,9 +54,10 @@ export function AdminAuditLogs() {
     }
   }, [page, filter, debouncedSearch])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized to true; setLoading(false) in finally after await
   useEffect(() => { load() }, [load])
 
-  // Reset to page 1 when filters change
+  // eslint-disable-next-line oxc/react/set-state-in-effect — setPage(1) resets pagination on filter change; page flows through load()
   useEffect(() => { setPage(1) }, [filter, debouncedSearch])
 
   // Fetch unique actions for filter dropdown (if not provided by API)

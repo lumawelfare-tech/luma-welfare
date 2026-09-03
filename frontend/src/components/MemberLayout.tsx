@@ -46,6 +46,7 @@ export function MemberLayout() {
 
   // Close drawer on route change
   useEffect(() => {
+    // eslint-disable-next-line oxc/react/set-state-in-effect — router pathname sync: close mobile nav on navigation
     setMobileOpen(false)
   }, [location.pathname])
 

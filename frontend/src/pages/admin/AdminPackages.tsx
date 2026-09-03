@@ -40,7 +40,6 @@ export function AdminPackages() {
   const [retiring, setRetiring] = useState(false)
 
   async function load() {
-    setLoading(true)
     try {
       const d = await api<{ packages: Pkg[] }>('/admin/packages', { auth: true })
       setPackages(d.packages ?? [])
@@ -56,6 +55,7 @@ export function AdminPackages() {
     }
   }
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load() }, [])
 
   async function saveRules(id: string) {

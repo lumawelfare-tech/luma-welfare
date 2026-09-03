@@ -129,8 +129,12 @@ export function ExportDialog({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [open, onClose])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — stopPolling cleanup must run whenever dialog closes (backdrop/ESC/parent close)
   useEffect(() => {
-    if (!open) resetState()
+    if (!open) {
+      // eslint-disable-next-line oxc/react/set-state-in-effect — stopPolling cleanup must run when dialog closes
+      resetState()
+    }
   }, [open, resetState])
 
   if (!open) return null

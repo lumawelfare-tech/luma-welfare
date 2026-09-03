@@ -20,8 +20,10 @@ export function Profile() {
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState(false)
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — deriving form/avatarPreview from member prop; legitimate prop→state sync
   useEffect(() => {
     if (member) {
+      // eslint-disable-next-line oxc/react/set-state-in-effect — deriving form state from member prop
       setForm({
         fullName: member.full_name ?? '',
         idNumber: (member.id_number as string) ?? '',

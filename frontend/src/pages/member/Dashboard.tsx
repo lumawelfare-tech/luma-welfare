@@ -151,6 +151,7 @@ export function Dashboard() {
     }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { loadDashboard() }, [loadDashboard])
 
   // Realtime: subscribe to payment and contribution updates affecting dashboard

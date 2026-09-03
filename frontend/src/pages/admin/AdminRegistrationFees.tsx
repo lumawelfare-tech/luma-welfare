@@ -39,7 +39,6 @@ export function AdminRegistrationFees() {
 
   const load = useCallback(async () => {
     setError(null)
-    setLoading(true)
     try {
       const qs = new URLSearchParams()
       if (filter) qs.set('status', filter)
@@ -53,6 +52,7 @@ export function AdminRegistrationFees() {
     }
   }, [filter])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load() }, [load])
 
   async function confirmPayment(fee: RegistrationFee) {

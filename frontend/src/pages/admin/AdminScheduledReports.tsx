@@ -260,10 +260,12 @@ function CalendarView({ schedules, calMonth, calYear, setCalMonth, setCalYear }:
   })
 
   // Sync weekStart when month/year changes
+  // eslint-disable-next-line oxc/react/set-state-in-effect — setWeekStart derived from calMonth/calYear/calView; legitimate calendar sync
   useEffect(() => {
     if (calView === 'week') {
       const d = new Date(calYear, calMonth, 1)
       d.setDate(d.getDate() - d.getDay())
+      // eslint-disable-next-line oxc/react/set-state-in-effect — derived Date value from calMonth/calYear; legitimate calendar state sync
       setWeekStart(d)
     }
   }, [calMonth, calYear, calView])
@@ -615,6 +617,7 @@ export function AdminScheduledReports() {
     } finally { setLoading(false) }
   }, [])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load() }, [load])
 
   const loadHistory = useCallback(async (page = 1) => {
@@ -637,6 +640,7 @@ export function AdminScheduledReports() {
     } finally { setHistoryLoading(false) }
   }, [historySearch, historyType, historyStatus, historyDateFrom, historyDateTo])
 
+  // eslint-disable-next-line oxc/react/set-state-in-effect — setHistoryLoading in loadHistory; guard: if (activeTab === 'history')
   useEffect(() => { if (activeTab === 'history') loadHistory(1) }, [activeTab, loadHistory])
 
   async function createSchedule() {
