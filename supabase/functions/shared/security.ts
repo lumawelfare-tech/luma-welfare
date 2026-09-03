@@ -93,10 +93,18 @@ export const SECURITY_HEADERS: Record<string, string> = {
 /**
  * Content Security Policy for the frontend.
  * Restricts resource loading to prevent XSS and data injection.
+ *
+ * Uses 'strict-dynamic' for scripts (CSP Level 3) which:
+ * - Allows scripts loaded by trusted scripts (bundled chunks)
+ * - Blocks inline script execution (<script> tags without nonce)
+ * - Works without build-time nonce generation
+ *
+ * 'unsafe-inline' for styles is REQUIRED for Tailwind CSS v4 runtime injection.
+ * CSS injection is lower severity than script injection; this is an acceptable tradeoff.
  */
 export const CSP_DIRECTIVES = [
   "default-src 'self'",
-  "script-src 'self'",
+  "script-src 'self' 'nonce-CSP_NONCE_PLACEHOLDER' 'strict-dynamic'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.supabase.co",
   "font-src 'self' data:",
@@ -192,6 +200,20 @@ export function sanitizeCsvValue(value: unknown): string {
     return `'${str}` // Prefix with single quote to neutralize formula
   }
   return str
+}
+
+// ============================================================================
+// NONCE GENERATION — CSP COMPATIBILITY
+// ============================================================================
+
+/**
+ * Generate a cryptographically secure nonce for CSP.
+ * Use for style-src and script-src nonce directives.
+ */
+export function generateNonce(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes))
 }
 
 // ============================================================================

@@ -22,6 +22,7 @@ export function getCorsHeaders(): Record<string, string> {
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Max-Age': '86400',
+    ...getSecurityHeaders(),
   }
 }
 
@@ -30,15 +31,31 @@ export const corsHeaders = getCorsHeaders()
 
 import { CSP_DIRECTIVES } from './security.ts'
 
-// Security headers for all responses
-export const securityHeaders: Record<string, string> = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'X-XSS-Protection': '0',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Content-Security-Policy': CSP_DIRECTIVES,
+function getCspNonce(): string {
+  return Deno.env.get('CSP_NONCE') ?? ''
 }
+
+function buildCsp(): string {
+  const nonce = getCspNonce()
+  if (!nonce) return CSP_DIRECTIVES
+  return CSP_DIRECTIVES
+    .replace(/'unsafe-inline'/g, `'nonce-${nonce}'`)
+    .replace(/'strict-dynamic'/g, `'nonce-${nonce}' 'strict-dynamic'`)
+}
+
+// Security headers for all responses
+export function getSecurityHeaders(): Record<string, string> {
+  return {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'X-XSS-Protection': '0',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    'Content-Security-Policy': buildCsp(),
+  }
+}
+
+export const securityHeaders = getSecurityHeaders()
 
 /**
  * Add security headers to a response.

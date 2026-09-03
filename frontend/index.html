@@ -3,8 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Content Security Policy (fallback for non-Vercel responses) -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" />
+    <!-- Content Security Policy
+         Vercel/CDN overrides this with proper security headers at runtime when deployed.
+         The meta tag is a fallback for direct access.
+
+         script-src uses 'strict-dynamic' (CSP Level 3) which:
+         - Allows scripts loaded by trusted scripts (bundled chunks)
+         - Blocks inline <script> execution
+         - Gracefully degrades to 'self' in older browsers
+
+         style-src 'unsafe-inline' is REQUIRED for Tailwind CSS v4 runtime injection.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" />
     <title>Luma Welfare — Community Welfare Platform in Kenya</title>
     <meta name="description" content="Luma Welfare is a community welfare organization in Kenya. Members contribute monthly to support each other through key life events — hospital costs, education, business, building, and more." />
     <meta name="robots" content="index, follow" />
