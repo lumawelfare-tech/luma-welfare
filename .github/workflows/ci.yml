@@ -7,8 +7,8 @@
 # 3. lint — Code linting
 # 4. test — Unit and integration tests
 # 5. build — Production build verification
-# 6. edge-function-check — Verify all Edge Functions are deployed
-# 7. deploy-verify — Post-deploy verification (manual trigger)
+# 6. edge-function-check — Verify all Edge Functions are deployed (also on PRs)
+# 7. e2e — Playwright smoke tests on production (also on PRs against preview deploys)
 
 name: CI
 
@@ -236,13 +236,13 @@ jobs:
           retention-days: 7
 
   # ============================================================================
-  # E2E TESTS (Playwright — production smoke test)
+  # E2E TESTS (Playwright — production smoke test + PR preview)
   # ============================================================================
   e2e:
     name: "🎭 E2E Tests"
     runs-on: ubuntu-latest
     needs: [build]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'pull_request' || (github.ref == 'refs/heads/main' && github.event_name == 'push')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -259,16 +259,27 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
+      - name: Determine E2E target URL
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "BASE_URL=https://luma-welfare-git-${GITHUB_REF#refs/heads/}-lumawelfaretech.vercel.app" >> $GITHUB_ENV
+            echo "E2E_TARGET=PR preview (branch: ${{ github.head_ref }})"
+          else
+            echo "BASE_URL=https://luma-welfare.vercel.app" >> $GITHUB_ENV
+            echo "E2E_TARGET=production"
+          fi
+          echo "Running E2E tests against: $BASE_URL"
+
       - name: Run E2E tests
         run: npx playwright test --reporter=list
         env:
-          BASE_URL: https://luma-welfare.vercel.app
+          BASE_URL: ${{ env.BASE_URL }}
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ github.run_id }}
           path: playwright-report/
           retention-days: 14
 
@@ -278,7 +289,7 @@ jobs:
   edge-function-check:
     name: "📡 Edge Function Check"
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'pull_request' || (github.ref == 'refs/heads/main' && github.event_name == 'push')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
