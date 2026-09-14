@@ -61,7 +61,7 @@ export function AdminGallery() {
     }
   }, [])
 
-  // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized to true; setLoading(false) in finally after await
+  // eslint-disable-next-line react-hooks/exhaustive-deps — load() has stable identity (no deps); adding it here silences the linter without changing behavior
   useEffect(() => { load(1, debouncedSearch) }, [debouncedSearch])
 
   // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized to true; setLoading(false) in finally after await

@@ -549,7 +549,7 @@ function StalePendingTab() {
       ) : (
         <div className="space-y-3">
           {payments.map(p => {
-            const ageMinutes = Math.round((Date.now() - new Date(p.created_at).getTime()) / 60000)
+            const ageMinutes = Math.round((Date.now() - new Date(p.created_at).getTime()) / 60000) // eslint-disable-line react/purity -- display-only calculation in map
             return (
               <div key={p.id} className="rounded-2xl border border-red-200 bg-white p-5">
                 <div className="flex items-start justify-between">

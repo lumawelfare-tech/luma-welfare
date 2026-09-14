@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
@@ -60,16 +60,18 @@ export function AdminAuditLogs() {
   // eslint-disable-next-line oxc/react/set-state-in-effect — setPage(1) resets pagination on filter change; page flows through load()
   useEffect(() => { setPage(1) }, [filter, debouncedSearch])
 
+  const fetchedActionsRef = useRef(false)
+
   // Fetch unique actions for filter dropdown (if not provided by API)
   useEffect(() => {
-    if (uniqueActions.length === 0) {
-      api<{ items: AuditLog[] }>('/admin/settings?resource_id=audit_logs&per_page=1000', { auth: true })
-        .then(d => {
-          const actions = [...new Set((d.items ?? []).map(l => l.action))].sort()
-          setUniqueActions(actions)
-        })
-        .catch(() => {})
-    }
+    if (fetchedActionsRef.current) return
+    fetchedActionsRef.current = true
+    api<{ items: AuditLog[] }>('/admin/settings?resource_id=audit_logs&per_page=1000', { auth: true })
+      .then(d => {
+        const actions = [...new Set((d.items ?? []).map(l => l.action))].sort()
+        setUniqueActions(actions)
+      })
+      .catch(() => {})
   }, [])
 
   return (

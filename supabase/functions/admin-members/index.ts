@@ -146,8 +146,12 @@ Deno.serve(async (req) => {
         .eq('id', resourceId)
         .select('id, full_name, email')
         .maybeSingle()
-      if (error) throw new Error('Update failed: ' + error.message)
-      if (!member) throw new Error('Member not found')
+      if (error) {
+        throw new Error('Update failed: ' + error.message);
+      }
+      if (!member) {
+        throw new Error('Member not found: Record does not exist or is already closed.');
+      }
 
       await logAudit(adminClient, {
         actor_id: session.id,

@@ -108,7 +108,7 @@ export function NotificationBell() {
   }
 
   function timeAgo(dateStr: string): string {
-    const now = Date.now()
+    const now = Date.now() // eslint-disable-line react/purity -- display-only relative time
     const then = new Date(dateStr).getTime()
     const diff = Math.floor((now - then) / 1000)
     if (diff < 60) return 'just now'

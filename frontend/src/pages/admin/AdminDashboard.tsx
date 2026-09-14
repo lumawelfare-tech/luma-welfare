@@ -155,10 +155,11 @@ export function AdminDashboard() {
   }, [fetchData])
 
   // Refetch when date range changes
-  // eslint-disable-next-line oxc/react/set-state-in-effect — setRefreshing(true) only on silent fetch; loading stays true until data arrives
   useEffect(() => {
     // eslint-disable-next-line oxc/react/set-state-in-effect — loading already true; setRefreshing only
+    // eslint-disable-next-line react-hooks/exhaustive-deps — fetchData is useCallback-stable; deps reflect actual reactive inputs
     fetchData(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datePreset, customFrom, customTo])
 
   // Month drill-down handler

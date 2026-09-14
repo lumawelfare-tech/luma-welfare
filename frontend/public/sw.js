@@ -269,9 +269,9 @@ async function retryQueuedRequests() {
         console.warn(`[SW] Sync failed (will retry): ${entry.method} ${entry.url} (${response.status})`)
         await updateQueuedRequest(entry.id, { retries: entry.retries + 1 })
       }
-    } catch (err) {
+  } catch (_err) {
       // Network error — retry later
-      console.warn(`[SW] Sync error (will retry): ${entry.method} ${entry.url}`, err)
+      console.warn(`[SW] Sync error (will retry): ${entry.method} ${entry.url}`, _err)
       await updateQueuedRequest(entry.id, { retries: entry.retries + 1 })
     }
   }
@@ -354,7 +354,7 @@ async function networkWithSyncFallback(request) {
   try {
     const response = await fetch(request)
     return response
-  } catch (err) {
+  } catch {
     // Network failed — queue for background sync
     const requestData = {
       url: request.url,
@@ -562,7 +562,7 @@ self.addEventListener('notificationclick', (event) => {
 
 /**
  * Notification close event — log for analytics
- */ self.addEventListener('notificationclose', (event) => {
+ */ self.addEventListener('notificationclose', (_event) => {
   // Optional: track notification dismissal
 })
 
