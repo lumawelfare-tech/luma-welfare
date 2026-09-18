@@ -1,6 +1,9 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createAdminClient } from '../shared/supabase.ts'
 
+/** Keys safe to expose publicly. Never include mpesa credentials or secrets. */
+const PUBLIC_SETTINGS_KEYS = new Set(['org_contact', 'stats'])
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
@@ -37,9 +40,14 @@ Deno.serve(async (req) => {
     }
 
     if (resource === 'settings') {
-      const { data } = await adminClient.from('platform_settings').select('key, value')
+      const { data } = await adminClient
+        .from('platform_settings')
+        .select('key, value')
+        .in('key', [...PUBLIC_SETTINGS_KEYS])
       const settings: Record<string, unknown> = {}
-      for (const row of data ?? []) settings[row.key] = row.value
+      for (const row of data ?? []) {
+        if (PUBLIC_SETTINGS_KEYS.has(row.key)) settings[row.key] = row.value
+      }
       return new Response(JSON.stringify(settings), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 

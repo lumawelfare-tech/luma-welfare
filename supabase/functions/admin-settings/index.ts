@@ -73,6 +73,31 @@ Deno.serve(async (req) => {
     // Also accept ?resource= query param for backward compatibility
     const resourceParam = url.searchParams.get("resource") ?? resource
 
+    // GET /admin-settings?resource=settings — list all platform settings (admin only)
+    // Explicit resource=settings (or bare /admin/settings with no query) only —
+    // do not steal ?resource=webhooks / audit-logs / open-questions.
+    if (
+      req.method === 'GET' &&
+      (
+        resource === 'settings' ||
+        resourceParam === 'settings' ||
+        (!resourceId && !url.searchParams.has('resource') && !action)
+      )
+    ) {
+      requirePermission(session, 'members', 'read')
+      const { data, error } = await adminClient
+        .from('platform_settings')
+        .select('key, value, description')
+        .order('key')
+      if (error) throw new Error(error.message)
+      const settings: Record<string, unknown> = {}
+      for (const row of data ?? []) settings[row.key] = row.value
+      return new Response(JSON.stringify(settings), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // GET /admin-settings/audit-logs
     if (req.method === 'GET' && (resource === 'audit-logs' || resourceParam === 'audit_logs')) {
       requirePermission(session, 'audit_logs', 'read')

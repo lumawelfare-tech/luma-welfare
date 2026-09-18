@@ -16,12 +16,18 @@
 #      Export: export SUPABASE_ACCESS_TOKEN="<your-token>"
 #
 # Secrets required (set in Supabase dashboard → Project Settings → Edge Functions):
-#   RESEND_API_KEY, OTP_HASH_SECRET, EMAIL_FROM, EMAIL_TEST_MODE,
+#   RESEND_API_KEY, OTP_HASH_SECRET, EMAIL_FROM, EMAIL_TEST_MODE, CRON_SECRET,
 #   MPESA_ENV, MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET,
 #   MPESA_SHORTCODE, MPESA_PASSKEY, MPESA_CALLBACK_URL, PAYMENTS_ENABLED
 #
 # Note: SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY are injected automatically
 # by the Supabase platform — do NOT set them manually.
+#
+# JWT strategy:
+#   Default deploy ENABLES gateway JWT verification.
+#   Only the allowlisted public/cron functions below use --no-verify-jwt.
+#   Cron functions (send-report-email, admin-exports-worker) still require
+#   CRON_SECRET inside the handler.
 # ============================================================================
 
 set -euo pipefail
@@ -34,16 +40,16 @@ NC='\033[0m'
 # Load project ref from supabase config
 PROJECT_REF=$(grep 'project_id' supabase/config.toml 2>/dev/null | head -1 | sed 's/.*= *"\([^"]*\)"/\1/' || echo "")
 if [ -z "$PROJECT_REF" ]; then
-  echo -e "${RED}ERROR: Could not find project_id in supabase/config.toml${NC}"
-  echo "Run: supabase link --project-ref <your-project-ref>"
-  exit 1
+  # Fallback used by CI when project_id is not in config.toml
+  PROJECT_REF="${SUPABASE_PROJECT_REF:-mkbxigxmhqdhxmptanqr}"
 fi
 
-# Verify linked project
-LINKED_REF=$(supabase projects list 2>/dev/null | grep '●' | awk '{print $3}' || echo "")
-if [ "$LINKED_REF" != "$PROJECT_REF" ]; then
-  echo -e "${RED}ERROR: Project $PROJECT_REF is not linked. Run: supabase link --project-ref $PROJECT_REF${NC}"
-  exit 1
+# Verify linked project (skip when deploying with explicit --project-ref in CI)
+if command -v supabase >/dev/null 2>&1; then
+  LINKED_REF=$(supabase projects list 2>/dev/null | grep '●' | awk '{print $3}' || echo "")
+  if [ -n "$LINKED_REF" ] && [ "$LINKED_REF" != "$PROJECT_REF" ]; then
+    echo -e "${YELLOW}WARNING: Linked project ($LINKED_REF) differs from config ($PROJECT_REF). Using $PROJECT_REF.${NC}"
+  fi
 fi
 
 # Check for access token
@@ -59,6 +65,30 @@ echo "============================================="
 echo "  EDGE FUNCTION DEPLOYMENT"
 echo "  Project: $PROJECT_REF"
 echo "============================================="
+
+# Functions that MUST remain publicly invocable at the gateway
+# (in-function auth still applies where required).
+NO_VERIFY_JWT_FUNCTIONS=(
+  auth-register
+  auth-verify-email
+  auth-login
+  public-data
+  payments-callback
+  send-report-email
+  admin-exports-worker
+  health
+)
+
+requires_no_verify_jwt() {
+  local fn="$1"
+  local candidate
+  for candidate in "${NO_VERIFY_JWT_FUNCTIONS[@]}"; do
+    if [ "$candidate" = "$fn" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
 
 # All functions that need deploying
 ALL_FUNCTIONS=(
@@ -119,6 +149,7 @@ fi
 echo ""
 echo "Deploy mode: $MODE"
 echo "Functions: ${#FUNCTIONS[@]}"
+echo "JWT: enabled by default; --no-verify-jwt only for: ${NO_VERIFY_JWT_FUNCTIONS[*]}"
 echo ""
 
 DEPLOYED=0
@@ -135,11 +166,16 @@ for fn in "${FUNCTIONS[@]}"; do
     continue
   fi
 
-  echo -n "  Deploying $fn... "
+  DEPLOY_ARGS=(functions deploy "$fn" --project-ref "$PROJECT_REF")
+  JWT_MODE="jwt-on"
+  if requires_no_verify_jwt "$fn"; then
+    DEPLOY_ARGS+=(--no-verify-jwt)
+    JWT_MODE="jwt-off"
+  fi
 
-  if supabase functions deploy "$fn" \
-    --project-ref "$PROJECT_REF" \
-    --no-verify-jwt \
+  echo -n "  Deploying $fn ($JWT_MODE)... "
+
+  if supabase "${DEPLOY_ARGS[@]}" \
     2>&1 | grep -q "error"; then
     echo -e "${RED}FAILED${NC}"
     FAILED=$((FAILED + 1))
