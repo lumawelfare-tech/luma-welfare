@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createAdminClient } from '../shared/supabase.ts'
+import { requireCronSecret } from '../shared/internal-auth.ts'
 
 /**
  * Admin Exports Worker — Background job processor for queued export jobs.
@@ -8,7 +9,9 @@ import { createAdminClient } from '../shared/supabase.ts'
  * Claims a pending job via `claim_export_job`, processes it in batches,
  * uploads CSV to storage, and updates the job record.
  *
- * No user authentication required — this is a system-level worker.
+ * Auth: CRON_SECRET required (Bearer / x-cron-secret / x-internal-secret).
+ * Gateway JWT verification stays off because callers are cron/pg_net, not users.
+ * worker_id alone is NOT authentication.
  */
 
 const BATCH_SIZE = 5000
@@ -374,8 +377,12 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
+  const unauthorized = requireCronSecret(req)
+  if (unauthorized) return unauthorized
+
   try {
-    // Validate worker_id from query param or header
+    // Validate worker_id from query param or header (identity of the worker process,
+    // not authentication — CRON_SECRET is checked above).
     const url = new URL(req.url)
     const workerId = url.searchParams.get('worker_id') ?? req.headers.get('x-worker-id')
 

@@ -28,7 +28,7 @@ export function AdminSettings() {
 
   async function load() {
     try {
-      const d = await api<Record<string, unknown>>('/settings?resource=settings', { auth: true })
+      const d = await api<Record<string, unknown>>('/admin/settings?resource=settings', { auth: true })
       const rows: Setting[] = []
       for (const [key, value] of Object.entries(d)) {
         if (key === 'error') continue

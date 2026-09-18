@@ -136,7 +136,11 @@ verify_jwt = true
 [functions.send-email]
 verify_jwt = true
 
+# Cron/pg_net callers — gateway JWT off; CRON_SECRET enforced in-function
 [functions.send-report-email]
+verify_jwt = false
+
+[functions.admin-exports-worker]
 verify_jwt = false
 
 # Health check — no auth needed
@@ -148,4 +152,35 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.admin-reconciliation]
+verify_jwt = true
+
+# Remaining authenticated functions (gateway JWT on)
+[functions.auth-google-authorize]
+verify_jwt = true
+
+[functions.auth-oauth-provision]
+verify_jwt = true
+
+[functions.admin-gallery]
+verify_jwt = true
+
+[functions.admin-media]
+verify_jwt = true
+
+[functions.admin-news]
+verify_jwt = true
+
+[functions.admin-exports]
+verify_jwt = true
+
+[functions.admin-registration-fee]
+verify_jwt = true
+
+[functions.admin-reports]
+verify_jwt = true
+
+[functions.member-push-subscriptions]
+verify_jwt = true
+
+[functions.member-registration-fee]
 verify_jwt = true

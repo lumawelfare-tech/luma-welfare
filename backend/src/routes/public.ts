@@ -45,9 +45,18 @@ app.get(
 
 app.get('/settings', withSupabase({ auth: 'publishable' }), async (c) => {
   const { supabase } = typedDb(c.var.supabaseContext)
-  const { data } = await supabase.from('platform_settings').select('key, value')
+  // Public allowlist only — never expose mpesa credentials or other secrets.
+  const PUBLIC_SETTINGS_KEYS = ['org_contact', 'stats'] as const
+  const { data } = await supabase
+    .from('platform_settings')
+    .select('key, value')
+    .in('key', [...PUBLIC_SETTINGS_KEYS])
   const settings: Record<string, unknown> = {}
-  for (const row of data ?? []) settings[row.key] = row.value
+  for (const row of data ?? []) {
+    if ((PUBLIC_SETTINGS_KEYS as readonly string[]).includes(row.key)) {
+      settings[row.key] = row.value
+    }
+  }
   return c.json(settings)
 })
 

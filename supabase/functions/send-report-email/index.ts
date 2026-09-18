@@ -6,11 +6,15 @@
  *
  * Downloads the Excel report from Supabase Storage and attaches it to the email.
  * Called by pg_net from the SQL cron function after report generation.
+ *
+ * Auth: CRON_SECRET required (Bearer / x-cron-secret / x-internal-secret).
+ * Gateway JWT verification stays off because callers are cron/pg_net, not users.
  */
 
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { sendEmail, buildEmailTemplate, readFileAsAttachment } from '../shared/email.ts'
 import { createAdminClient } from '../shared/supabase.ts'
+import { requireCronSecret } from '../shared/internal-auth.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -21,6 +25,9 @@ Deno.serve(async (req) => {
       status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
+
+  const unauthorized = requireCronSecret(req)
+  if (unauthorized) return unauthorized
 
   try {
     const apiKey = Deno.env.get('RESEND_API_KEY')
