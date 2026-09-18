@@ -1,0 +1,24 @@
+{
+  "name": "Luma Welfare Platform",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "frontend",
+      "command": "npm run dev"
+    },
+    {
+      "name": "backend",
+      "command": "npm run dev:backend"
+    }
+  ],
+  "ports": [
+    {
+      "name": "frontend",
+      "port": 5173
+    },
+    {
+      "name": "backend",
+      "port": 3001
+    }
+  ]
+}
