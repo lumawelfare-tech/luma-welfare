@@ -272,7 +272,7 @@ export function NotificationPreferences() {
         })}
       </div>
 
-      <div className="mt-8 rounded-xl border border-gray-200 bg-white p-5">
+      <div className="mt-8 glass-panel p-5">
         <h3 className="text-sm font-semibold text-gray-900 mb-2">About notifications</h3>
         <ul className="space-y-2 text-xs text-gray-500">
           <li className="flex items-start gap-2">

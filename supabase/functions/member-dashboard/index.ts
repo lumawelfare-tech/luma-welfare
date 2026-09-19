@@ -1,6 +1,24 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient } from '../shared/supabase.ts'
 
+/** UI mapping — does not change DB payment_status values. */
+function mapPaymentUiStatus(
+  status: string,
+  createdAt: string | null | undefined,
+): 'pending' | 'success' | 'failed' | 'expired' {
+  if (status === 'Completed') return 'success'
+  if (status === 'Failed' || status === 'Cancelled' || status === 'Reversed') return 'failed'
+  if (status === 'Timeout') return 'expired'
+  if (status === 'Pending' || status === 'Processing') {
+    if (createdAt) {
+      const ageMs = Date.now() - new Date(createdAt).getTime()
+      if (ageMs > 15 * 60 * 1000) return 'expired'
+    }
+    return 'pending'
+  }
+  return 'pending'
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
@@ -22,9 +40,10 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createAdminClient()
+    const today = new Date()
+    const currentPeriod = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
 
-    // Parallel fetch: registration fee + dashboard data
-    const [regFeeResult, dashboardResult] = await Promise.all([
+    const [regFeeResult, dashboardResult, contribSum, paymentsHist, pendingPay] = await Promise.all([
       adminClient
         .from('registration_fees')
         .select('status, amount, paid_at')
@@ -32,14 +51,76 @@ Deno.serve(async (req) => {
         .eq('fee_type', 'registration')
         .maybeSingle(),
       adminClient.rpc('build_member_dashboard', { p_member_id: user.id }),
+      adminClient
+        .from('contributions')
+        .select('amount, status, period, subscription_id')
+        .eq('member_id', user.id),
+      adminClient
+        .from('payments')
+        .select('id, amount, status, mpesa_receipt, checkout_request_id, subscription_id, created_at, updated_at')
+        .eq('member_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(25),
+      adminClient
+        .from('payments')
+        .select('id, status, subscription_id, amount, created_at, checkout_request_id')
+        .eq('member_id', user.id)
+        .in('status', ['Pending', 'Processing'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ])
 
     const registrationFeeStatus = regFeeResult.data?.status ?? 'unpaid'
     const registrationFeePaid = registrationFeeStatus === 'paid'
 
+    const contribRows = contribSum.data ?? []
+    const totalContributed = contribRows
+      .filter((c) => ['Paid', 'Verified', 'Late'].includes(c.status))
+      .reduce((sum, c) => sum + Number(c.amount ?? 0), 0)
+
+    const monthPaid = contribRows.some(
+      (c) => c.period === currentPeriod && ['Paid', 'Verified', 'Late'].includes(c.status),
+    )
+
+    function buildSummary(cards: Array<{
+      package?: { name?: string | null } | null
+      status?: string
+      contributions?: { current_month_paid?: boolean }
+      next_due_date?: string | null
+      monthly_amount?: number | null
+    }>) {
+      const active = cards.filter((c) => c.status === 'active')
+      const primary = active[0] ?? cards[0] ?? null
+      let monthStatus: 'paid' | 'due' | 'overdue' = 'due'
+      if (monthPaid || primary?.contributions?.current_month_paid) {
+        monthStatus = 'paid'
+      } else if (primary?.next_due_date) {
+        const due = new Date(primary.next_due_date)
+        if (due.getTime() < Date.now()) monthStatus = 'overdue'
+      }
+      return {
+        total_contributed: totalContributed,
+        month_status: monthStatus,
+        current_period: currentPeriod,
+        package_name: primary?.package?.name ?? null,
+        monthly_amount: primary?.monthly_amount ?? null,
+        pending_payment: pendingPay.data
+          ? {
+              ...pendingPay.data,
+              ui_status: mapPaymentUiStatus(pendingPay.data.status, pendingPay.data.created_at),
+            }
+          : null,
+      }
+    }
+
+    const recentPayments = (paymentsHist.data ?? []).map((p) => ({
+      ...p,
+      ui_status: mapPaymentUiStatus(p.status, p.created_at),
+    }))
+
     if (dashboardResult.error) {
-      // Fallback: use optimized direct queries with joins (not N+1)
-      const [subsResult, qualsResult, memberResult] = await Promise.all([
+      const [subsResult, qualsResult] = await Promise.all([
         adminClient
           .from('subscriptions')
           .select('id, status, started_at, next_due_date, package_id, packages(code, name, waiting_period_months), package_tiers(name, amount)')
@@ -49,25 +130,17 @@ Deno.serve(async (req) => {
           .from('qualifications')
           .select('subscription_id, status, eligible_from, criteria_met, evaluated_at')
           .eq('member_id', user.id),
-        adminClient
-          .from('members')
-          .select('status')
-          .eq('id', user.id)
-          .single(),
       ])
 
       const subs = subsResult.data ?? []
       const quals = qualsResult.data ?? []
-      const member = memberResult.data
 
-      // Batch fetch all contributions for this member (not per-subscription N+1)
       const { data: allContributions } = await adminClient
         .from('contributions')
         .select('subscription_id, status, period')
         .eq('member_id', user.id)
 
-      // Batch fetch all package rules
-      const packageIds = [...new Set(subs.map(s => s.package_id))]
+      const packageIds = [...new Set(subs.map((s) => s.package_id))]
       const { data: allRules } = packageIds.length > 0
         ? await adminClient
             .from('package_rules')
@@ -83,15 +156,13 @@ Deno.serve(async (req) => {
       }
 
       const qualsBySub = new Map((quals ?? []).map((q) => [q.subscription_id, q]))
-
-      const today = new Date()
-      const currentPeriod = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+      void qualsBySub
 
       const result = subs.map((s) => {
         const rules = rulesByPackage.get(s.package_id) ?? {}
         const contributions = (allContributions ?? []).filter((c) => c.subscription_id === s.id)
         const paid = contributions.filter((c) => ['Paid', 'Verified', 'Late'].includes(c.status)).length
-        const waitingMonths = s.packages?.[0]?.waiting_period_months === null || s.packages?.[0]?.waiting_period_months === undefined
+        const waitingMonths = s.packages?.[0]?.waiting_period_months == null
           ? null
           : Number(s.packages?.[0]?.waiting_period_months)
 
@@ -104,12 +175,18 @@ Deno.serve(async (req) => {
         const arrearsAllowed = Number(rules.arrears_allowed_months ?? 0)
         const maxArrears = Number(rules.max_arrears_months ?? arrearsAllowed + 1)
 
-        const coveredPeriods = new Set(contributions.filter((c) => ['Paid', 'Verified', 'Late'].includes(c.status)).map((c) => c.period))
+        const coveredPeriods = new Set(
+          contributions.filter((c) => ['Paid', 'Verified', 'Late'].includes(c.status)).map((c) => c.period),
+        )
         const startedAt = s.started_at ? new Date(s.started_at) : null
-        const monthsElapsed = startedAt ? Math.max(0, (today.getFullYear() - startedAt.getFullYear()) * 12 + (today.getMonth() - startedAt.getMonth())) : 0
+        const monthsElapsed = startedAt
+          ? Math.max(0, (today.getFullYear() - startedAt.getFullYear()) * 12 + (today.getMonth() - startedAt.getMonth()))
+          : 0
         const arrearsMonths = Math.max(0, monthsElapsed - coveredPeriods.size)
 
-        const currentMonthPaid = contributions.some((c) => c.period === currentPeriod && ['Paid', 'Verified', 'Late'].includes(c.status))
+        const currentMonthPaid = contributions.some(
+          (c) => c.period === currentPeriod && ['Paid', 'Verified', 'Late'].includes(c.status),
+        )
         const waitingMet = waitingMonths === null ? true : paid >= waitingMonths
         const atRisk = requiresCurrent && arrearsMonths > arrearsAllowed && arrearsMonths <= maxArrears
         const revoked = requiresCurrent && arrearsMonths > maxArrears
@@ -131,24 +208,49 @@ Deno.serve(async (req) => {
           monthly_amount: Number(s.package_tiers?.[0]?.amount ?? 0),
           status: s.status,
           waiting_period_months: waitingMonths,
-          contributions: { paid, required: waitingMonths, months_to_go: waitingMonths ? Math.max(0, waitingMonths - paid) : null, current_month_paid: currentMonthPaid },
+          contributions: {
+            paid,
+            required: waitingMonths,
+            months_to_go: waitingMonths ? Math.max(0, waitingMonths - paid) : null,
+            current_month_paid: currentMonthPaid,
+          },
           qualification: { status: qualStatus, eligible_from: eligibleFrom, criteria_met: {} },
           welfare_cover_at_risk: s.packages?.[0]?.code === 'welfare' && !currentMonthPaid,
           next_due_date: s.next_due_date,
         }
       })
 
-      return new Response(JSON.stringify({ cards: result, registration_fee_status: registrationFeeStatus, registration_fee_paid: registrationFeePaid }), {
+      return new Response(JSON.stringify({
+        cards: result,
+        registration_fee_status: registrationFeeStatus,
+        registration_fee_paid: registrationFeePaid,
+        summary: buildSummary(result),
+        recent_payments: recentPayments,
+      }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    return new Response(JSON.stringify({ cards: dashboardResult.data ?? [], registration_fee_status: registrationFeeStatus, registration_fee_paid: registrationFeePaid }), {
+    const cards = (dashboardResult.data ?? []) as Array<{
+      package?: { name?: string | null } | null
+      status?: string
+      contributions?: { current_month_paid?: boolean }
+      next_due_date?: string | null
+      monthly_amount?: number | null
+    }>
+
+    return new Response(JSON.stringify({
+      cards,
+      registration_fee_status: registrationFeeStatus,
+      registration_fee_paid: registrationFeePaid,
+      summary: buildSummary(cards),
+      recent_payments: recentPayments,
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
-  } catch (err) {
+  } catch (_err) {
     return new Response(JSON.stringify({ message: 'Internal server error', code: 'INTERNAL' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

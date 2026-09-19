@@ -26,6 +26,7 @@ export function Profile() {
       // eslint-disable-next-line oxc/react/set-state-in-effect — deriving form state from member prop
       setForm({
         fullName: member.full_name ?? '',
+        phone: member.phone ?? '',
         idNumber: (member.id_number as string) ?? '',
         altPhone: (member.alt_phone as string) ?? '',
         county: (member.county as string) ?? '',
@@ -111,7 +112,7 @@ export function Profile() {
       </div>
 
       {/* Profile header */}
-      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+      <div className="mt-6 glass-panel p-6">
         <div className="flex items-center gap-4">
           {/* Avatar */}
           <div className="relative group">
@@ -160,12 +161,16 @@ export function Profile() {
       </div>
 
       {/* Edit form */}
-      <form onSubmit={submit} className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+      <form onSubmit={submit} className="mt-6 glass-panel p-6">
         <h3 className="text-sm font-semibold text-gray-900 mb-4">Personal Information</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Full name</label>
             <input value={form.fullName ?? ''} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Phone (M-Pesa)</label>
+            <input value={form.phone ?? ''} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" placeholder="07XXXXXXXX" autoComplete="tel" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">ID number</label>
@@ -226,7 +231,7 @@ export function Profile() {
         } finally {
           setChangingPassword(false)
         }
-      }} className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+      }} className="mt-6 glass-panel p-6">
         <h3 className="text-sm font-semibold text-gray-900 mb-4">Change Password</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>

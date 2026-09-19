@@ -3,11 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Content Security Policy
-         CSP headers are configured at the Vercel/CDN layer (vercel.json or dashboard).
-         The meta tag is removed because it conflicts with Vite's hashed script chunks
-         and prevents React from mounting in production builds.
-    -->
+    <!-- Content Security Policy is set via Vercel headers (frontend/vercel.json).
+         No inline scripts: production script-src is 'self' only. -->
     <title>Luma Welfare — Community Welfare Platform in Kenya</title>
     <meta name="description" content="Luma Welfare is a community welfare organization in Kenya. Members contribute monthly to support each other through key life events — hospital costs, education, business, building, and more." />
     <meta name="robots" content="index, follow" />
@@ -34,27 +31,6 @@
     <meta name="twitter:image" content="https://luma-welfare.vercel.app/brand/luma-logo.jpeg" />
     <meta name="twitter:title" content="Luma Welfare — Community Welfare Platform in Kenya" />
     <meta name="twitter:description" content="Members contribute monthly to support each other through key life events. Affordable welfare packages with transparent tracking." />
-    <!-- Structured Data -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "Luma Welfare",
-      "url": "https://luma-welfare.vercel.app",
-      "logo": "https://luma-welfare.vercel.app/brand/luma-logo.jpeg",
-      "description": "Community welfare organization in Kenya. Members contribute monthly to support each other through key life events.",
-      "foundingDate": "2026",
-      "address": {
-        "@type": "PostalAddress",
-        "addressCountry": "KE"
-      },
-      "areaServed": {
-        "@type": "Country",
-        "name": "Kenya"
-      },
-      "sameAs": []
-    }
-    </script>
   </head>
   <body>
     <div id="root"></div>

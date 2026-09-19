@@ -1,5 +1,12 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, logAudit } from '../shared/supabase.ts'
+import {
+  getAuthenticatedUser,
+  createAdminClient,
+  loadAdminSession,
+  adminSessionDeniedResponse,
+  logAudit,
+  handleAdminError,
+} from '../shared/supabase.ts'
 import { mintAdmin2faStepUpToken } from '../shared/admin-2fa-token.ts'
 
 /**
@@ -372,9 +379,6 @@ Deno.serve(async (req) => {
       status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    console.error('admin-2fa error:', err)
-    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return handleAdminError(err, 'admin-2fa')
   }
 })

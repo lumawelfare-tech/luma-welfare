@@ -215,7 +215,7 @@ export function VerifyEmail() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center py-16">
         <div className="w-full max-w-md px-4">
-          <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-xl">
+          <div className="glass-modal p-8">
             <div className="text-center">
               <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-luma-700 font-bold text-white text-lg">
                 LW
@@ -263,7 +263,7 @@ export function VerifyEmail() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center py-16">
       <div className="w-full max-w-md px-4">
-        <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-xl">
+        <div className="glass-modal p-8">
           {/* Header */}
           <div className="text-center">
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-luma-700 font-bold text-white text-lg">

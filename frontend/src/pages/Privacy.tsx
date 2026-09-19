@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useHead } from '../lib/seo'
+import { PageHero } from '../components/PageHero'
 
 function Section({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
   return (
@@ -19,21 +20,15 @@ export function Privacy() {
 
   return (
     <div>
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-luma-800 to-luma-900 py-16 lg:py-20">
-        <div className="container-luma">
-          <span className="text-sm font-semibold uppercase tracking-wider text-luma-300">Legal</span>
-          <h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">Privacy Policy</h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/70">
-            How we collect, use, store, and protect your personal information.
-          </p>
-          <div className="mt-3 h-1 w-12 rounded-full bg-luma-400" />
-          <p className="mt-4 text-sm text-white/50">Last updated: August 2026</p>
-        </div>
-      </section>
+      <PageHero
+        eyebrow="Legal"
+        title="Privacy Policy"
+        description="How we collect, use, store, and protect your personal information."
+        meta="Last updated: August 2026"
+      />
 
       <div className="container-luma py-14">
-        <div className="mx-auto max-w-3xl">
+        <div className="glass-card mx-auto max-w-3xl p-8 sm:p-10">
           <Section number={1} title="Introduction">
             <p>
               Luma Welfare ("we," "our," or "us") is a community welfare organisation committed to protecting the privacy and security of our members' personal information. This Privacy Policy explains how we collect, use, store, and safeguard information when you use the Luma Welfare platform and services.

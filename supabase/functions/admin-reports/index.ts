@@ -1,5 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 
 /**
  * Admin Reports & Exports
@@ -295,10 +295,6 @@ Deno.serve(async (req) => {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    console.error('admin-reports error:', err)
-    const message = err instanceof Error ? err.message : 'An unexpected error occurred.'
-    return new Response(JSON.stringify({ message, code: 'INTERNAL' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return handleAdminError(err, 'admin-reports')
   }
 })

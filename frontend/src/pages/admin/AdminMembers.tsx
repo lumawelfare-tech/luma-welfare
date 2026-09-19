@@ -368,7 +368,7 @@ export function AdminMembers() {
             {showExportMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
-                <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                <div className="absolute right-0 top-full z-50 mt-1 w-56 glass-panel py-1 shadow-lg">
                   <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Current Page ({members.length})</div>
                   {([['csv', 'CSV'], ['excel', 'Excel'], ['pdf', 'PDF']] as const).map(([fmt, label]) => (
                     <button key={fmt} onClick={() => handleExport(fmt, false)} className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">{label}</button>
@@ -429,7 +429,7 @@ export function AdminMembers() {
       {/* Members Table with Selection */}
       <div className="mt-6">
         {loading ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
+          <div className="glass-panel p-12 text-center">
             <svg className="mx-auto h-6 w-6 animate-spin text-luma-600" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -509,7 +509,7 @@ export function AdminMembers() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+        <div className="flex items-center justify-between glass-panel px-4 py-3">
           <div className="text-sm text-gray-500">
             Page {page} of {totalPages}
           </div>

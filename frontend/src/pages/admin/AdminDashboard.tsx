@@ -37,7 +37,7 @@ function ExportButtons({ onCSV, onPDF }: { onCSV: () => void; onPDF: () => void 
 
 function StatCard({ label, value, color, icon }: { label: string; value: number | string; color: string; icon: React.ReactNode }) {
   return (
-    <div className={`rounded-2xl border border-gray-100 p-5 transition-all hover:shadow-md ${color}`}>
+    <div className={`glass-panel p-5 transition-all hover:shadow-md ${color}`}>
       <div className="flex items-start justify-between">
         <div>
           <div className="text-3xl font-extrabold">{value}</div>
@@ -63,6 +63,26 @@ function timeAgo(date: Date): string {
   return `${hours}h ago`
 }
 
+function kenyaTodayISO(d = new Date()): string {
+  // Africa/Nairobi is UTC+3 year-round (no DST)
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Nairobi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d)
+  const y = parts.find((p) => p.type === 'year')!.value
+  const m = parts.find((p) => p.type === 'month')!.value
+  const day = parts.find((p) => p.type === 'day')!.value
+  return `${y}-${m}-${day}`
+}
+
+function kenyaDateParts(d = new Date()): { y: number; m: number; day: number } {
+  const iso = kenyaTodayISO(d)
+  const [y, m, day] = iso.split('-').map(Number)
+  return { y, m, day }
+}
+
 export function AdminDashboard() {
   useHead('Admin Dashboard', undefined, { noindex: true })
   const { member } = useAuth()
@@ -84,28 +104,34 @@ export function AdminDashboard() {
   const [customTo, setCustomTo] = useState('')
 
   const getDateRange = useCallback((): { from: string; to: string } => {
-    const now = new Date()
-    const to = now.toISOString().split('T')[0]
+    const { y, m } = kenyaDateParts()
+    const to = kenyaTodayISO()
     let from: string
     switch (datePreset) {
       case 'today': {
         from = to; break
       }
       case '7d': {
-        const d = new Date(); d.setDate(d.getDate() - 7); from = d.toISOString().split('T')[0]; break
+        const d = new Date()
+        d.setUTCDate(d.getUTCDate() - 7)
+        from = kenyaTodayISO(d)
+        break
       }
       case '30d': {
-        const d = new Date(); d.setDate(d.getDate() - 30); from = d.toISOString().split('T')[0]; break
+        const d = new Date()
+        d.setUTCDate(d.getUTCDate() - 30)
+        from = kenyaTodayISO(d)
+        break
       }
       case 'month': {
-        from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`; break
+        from = `${y}-${String(m).padStart(2, '0')}-01`; break
       }
       case 'quarter': {
-        const q = Math.floor(now.getMonth() / 3)
-        from = `${now.getFullYear()}-${String(q * 3 + 1).padStart(2, '0')}-01`; break
+        const q = Math.floor((m - 1) / 3)
+        from = `${y}-${String(q * 3 + 1).padStart(2, '0')}-01`; break
       }
       case 'ytd': {
-        from = `${now.getFullYear()}-01-01`; break
+        from = `${y}-01-01`; break
       }
       case 'all': {
         from = '2024-01-01'; break
@@ -115,7 +141,7 @@ export function AdminDashboard() {
         break
       }
     }
-    return { from, to: customTo || to }
+    return { from, to: datePreset === 'custom' ? (customTo || to) : to }
   }, [datePreset, customFrom, customTo])
 
   const fetchData = useCallback(async (silent = false) => {
@@ -145,7 +171,7 @@ export function AdminDashboard() {
     }
   }, [getDateRange])
 
-  // Initial load + refetch on date range change
+  // Initial load + refetch when date range (via fetchData) changes — single effect avoids double mount fetch
   // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => {
     mountedRef.current = true
@@ -153,14 +179,6 @@ export function AdminDashboard() {
     fetchData()
     return () => { mountedRef.current = false }
   }, [fetchData])
-
-  // Refetch when date range changes
-  useEffect(() => {
-    // eslint-disable-next-line oxc/react/set-state-in-effect — loading already true; setRefreshing only
-    // eslint-disable-next-line react-hooks/exhaustive-deps — fetchData is useCallback-stable; deps reflect actual reactive inputs
-    fetchData(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datePreset, customFrom, customTo])
 
   // Month drill-down handler
   const handleMonthClick = useCallback(async (month: string) => {
@@ -262,18 +280,18 @@ export function AdminDashboard() {
         </div>
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-gray-100 bg-white p-5 space-y-2">
+            <div key={i} className="glass-panel p-5 space-y-2">
               <div className="h-8 w-16 animate-pulse rounded bg-gray-200" />
               <div className="h-3 w-24 animate-pulse rounded bg-gray-200" />
             </div>
           ))}
         </div>
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 lg:col-span-2">
+          <div className="glass-panel p-6 lg:col-span-2">
             <div className="h-5 w-40 animate-pulse rounded bg-gray-200" />
             <div className="mt-4 h-64 animate-pulse rounded bg-gray-100" />
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="glass-panel p-6">
             <div className="h-5 w-32 animate-pulse rounded bg-gray-200" />
             <div className="mt-4 h-64 animate-pulse rounded bg-gray-100" />
           </div>
@@ -407,7 +425,7 @@ export function AdminDashboard() {
       </div>
 
       {/* Global Date Range Filter */}
-      <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3">
+      <div className="mt-6 flex flex-wrap items-center gap-3 glass-panel px-5 py-3">
         <span className="text-sm font-medium text-gray-700">Date Range:</span>          <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
           {([
             { value: 'today' as DatePreset, label: 'Today' },
@@ -457,7 +475,7 @@ export function AdminDashboard() {
       {/* Charts Row 1 */}
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* Monthly Contributions Chart */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 lg:col-span-2">
+        <div className="glass-panel p-6 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Monthly Contributions</h2>
@@ -546,7 +564,7 @@ export function AdminDashboard() {
         </div>
 
         {/* Claims Status Pie */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="glass-panel p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Claims by Status</h2>
@@ -563,7 +581,7 @@ export function AdminDashboard() {
       {/* Charts Row 2 */}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Package Breakdown */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="glass-panel p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Active Subscriptions by Package</h2>
@@ -577,7 +595,7 @@ export function AdminDashboard() {
         </div>
 
         {/* Registration Fee Stats + Summary */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="glass-panel p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Registration Fees</h2>
@@ -619,7 +637,7 @@ export function AdminDashboard() {
       </div>
 
       {/* Recent Transactions Table */}
-      <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="mt-6 glass-panel p-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-gray-900">Recent Transactions</h2>
@@ -676,7 +694,7 @@ export function AdminDashboard() {
 
           {/* Analytics KPIs */}
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="rounded-2xl border border-gray-100 bg-white p-5">
+            <div className="glass-panel p-5">
               <div className="text-2xl font-extrabold text-gray-900">{data.report_analytics.total_reports}</div>
               <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Total Reports</div>
             </div>
@@ -699,7 +717,7 @@ export function AdminDashboard() {
           {/* Charts Row */}
           <div className="mt-4 grid gap-6 lg:grid-cols-2">
             {/* Report Generation Trend */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+            <div className="glass-panel p-6">
               <h3 className="text-sm font-bold text-gray-900">Generation Trend</h3>
               <p className="mt-0.5 text-xs text-gray-500">Reports generated per month</p>
               <div className="mt-4 h-48">
@@ -721,7 +739,7 @@ export function AdminDashboard() {
             </div>
 
             {/* Reports by Type */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+            <div className="glass-panel p-6">
               <h3 className="text-sm font-bold text-gray-900">Reports by Type</h3>
               <p className="mt-0.5 text-xs text-gray-500">Generation count per report type</p>
               <div className="mt-4 space-y-2.5">
@@ -747,7 +765,7 @@ export function AdminDashboard() {
           </div>
 
           {/* Schedule Performance */}
-          <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="mt-4 glass-panel p-6">
             <h3 className="text-sm font-bold text-gray-900">Schedule Performance</h3>
             <p className="mt-0.5 text-xs text-gray-500">Success rate per scheduled report</p>
             <div className="mt-4 overflow-x-auto">
@@ -794,7 +812,7 @@ export function AdminDashboard() {
 
       {/* Recent Reports Widget */}
       {data.recent_reports && data.recent_reports.length > 0 && (
-        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="mt-6 glass-panel p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Recent Reports</h2>
@@ -829,7 +847,7 @@ export function AdminDashboard() {
       {/* Membership Funnel + Member Growth */}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Membership Funnel */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="glass-panel p-6">
           <div>
             <h2 className="text-base font-bold text-gray-900">Membership Funnel</h2>
             <p className="mt-1 text-xs text-gray-500">Member journey from registration to qualification</p>
@@ -841,7 +859,7 @@ export function AdminDashboard() {
 
         {/* Member Growth Chart */}
         {data.member_growth && data.member_growth.length > 0 && (
-        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="mt-6 glass-panel p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Member Growth</h2>
@@ -877,7 +895,7 @@ export function AdminDashboard() {
       {/* Payment Health + Outstanding Obligations + Qualifications */}
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* Payment Health */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="glass-panel p-6">
           <h2 className="text-base font-bold text-gray-900">Payment Health</h2>
           <p className="mt-1 text-xs text-gray-500">M-Pesa payment performance</p>
           <div className="mt-4 space-y-3">
@@ -913,7 +931,7 @@ export function AdminDashboard() {
         </div>
 
         {/* Outstanding Obligations */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="glass-panel p-6">
           <h2 className="text-base font-bold text-gray-900">Outstanding Obligations</h2>
           <p className="mt-1 text-xs text-gray-500">Items requiring attention</p>
           <div className="mt-4 space-y-3">
@@ -949,7 +967,7 @@ export function AdminDashboard() {
         </div>
 
         {/* Qualifications + Retention */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="glass-panel p-6">
           <h2 className="text-base font-bold text-gray-900">Qualifications</h2>
           <p className="mt-1 text-xs text-gray-500">Member qualification status</p>
           <div className="mt-4 space-y-2">

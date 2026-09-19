@@ -55,7 +55,7 @@ export function Family() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* Add form */}
-        <form onSubmit={add} className="rounded-xl border border-gray-200 bg-white p-5">
+        <form onSubmit={add} className="glass-panel p-5">
           <h2 className="text-sm font-semibold text-gray-900">Add Family Member</h2>
           <div className="mt-4 space-y-3">
             <div>
@@ -98,14 +98,14 @@ export function Family() {
           )}
 
           {!loading && members.length === 0 && (
-            <div className="rounded-xl border border-gray-200 bg-white p-10 text-center">
+            <div className="glass-panel p-10 text-center">
               <p className="text-sm text-gray-500">No family members registered yet.</p>
             </div>
           )}
 
           <div className="grid gap-3 sm:grid-cols-2">
             {members.map((m) => (
-              <div key={m.id} className="flex items-start justify-between rounded-xl border border-gray-200 bg-white p-4 hover:shadow-sm transition-all">
+              <div key={m.id} className="flex items-start justify-between glass-panel p-4 hover:shadow-sm transition-all">
                 <div>
                   <div className="font-medium text-gray-900">{m.full_name}</div>
                   <div className="mt-1 text-xs text-gray-500">

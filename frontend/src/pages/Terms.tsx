@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useHead } from '../lib/seo'
+import { PageHero } from '../components/PageHero'
 
 function Section({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
   return (
@@ -19,21 +20,15 @@ export function Terms() {
 
   return (
     <div>
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-luma-800 to-luma-900 py-16 lg:py-20">
-        <div className="container-luma">
-          <span className="text-sm font-semibold uppercase tracking-wider text-luma-300">Legal</span>
-          <h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">Terms & Conditions</h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/70">
-            The terms governing your use of the Luma Welfare platform and services.
-          </p>
-          <div className="mt-3 h-1 w-12 rounded-full bg-luma-400" />
-          <p className="mt-4 text-sm text-white/50">Last updated: August 2026</p>
-        </div>
-      </section>
+      <PageHero
+        eyebrow="Legal"
+        title="Terms & Conditions"
+        description="The terms governing your use of the Luma Welfare platform and services."
+        meta="Last updated: August 2026"
+      />
 
       <div className="container-luma py-14">
-        <div className="mx-auto max-w-3xl">
+        <div className="glass-card mx-auto max-w-3xl p-8 sm:p-10">
           <Section number={1} title="Acceptance of Terms">
             <p>
               By accessing or using the Luma Welfare platform ("the Service"), you agree to be bound by these Terms & Conditions. If you do not agree to these terms, please do not use the Service.

@@ -271,7 +271,7 @@ export function ReceiptsStatements() {
       {error && <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {!loading && !error && (
-        <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="mt-6 overflow-x-auto glass-panel">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>

@@ -1,14 +1,23 @@
 /**
- * admin-notifications — Admin notification bell for report failures and system alerts
+ * admin-notifications — Admin notification bell + member announcements
  *
  * GET  /admin-notifications              — list admin notifications (newest first)
  * GET  /admin-notifications?unread=true  — count only unread
  * PATCH /admin-notifications?id=xxx      — mark as read
  * PATCH /admin-notifications?read_all=true — mark all as read
+ * POST /admin-notifications?action=announce — fan-out admin announcement to members
  */
 
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse } from '../shared/supabase.ts'
+import {
+  getAuthenticatedUser,
+  createAdminClient,
+  loadAdminSession,
+  adminSessionDeniedResponse,
+  logAudit,
+  handleAdminError,
+} from '../shared/supabase.ts'
+import { sendNotification } from '../shared/notifications.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -31,6 +40,77 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url)
 
+    // POST — publish announcement to members
+    if (req.method === 'POST' && url.searchParams.get('action') === 'announce') {
+      if (!session.is_superadmin) {
+        const canNotify = session.permissions.has('notifications:create')
+          || session.permissions.has('members:update')
+          || session.permissions.has('notifications:write')
+        if (!canNotify) {
+          return new Response(JSON.stringify({ message: 'Forbidden', code: 'FORBIDDEN' }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+      }
+
+      const body = await req.json()
+      const title = typeof body.title === 'string' ? body.title.trim() : ''
+      const message = typeof body.body === 'string' ? body.body.trim() : ''
+      if (!title || !message) {
+        return new Response(JSON.stringify({ message: 'title and body are required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: announcement, error: annErr } = await adminClient
+        .from('announcements')
+        .insert({
+          title,
+          body: message,
+          created_by: user.id,
+          published_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+
+      if (annErr) throw new Error(annErr.message)
+
+      const { data: members, error: memErr } = await adminClient
+        .from('members')
+        .select('id')
+        .eq('status', 'active')
+
+      if (memErr) throw new Error(memErr.message)
+
+      let sent = 0
+      for (const m of members ?? []) {
+        const r = await sendNotification(adminClient, {
+          memberId: m.id,
+          type: 'admin_announcement',
+          subject: title,
+          body: message,
+          meta: { announcementId: announcement.id },
+          skipEmail: body.skipEmail === true,
+        })
+        if (r.inApp) sent++
+      }
+
+      await logAudit(adminClient, {
+        actor_id: user.id,
+        action: 'announcement_published',
+        resource: 'announcement',
+        resource_id: announcement.id,
+        meta: { recipients: sent },
+      })
+
+      return new Response(JSON.stringify({
+        announcement_id: announcement.id,
+        recipients: sent,
+      }), {
+        status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // GET — list notifications or count unread
     if (req.method === 'GET') {
       const unreadOnly = url.searchParams.get('unread') === 'true'
@@ -51,7 +131,7 @@ Deno.serve(async (req) => {
 
       const { data, error } = await adminClient
         .from('notifications')
-        .select('id, channel, subject, body, status, created_at, sent_at')
+        .select('id, channel, subject, body, status, type, meta, created_at, sent_at')
         .eq('member_id', user.id)
         .eq('channel', 'admin')
         .order('created_at', { ascending: false })
@@ -105,8 +185,6 @@ Deno.serve(async (req) => {
       status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal server error' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return handleAdminError(err, 'admin-notifications')
   }
 })

@@ -1,4 +1,6 @@
 import { useHead } from '../lib/seo'
+import { PageHero } from '../components/PageHero'
+import { MotionSection, MotionCard } from '../components/MotionSection'
 
 const details = [
   { label: 'Phone / WhatsApp', value: '0798635024', href: 'tel:0798635024', icon: (
@@ -28,31 +30,24 @@ export function Contact() {
   useHead('Contact', 'Contact Luma Welfare — phone, WhatsApp, email, and address. Reach the welfare office for membership, payment, and claim questions.')
   return (
     <div>
-      {/* Page Hero */}
-      <section className="bg-gradient-to-br from-luma-800 to-luma-900 py-16 lg:py-20">
-        <div className="container-luma">
-          <span className="text-sm font-semibold uppercase tracking-wider text-luma-300">Get in Touch</span>
-          <h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">Contact Us</h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/70">
-            Call, WhatsApp or email the welfare office. If your question is about your own
-            contributions or a claim, sign in and check your dashboard first — most answers are there.
-          </p>
-          <div className="mt-3 h-1 w-12 rounded-full bg-luma-400" />
-        </div>
-      </section>
+      <PageHero
+        eyebrow="Get in Touch"
+        title="Contact Us"
+        description="Call, WhatsApp or email the welfare office. If your question is about your own contributions or a claim, sign in and check your dashboard first — most answers are there."
+      />
 
-      <div className="container-luma py-14">
+      <MotionSection as="div" className="container-luma py-14">
         <div className="grid gap-5 sm:grid-cols-2">
           {details.map((d) => (
-            <div key={d.label} className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-md hover:border-luma-200">
+            <MotionCard key={d.label} className="glass-card p-6">
               <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-luma-50 text-luma-600">
+                <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-luma-50/90 text-luma-700">
                   {d.icon}
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-500">{d.label}</div>
+                  <div className="text-sm font-medium text-gray-600">{d.label}</div>
                   {d.href ? (
-                    <a href={d.href} className="mt-1 block text-lg font-bold text-luma-700 hover:underline">
+                    <a href={d.href} className="mt-1 block text-lg font-bold text-luma-800 hover:underline">
                       {d.value}
                     </a>
                   ) : (
@@ -60,11 +55,11 @@ export function Contact() {
                   )}
                 </div>
               </div>
-            </div>
+            </MotionCard>
           ))}
         </div>
 
-        <div className="mt-8 max-w-2xl rounded-2xl border border-gray-200 bg-white p-8">
+        <div className="glass-card mt-8 max-w-2xl p-8">
           <h2 className="text-xl font-bold text-gray-900">What to have ready when you call</h2>
           <ul className="mt-4 space-y-2">
             <li className="flex items-center gap-3 text-sm text-gray-600">
@@ -82,7 +77,7 @@ export function Contact() {
           </ul>
         </div>
 
-        <div className="mt-6 max-w-2xl rounded-2xl border border-gold-400/50 bg-gold-400/10 p-8">
+        <div className="glass-card mt-6 max-w-2xl border-gold-400/40 p-8">
           <h2 className="text-xl font-bold text-gray-900">Before you contact us</h2>
           <p className="mt-3 text-sm leading-relaxed text-gray-600">
             The office answers hundreds of WhatsApp messages, so it helps everyone if you first
@@ -91,7 +86,7 @@ export function Contact() {
             there, then message us.
           </p>
         </div>
-      </div>
+      </MotionSection>
     </div>
   )
 }

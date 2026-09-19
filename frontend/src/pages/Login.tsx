@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { api, ApiError } from '../lib/api'
+import { useHead } from '../lib/seo'
+import { AuthCard, fieldClass, alertErrorClass, alertSuccessClass, alertWarnClass } from '../components/PageHero'
 
 export function Login() {
+  useHead('Login', undefined, { noindex: true })
   const { login, signInWithGoogle, member, isAdmin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -107,17 +111,17 @@ export function Login() {
     navigate(isAdmin ? '/admin' : '/dashboard', { replace: true })
   }
 
+  const reduceMotion = useReducedMotion()
+
   return (
-    <div className="flex min-h-[60vh] items-center justify-center py-16">
-      <div className="w-full max-w-md px-4">
-        <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-xl">
+    <AuthCard>
           {/* Logo */}
           <div className="text-center">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-luma-700 font-bold text-white text-lg">
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-luma-700 font-bold text-white text-lg shadow-sm shadow-luma-700/30">
               LW
             </span>
             <h1 className="mt-4 text-2xl font-bold text-gray-900">{requires2fa ? 'Two-Factor Verification' : 'Welcome Back'}</h1>
-            <p className="mt-2 text-sm text-gray-500">
+            <p className="mt-2 text-sm text-gray-600">
               {requires2fa
                 ? 'Enter the 6-digit code from your authenticator app'
                 : 'Sign in to your Luma Welfare account'}
@@ -136,49 +140,52 @@ export function Login() {
                   placeholder="000000"
                   maxLength={6}
                   autoFocus
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center font-mono text-xl tracking-[0.3em] outline-none focus:border-luma-500 focus:bg-white focus:ring-2 focus:ring-luma-500/20 transition-all"
+                  className={`${fieldClass} text-center font-mono text-xl tracking-[0.3em]`}
                 />
               </div>
 
               {error && (
-                <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+                <div className={alertErrorClass} role="alert">{error}</div>
               )}
 
-              <button
+              <motion.button
+                type="button"
                 onClick={handleVerify2FA}
                 disabled={verifying2fa || totpCode.length !== 6}
+                whileTap={reduceMotion ? undefined : { scale: 0.98 }}
                 className="w-full rounded-xl bg-luma-700 py-3 text-sm font-bold text-white hover:bg-luma-800 disabled:opacity-60 transition-all shadow-sm"
               >
                 {verifying2fa ? 'Verifying…' : 'Verify'}
-              </button>
+              </motion.button>
 
               <button
+                type="button"
                 onClick={() => { setRequires2fa(false); setTotpCode(''); setError(null) }}
-                className="w-full text-center text-sm font-medium text-gray-500 hover:text-gray-700"
+                className="w-full text-center text-sm font-medium text-gray-600 hover:text-gray-800"
               >
                 Use a different account
               </button>
             </div>
           ) : (
             <>
-              {/* Normal Login Form */}
-              <form onSubmit={submit} className="mt-8 space-y-4">
+              <form onSubmit={submit} className="mt-8 space-y-4" noValidate>
                 <div>
                   <label htmlFor="login-email" className="mb-1.5 block text-sm font-medium text-gray-700">Email</label>
                   <input
                     id="login-email"
                     type="email"
                     required
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-luma-500 focus:bg-white focus:ring-2 focus:ring-luma-500/20 transition-all"
+                    className={fieldClass}
                   />
                 </div>
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">
                     <label htmlFor="login-password" className="text-sm font-medium text-gray-700">Password</label>
-                    <Link to="/forgot-password" className="text-xs font-medium text-luma-600 hover:text-luma-700 hover:underline">
+                    <Link to="/forgot-password" className="text-xs font-medium text-luma-700 hover:text-luma-800 hover:underline">
                       Forgot password?
                     </Link>
                   </div>
@@ -186,27 +193,28 @@ export function Login() {
                     id="login-password"
                     type="password"
                     required
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-luma-500 focus:bg-white focus:ring-2 focus:ring-luma-500/20 transition-all"
+                    className={fieldClass}
                   />
                 </div>
 
                 {passwordReset && (
-                  <div className="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">
+                  <div className={alertSuccessClass} role="status">
                     Password reset successful. You can now sign in with your new password.
                   </div>
                 )}
 
                 {justVerified && (
-                  <div className="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">
+                  <div className={alertSuccessClass} role="status">
                     Email verified successfully. You can now sign in to your account.
                   </div>
                 )}
 
                 {needsVerification && (
-                  <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <div className={alertWarnClass} role="alert">
                     <p className="font-medium">Your email isn&apos;t verified yet.</p>
                     <p className="mt-1 text-xs">
                       Enter the 6-digit code we sent to {email.trim()} or request a new one.
@@ -214,7 +222,7 @@ export function Login() {
                     <button
                       type="button"
                       onClick={() => navigate('/verify-email', { state: { email: email.trim() } })}
-                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-900 hover:underline"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-950 hover:underline"
                     >
                       Verify your email →
                     </button>
@@ -222,32 +230,33 @@ export function Login() {
                 )}
 
                 {error && !needsVerification && (
-                  <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <div className={alertErrorClass} role="alert">
                     {error}
                   </div>
                 )}
 
-                <button
+                <motion.button
                   type="submit"
                   disabled={busy || googleBusy}
+                  whileTap={reduceMotion ? undefined : { scale: 0.98 }}
                   className="w-full rounded-xl bg-luma-700 py-3 text-sm font-bold text-white hover:bg-luma-800 disabled:opacity-60 transition-all shadow-sm"
                 >
                   {busy ? 'Signing in…' : 'Sign In'}
-                </button>
+                </motion.button>
               </form>
 
-              {/* Divider */}
               <div className="my-6 flex items-center gap-3">
-                <div className="h-px flex-1 bg-gray-200" />
-                <span className="text-xs font-medium text-gray-400 uppercase">or</span>
-                <div className="h-px flex-1 bg-gray-200" />
+                <div className="h-px flex-1 bg-gray-200/80" />
+                <span className="text-xs font-medium text-gray-500 uppercase">or</span>
+                <div className="h-px flex-1 bg-gray-200/80" />
               </div>
 
-              {/* Google Sign-In */}
-              <button
+              <motion.button
+                type="button"
                 onClick={handleGoogle}
                 disabled={busy || googleBusy}
-                className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition-all shadow-sm"
+                whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/60 bg-white/60 py-3 text-sm font-medium text-gray-800 hover:bg-white/90 disabled:opacity-60 transition-all shadow-sm"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -256,20 +265,18 @@ export function Login() {
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>
                 {googleBusy ? 'Connecting…' : 'Continue with Google'}
-              </button>
+              </motion.button>
             </>
           )}
 
           {!requires2fa && (
-            <p className="mt-6 text-center text-sm text-gray-500">
+            <p className="mt-6 text-center text-sm text-gray-600">
               Not a member yet?{' '}
-              <Link to="/register" className="font-semibold text-luma-700 hover:underline">
+              <Link to="/register" className="font-semibold text-luma-800 hover:underline">
                 Join now
               </Link>
             </p>
           )}
-        </div>
-      </div>
-    </div>
+    </AuthCard>
   )
 }

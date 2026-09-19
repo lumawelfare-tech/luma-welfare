@@ -294,7 +294,7 @@ export function Claims() {
 
       {/* Submit Form */}
       {showForm && (
-        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6" role="region" aria-label="Claim submission form">
+        <div className="mt-6 glass-panel p-6" role="region" aria-label="Claim submission form">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">File a Claim</h2>
             <button onClick={resetForm} className="text-sm text-gray-500 hover:text-gray-700 min-h-[44px] px-2" aria-label="Cancel claim submission">Cancel</button>
@@ -394,7 +394,7 @@ export function Claims() {
       )}
 
       {!loading && claims.length === 0 && (
-        <div className="mt-8 rounded-xl border border-gray-200 bg-white p-12 text-center">
+        <div className="mt-8 glass-panel p-12 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400">
             <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
@@ -420,7 +420,7 @@ export function Claims() {
       {!loading && claims.length > 0 && (
         <div className="mt-6 space-y-3">
           {claims.map((cl) => (
-            <div key={cl.id} className="rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md transition-all">
+            <div key={cl.id} className="glass-panel p-4 hover:shadow-md transition-all">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">

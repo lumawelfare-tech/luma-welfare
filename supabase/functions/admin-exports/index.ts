@@ -3,7 +3,7 @@ import {
   getAuthenticatedUser,
   createAdminClient,
   loadAdminSession, adminSessionDeniedResponse,
-  requirePermission,
+  requirePermission, handleAdminError,
   logAudit,
 } from '../shared/supabase.ts'
 
@@ -461,8 +461,6 @@ Deno.serve(async (req) => {
       created_at: new Date().toISOString(),
     })
   } catch (err) {
-    console.error('admin-exports error:', err)
-    const message = err instanceof Error ? err.message : 'An unexpected error occurred.'
-    return jsonResponse({ message }, 500)
+    return handleAdminError(err, 'admin-exports')
   }
 })

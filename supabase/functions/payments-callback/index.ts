@@ -222,8 +222,10 @@ Deno.serve(async (req) => {
       if (success && memberId) {
         await sendNotification(adminClient, {
           memberId,
+          type: 'payment_confirmed',
           subject: 'Membership Activated',
           body: 'Your KSh 300 activation payment was successful. Your Luma Welfare membership is now active. You can explore and join welfare packages.',
+          meta: { kind: 'registration_fee', mpesaReceipt: meta.mpesaReceipt },
           emailButtonText: 'Explore Packages',
           emailButtonUrl: 'https://luma-welfare.vercel.app/join',
         })
@@ -269,6 +271,43 @@ Deno.serve(async (req) => {
       const amountMismatch = paymentResult?.amount_mismatch ?? false
 
       if (paymentResult?.payment_id) {
+        const { data: paymentRow } = await adminClient
+          .from('payments')
+          .select('member_id')
+          .eq('id', paymentResult.payment_id)
+          .maybeSingle()
+
+        const memberIdForNotify = paymentRow?.member_id as string | undefined
+        if (memberIdForNotify) {
+          if (success) {
+            await sendNotification(adminClient, {
+              memberId: memberIdForNotify,
+              type: 'payment_confirmed',
+              subject: 'Payment confirmed',
+              body: meta.mpesaReceipt
+                ? `Your contribution payment was confirmed. M-Pesa receipt: ${meta.mpesaReceipt}.`
+                : 'Your contribution payment was confirmed.',
+              meta: {
+                paymentId: paymentResult.payment_id,
+                mpesaReceipt: meta.mpesaReceipt,
+              },
+            })
+          } else {
+            await sendNotification(adminClient, {
+              memberId: memberIdForNotify,
+              type: 'payment_failed',
+              subject: 'Payment failed',
+              body: ResultDesc
+                ? `Your M-Pesa payment could not be completed: ${ResultDesc}. You can try again from your dashboard.`
+                : 'Your M-Pesa payment could not be completed. You can try again from your dashboard.',
+              meta: {
+                paymentId: paymentResult.payment_id,
+                resultCode: ResultCode,
+              },
+            })
+          }
+        }
+
         await logAudit(adminClient, {
           actor_id: paymentResult.payment_id,
           action: success ? 'payment_completed' : (amountMismatch ? 'payment_amount_mismatch' : 'payment_failed'),

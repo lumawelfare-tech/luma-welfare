@@ -1,5 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 
 function makeStoragePath(filename: string): string {
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 50)
@@ -282,9 +282,6 @@ Deno.serve(async (req) => {
       status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    console.error('admin-media error:', err)
-    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return handleAdminError(err, 'admin-media')
   }
 })

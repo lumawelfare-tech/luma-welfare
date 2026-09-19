@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api } from '../lib/api'
 import { useHead } from '../lib/seo'
+import { PageHero } from '../components/PageHero'
+import { EmptyState } from '../components/EmptyState'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -107,37 +109,32 @@ export function Media() {
 
   return (
     <div>
-      {/* ---- Hero ---- */}
-      <section className="bg-gradient-to-br from-luma-800 to-luma-900 py-16 lg:py-20">
-        <div className="container-luma">
-          <span className="text-sm font-semibold uppercase tracking-wider text-luma-300">Our Content</span>
-          <h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">Media</h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/70">
-            Explore Luma Welfare's latest photos, videos, publications and media content.
-          </p>
-          <div className="mt-3 h-1 w-12 rounded-full bg-luma-400" />
-        </div>
-      </section>
+      <PageHero
+        eyebrow="Our Content"
+        title="Media"
+        description="Explore Luma Welfare's latest photos, videos, publications and media content."
+      />
 
       {/* ---- Featured ---- */}
       {!loading && items.some((i) => i.is_featured) && activeType === 'all' && page === 1 && (
-        <section className="bg-luma-50 py-10">
+        <section className="py-10">
           <div className="container-luma">
             <h2 className="text-lg font-bold text-gray-900">Featured</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {items.filter((i) => i.is_featured).slice(0, 3).map((item) => (
                 <button
                   key={item.id}
+                  type="button"
                   onClick={() => setViewerItem(item)}
-                  className="group overflow-hidden rounded-xl border border-luma-200 bg-white text-left transition-all hover:shadow-lg hover:border-luma-300"
+                  className="glass-card group overflow-hidden text-left transition-all hover:border-luma-300"
                 >
-                  <div className="aspect-video overflow-hidden bg-gray-100">
+                  <div className="aspect-video overflow-hidden bg-luma-50/50">
                     {item.media_type === 'image' ? (
                       <img src={item.thumbnail_url || item.file_url} alt={item.title}
                         className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <svg className="h-10 w-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                        <svg className="h-10 w-10 text-luma-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                           <path strokeLinecap="round" strokeLinejoin="round" d={typeIcon(item.media_type)} />
                         </svg>
                       </div>
@@ -145,7 +142,7 @@ export function Media() {
                   </div>
                   <div className="p-4">
                     <div className="font-semibold text-gray-900 text-sm">{item.title}</div>
-                    <div className="mt-1 text-xs text-gray-500 capitalize">{item.media_type}</div>
+                    <div className="mt-1 text-xs text-gray-600 capitalize">{item.media_type}</div>
                   </div>
                 </button>
               ))}
@@ -161,18 +158,19 @@ export function Media() {
           {TYPE_FILTERS.map((f) => (
             <button
               key={f.value}
+              type="button"
               onClick={() => { setActiveType(f.value); setPage(1) }}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                 activeType === f.value
                   ? 'bg-luma-700 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'glass text-gray-700 hover:bg-white/80'
               }`}
             >
               {f.label}
             </button>
           ))}
           {totalCount > 0 && (
-            <span className="ml-auto flex items-center text-sm text-gray-500">
+            <span className="ml-auto flex items-center text-sm text-gray-600">
               {totalCount} item{totalCount !== 1 ? 's' : ''}
             </span>
           )}
@@ -182,11 +180,11 @@ export function Media() {
         {loading && (
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="animate-pulse rounded-xl border border-gray-100 bg-white">
-                <div className="aspect-square bg-gray-200 rounded-t-xl" />
+              <div key={i} className="glass-card animate-pulse overflow-hidden">
+                <div className="aspect-square bg-luma-100/80" />
                 <div className="p-4 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-2/3" />
-                  <div className="h-3 bg-gray-200 rounded w-1/3" />
+                  <div className="h-4 bg-luma-100/80 rounded w-2/3" />
+                  <div className="h-3 bg-luma-100/80 rounded w-1/3" />
                 </div>
               </div>
             ))}
@@ -195,18 +193,25 @@ export function Media() {
 
         {/* Error */}
         {error && (
-          <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-16 text-center text-red-600">{error}</div>
+          <div className="mt-8">
+            <EmptyState
+              title="Couldn’t load media"
+              message={error}
+              icon="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+              action={{ label: 'Retry', onClick: () => load(page, activeType) }}
+            />
+          </div>
         )}
 
         {/* Empty */}
         {!loading && !error && items.length === 0 && (
-          <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-16 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-              </svg>
-            </div>
-            <p className="mt-4 text-gray-500">No media available yet. Check back soon for updates.</p>
+          <div className="mt-8">
+            <EmptyState
+              title="No media yet"
+              message="Check back soon for photos, videos, and publications."
+              icon="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"
+              action={{ label: 'Retry', onClick: () => load(1, activeType) }}
+            />
           </div>
         )}
 
@@ -216,24 +221,23 @@ export function Media() {
             {items.map((item) => (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => setViewerItem(item)}
-                className="group overflow-hidden rounded-xl border border-gray-200 bg-white text-left transition-all hover:shadow-lg hover:border-luma-200"
+                className="glass-card group overflow-hidden text-left transition-all hover:border-luma-300"
               >
-                {/* Thumbnail */}
-                <div className="relative aspect-square overflow-hidden bg-gray-100">
+                <div className="relative aspect-square overflow-hidden bg-luma-50/40">
                   {item.media_type === 'image' ? (
                     <img src={item.thumbnail_url || item.file_url} alt={item.title}
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
-                      <svg className="h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                      <svg className="h-12 w-12 text-luma-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                         <path strokeLinecap="round" strokeLinejoin="round" d={typeIcon(item.media_type)} />
                       </svg>
                     </div>
                   )}
 
-                  {/* Type badge */}
-                  <span className="absolute left-2 top-2 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-700 shadow-sm capitalize">
+                  <span className="absolute left-2 top-2 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-800 shadow-sm capitalize">
                     {item.media_type}
                   </span>
 
@@ -243,7 +247,6 @@ export function Media() {
                     </span>
                   )}
 
-                  {/* Hover play/view icon */}
                   <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors opacity-0 group-hover:opacity-100">
                     <div className="rounded-full bg-white/90 p-3 shadow-lg">
                       <svg className="h-6 w-6 text-luma-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -254,10 +257,9 @@ export function Media() {
                   </div>
                 </div>
 
-                {/* Info */}
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-900 text-sm line-clamp-1">{item.title}</h3>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                  <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
                     {item.category && <span>{item.category}</span>}
                     {item.category && <span>·</span>}
                     <span>{new Date(item.created_at).toLocaleDateString()}</span>
@@ -268,21 +270,22 @@ export function Media() {
           </div>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="mt-8 flex items-center justify-center gap-2">
             <button
+              type="button"
               disabled={page <= 1}
               onClick={() => load(page - 1, activeType)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="glass rounded-lg px-4 py-2 text-sm font-medium text-gray-800 hover:bg-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Previous
             </button>
-            <span className="px-3 text-sm text-gray-500">Page {page} of {totalPages}</span>
+            <span className="px-3 text-sm text-gray-600">Page {page} of {totalPages}</span>
             <button
+              type="button"
               disabled={page >= totalPages}
               onClick={() => load(page + 1, activeType)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="glass rounded-lg px-4 py-2 text-sm font-medium text-gray-800 hover:bg-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Next
             </button>
@@ -290,7 +293,6 @@ export function Media() {
         )}
       </div>
 
-      {/* ---- Viewer Modal ---- */}
       {viewerItem && (
         <ViewerModal item={viewerItem} onClose={() => setViewerItem(null)} />
       )}
@@ -320,7 +322,7 @@ function ViewerModal({ item, onClose }: { item: MediaItem; onClose: () => void }
       aria-label={`View: ${item.title}`}
     >
       <div
-        className="relative max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white shadow-2xl"
+        className="relative max-h-[90vh] w-full max-w-4xl overflow-auto glass-modal"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close */}

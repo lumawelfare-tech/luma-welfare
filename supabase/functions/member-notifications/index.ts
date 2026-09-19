@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
 
       const { data, error } = await adminClient
         .from('notifications')
-        .select('id, channel, subject, body, status, created_at, sent_at')
+        .select('id, channel, subject, body, status, type, meta, created_at, sent_at')
         .eq('member_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50)

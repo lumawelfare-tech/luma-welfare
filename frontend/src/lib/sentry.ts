@@ -55,7 +55,7 @@ export function initSentry() {
       'Non-Error Captured',
     ],
 
-    // Before send hook to filter out noise
+    // Before send hook to filter out noise and strip sensitive extras
     beforeSend(event) {
       // Don't send events for development errors
       if (event.exception?.values?.[0]?.type === 'ChunkLoadError') {
@@ -65,6 +65,14 @@ export function initSentry() {
       // Don't send events for network errors (user offline)
       if (event.exception?.values?.[0]?.value?.includes('Failed to fetch')) {
         return null // Network issue, not a bug
+      }
+
+      // Strip common secret-bearing keys from extras/contexts if present
+      const sensitiveKey = /token|secret|password|authorization|cookie|mpesa|service.?role|cron/i
+      if (event.extra) {
+        for (const key of Object.keys(event.extra)) {
+          if (sensitiveKey.test(key)) delete event.extra[key]
+        }
       }
 
       return event

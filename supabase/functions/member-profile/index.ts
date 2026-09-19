@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
 
       const { data, error } = await adminClient
         .from('members').update({
-          full_name: body.fullName, id_number: body.idNumber, alt_phone: body.altPhone,
+          full_name: body.fullName, id_number: body.idNumber, phone: body.phone, alt_phone: body.altPhone,
           date_of_birth: body.dateOfBirth, county: body.county, location: body.location,
           occupation: body.occupation, photo_url: body.photoUrl || undefined,
         }).eq('id', user.id).select().single()
