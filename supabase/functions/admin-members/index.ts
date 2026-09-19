@@ -1,5 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, logAudit } from '../shared/supabase.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -14,12 +14,11 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createAdminClient()
-    const session = await loadAdminSession(adminClient, user.id)
-    if (!session) {
-      return new Response(JSON.stringify({ message: 'No admin access', code: 'FORBIDDEN' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const loaded = await loadAdminSession(adminClient, user.id, { req })
+    if (loaded.status !== 'ok') {
+      return adminSessionDeniedResponse(loaded)
     }
+    const session = loaded.session
 
     const url = new URL(req.url)
     const resourceId = url.searchParams.get('resource_id')
@@ -89,6 +88,20 @@ Deno.serve(async (req) => {
       if (!['active', 'suspended', 'closed'].includes(memberStatus)) {
         return new Response(JSON.stringify({ message: 'Invalid status', code: 'VALIDATION' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: targetAdmin } = await adminClient
+        .from('admins')
+        .select('id')
+        .eq('id', resourceId)
+        .maybeSingle()
+      if (targetAdmin) {
+        return new Response(JSON.stringify({
+          message: 'Cannot modify administrator accounts through member management',
+          code: 'ADMIN_STATUS_BLOCKED',
+        }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 

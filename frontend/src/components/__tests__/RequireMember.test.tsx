@@ -56,12 +56,22 @@ describe('RequireMember', () => {
     expect(screen.getByText('Protected Content')).toBeInTheDocument()
   })
 
-  it('renders outlet when authenticated with approved status', () => {
+  it('blocks suspended members from the portal', () => {
     mockedUseAuth.mockReturnValue({
-      member: { status: 'approved', email: 'test@example.com' },
+      member: { status: 'suspended', email: 'test@example.com' },
       loading: false,
     })
     renderWithRouter('/protected')
-    expect(screen.getByText('Protected Content')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent(/suspended/i)
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
+  })
+
+  it('blocks closed members from the portal', () => {
+    mockedUseAuth.mockReturnValue({
+      member: { status: 'closed', email: 'test@example.com' },
+      loading: false,
+    })
+    renderWithRouter('/protected')
+    expect(screen.getByRole('alert')).toHaveTextContent(/closed/i)
   })
 })

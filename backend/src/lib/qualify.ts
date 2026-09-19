@@ -38,7 +38,9 @@ function num(ruleMap: RuleMap, key: string, fallback: number): number {
 function bool(ruleMap: RuleMap, key: string, fallback: boolean): boolean {
   const v = ruleMap[key]
   if (v === null || v === undefined) return fallback
-  return v === true || v === 'true'
+  if (typeof v === 'boolean') return v
+  if (typeof v === 'string') return v.trim().toLowerCase() === 'true'
+  return Boolean(v)
 }
 
 function monthsBetween(start: Date, end: Date): number {

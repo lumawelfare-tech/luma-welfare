@@ -20,6 +20,7 @@
  */
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
+import { assertMemberActive } from '../shared/member-status.ts'
 
 const DARADA_BASE: Record<string, string> = {
   sandbox: 'https://sandbox.safaricom.co.ke',
@@ -111,6 +112,9 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createAdminClient()
+    const inactive = await assertMemberActive(adminClient, user.id)
+    if (inactive) return inactive
+
     const body = await req.json()
     const { subscriptionId, phone, idempotencyKey } = body
 

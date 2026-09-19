@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
+import { assertMemberActive } from '../shared/member-status.ts'
 
 /**
  * Member Claims — Submit, List, Detail, Document Upload
@@ -64,6 +65,9 @@ Deno.serve(async (req) => {
 
     // PATCH — submit a draft claim (Draft → Submitted)
     if (req.method === 'PATCH' && claimId) {
+      const inactive = await assertMemberActive(adminClient, user.id)
+      if (inactive) return inactive
+
       const body = await req.json()
       const { status: newStatus, description, amountRequested } = body
 
@@ -75,7 +79,7 @@ Deno.serve(async (req) => {
 
       const { data: claim, error: fetchErr } = await adminClient
         .from('claims')
-        .select('id, status, member_id')
+        .select('id, status, member_id, subscription_id')
         .eq('id', claimId)
         .eq('member_id', user.id)
         .single()
@@ -89,6 +93,19 @@ Deno.serve(async (req) => {
       if (claim.status !== 'Draft') {
         return new Response(JSON.stringify({ message: 'Only draft claims can be submitted' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: qual } = await adminClient
+        .from('qualifications')
+        .select('status')
+        .eq('subscription_id', claim.subscription_id)
+        .eq('member_id', user.id)
+        .maybeSingle()
+
+      if (!qual || qual.status !== 'eligible') {
+        return new Response(JSON.stringify({ message: 'You are not yet eligible to file a claim for this package', code: 'NOT_ELIGIBLE' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
@@ -221,6 +238,9 @@ Deno.serve(async (req) => {
 
     // POST — submit new claim (creates as Draft or Submitted)
     if (req.method === 'POST' && !uploadClaimId) {
+      const inactive = await assertMemberActive(adminClient, user.id)
+      if (inactive) return inactive
+
       const body = await req.json()
       const { subscriptionId, claimType, description, amountRequested, submit } = body
 
@@ -250,7 +270,7 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Check qualification — member must be eligible
+      // Check qualification — missing row is not eligible (fail closed)
       const { data: qual } = await adminClient
         .from('qualifications')
         .select('status')
@@ -258,7 +278,7 @@ Deno.serve(async (req) => {
         .eq('member_id', user.id)
         .maybeSingle()
 
-      if (qual && qual.status !== 'eligible') {
+      if (!qual || qual.status !== 'eligible') {
         return new Response(JSON.stringify({ message: 'You are not yet eligible to file a claim for this package', code: 'NOT_ELIGIBLE' }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })

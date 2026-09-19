@@ -1,11 +1,10 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-// Member-gated routes. The admin area is further restricted server-side; the
-// client-side check only redirects visitors to login.
-//
-// Members whose `status` is `pending_approval` haven't completed email
-// verification and are routed to the OTP verification screen.
+/**
+ * Member-gated routes. Server-side authorization remains authoritative.
+ * Client checks only redirect for UX.
+ */
 export function RequireMember() {
   const { member, loading } = useAuth()
   const location = useLocation()
@@ -29,6 +28,16 @@ export function RequireMember() {
         state={{ email: member.email ?? '' }}
         replace
       />
+    )
+  }
+
+  if (member.status === 'suspended' || member.status === 'closed') {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center px-4">
+        <div role="alert" className="max-w-md rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Your account is {member.status}. Contact Luma Welfare support for help.
+        </div>
+      </div>
     )
   }
 

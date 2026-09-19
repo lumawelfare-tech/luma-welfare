@@ -266,4 +266,22 @@ describe('Qualification Engine', () => {
     const result = evaluateQualification(rules, input, contribs)
     assert.strictEqual(result.status, 'eligible')
   })
+
+  it('treats string "True" as requires_current_contributions', () => {
+    const rules = {
+      waiting_period_months: 0,
+      requires_current_contributions: 'True',
+      arrears_allowed_months: 0,
+      max_arrears_months: 1,
+    }
+    const input = {
+      memberStatus: 'active',
+      subscriptionStatus: 'active',
+      startedAt: '2025-01-01',
+      now: new Date('2025-07-01'),
+    }
+    // No contributions over many months → revoked when current required
+    const result = evaluateQualification(rules, input, [])
+    assert.strictEqual(result.status, 'revoked')
+  })
 })

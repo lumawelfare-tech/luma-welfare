@@ -95,7 +95,12 @@ Deno.serve(async (req) => {
           ? null
           : Number(s.packages?.[0]?.waiting_period_months)
 
-        const requiresCurrent = rules.requires_current_contributions === true || rules.requires_current_contributions === 'true'
+        const requiresCurrent = (() => {
+          const v = rules.requires_current_contributions
+          if (v === true) return true
+          if (typeof v === 'string') return v.trim().toLowerCase() === 'true'
+          return false
+        })()
         const arrearsAllowed = Number(rules.arrears_allowed_months ?? 0)
         const maxArrears = Number(rules.max_arrears_months ?? arrearsAllowed + 1)
 

@@ -6,6 +6,7 @@ export const config = {
 }
 
 const SESSION_KEY = 'luma_session'
+const ADMIN_2FA_TOKEN_KEY = 'luma_admin_2fa_token'
 
 export type Session = {
   access_token: string
@@ -36,6 +37,33 @@ export function setSession(token: string, expiresAt?: number): void {
 
 export function clearSession(): void {
   localStorage.removeItem(SESSION_KEY)
+  clearAdmin2faStepUpToken()
+}
+
+export function setAdmin2faStepUpToken(token: string, expiresAt?: number): void {
+  sessionStorage.setItem(
+    ADMIN_2FA_TOKEN_KEY,
+    JSON.stringify({ token, expires_at: expiresAt }),
+  )
+}
+
+export function getAdmin2faStepUpToken(): string | null {
+  try {
+    const raw = sessionStorage.getItem(ADMIN_2FA_TOKEN_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { token?: string; expires_at?: number }
+    if (parsed.expires_at && parsed.expires_at * 1000 < Date.now()) {
+      sessionStorage.removeItem(ADMIN_2FA_TOKEN_KEY)
+      return null
+    }
+    return parsed.token ?? null
+  } catch {
+    return null
+  }
+}
+
+export function clearAdmin2faStepUpToken(): void {
+  sessionStorage.removeItem(ADMIN_2FA_TOKEN_KEY)
 }
 
 type Options = {
@@ -124,6 +152,12 @@ async function apiInternal<T = unknown>(
 
   if (!functionName) {
     throw new ApiError(404, `Unknown API path: ${path}`, 'NOT_FOUND')
+  }
+
+  // Admin 2FA step-up token (required by admin Edge Functions when 2FA is enabled)
+  if (auth && functionName.startsWith('admin-')) {
+    const stepUp = getAdmin2faStepUpToken()
+    if (stepUp) headers['x-admin-2fa-token'] = stepUp
   }
 
   // Extract sub-resource IDs from path segments and forward as query params

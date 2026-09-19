@@ -107,3 +107,60 @@ describe('Phase 1 — RLS containment migration', () => {
     expect(migration).toContain('ALTER TABLE IF EXISTS open_questions ENABLE ROW LEVEL SECURITY')
   })
 })
+
+describe('Production security lockdown migration', () => {
+  const migration = read('supabase/migrations/20260919160000_production_security_lockdown.sql')
+
+  it('adds ownership check to member_search_contributions', () => {
+    expect(migration).toContain('member_search_contributions')
+    expect(migration).toContain("RAISE EXCEPTION 'forbidden'")
+    expect(migration).toContain('p_member_id IS DISTINCT FROM auth.uid()')
+  })
+
+  it('revokes broad EXECUTE on push broadcast RPC', () => {
+    expect(migration).toContain('get_all_active_push_subscriptions')
+    expect(migration).toMatch(/REVOKE ALL ON FUNCTION get_all_active_push_subscriptions\(\) FROM PUBLIC, anon, authenticated/)
+  })
+
+  it('hardens export_jobs and registration_fees insert policies', () => {
+    expect(migration).toContain('DROP POLICY IF EXISTS "export_jobs_select_own"')
+    expect(migration).toMatch(/registration_fees_insert_own[\s\S]*status IN \('unpaid', 'pending'\)/)
+    expect(migration).toMatch(/subscriptions_insert_own[\s\S]*status = 'pending'/)
+  })
+
+  it('enables RLS on package_rules', () => {
+    expect(migration).toContain('ALTER TABLE IF EXISTS package_rules ENABLE ROW LEVEL SECURITY')
+  })
+})
+
+describe('Claim eligibility fail-closed', () => {
+  it('member-claims requires eligible qualification (null is denied)', () => {
+    const src = read('supabase/functions/member-claims/index.ts')
+    expect(src).toContain("!qual || qual.status !== 'eligible'")
+    expect(src).not.toContain('if (qual && qual.status !== ')
+  })
+})
+
+describe('Payments callback authentication', () => {
+  it('requires MPESA_CALLBACK_SECRET and respects PAYMENTS_ENABLED', () => {
+    const src = read('supabase/functions/payments-callback/index.ts')
+    expect(src).toContain('MPESA_CALLBACK_SECRET')
+    expect(src).toContain('authorizeCallback')
+    expect(src).toContain("PAYMENTS_ENABLED') !== 'true'")
+  })
+})
+
+describe('Admin 2FA step-up', () => {
+  it('does not return current_code from setup', () => {
+    const src = read('supabase/functions/admin-2fa/index.ts')
+    expect(src).not.toContain('current_code')
+    expect(src).toContain('mintAdmin2faStepUpToken')
+    expect(src).toContain('skip2faCheck: true')
+  })
+
+  it('loadAdminSession enforces step-up when 2FA enabled', () => {
+    const src = read('supabase/functions/shared/supabase.ts')
+    expect(src).toContain('2fa_required')
+    expect(src).toContain('verifyAdmin2faStepUpToken')
+  })
+})

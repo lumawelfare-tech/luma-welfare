@@ -196,6 +196,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAdminRole(me.adminRole)
     setRegistrationFeePaid(me.registrationFeePaid)
 
+    // Suspended/closed members may not use the portal (admins without member rows still allowed)
+    if (me.member && (me.member.status === 'suspended' || me.member.status === 'closed') && !me.isAdmin) {
+      clearSession()
+      await supabase.auth.signOut()
+      setMember(null)
+      setIsAdmin(false)
+      setAdminRole(null)
+      setRegistrationFeePaid(false)
+      throw new ApiError(403, 'Your account is suspended or closed. Contact Luma Welfare support.', 'ACCOUNT_INACTIVE')
+    }
+
     // Check if admin has 2FA enabled
     if (me.isAdmin) {
       try {
@@ -203,7 +214,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (d.two_factor_enabled) {
           return { member: me.member, isAdmin: true, requires2fa: true }
         }
-      } catch { /* continue without 2FA check */ }
+      } catch {
+        // Fail closed for admin 2FA status — require verification UI rather than skipping
+        return { member: me.member, isAdmin: true, requires2fa: true }
+      }
     }
 
     return { member: me.member, isAdmin: me.isAdmin }

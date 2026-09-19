@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, loadAdminSession, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, logAudit } from '../shared/supabase.ts'
+import { mintAdmin2faStepUpToken } from '../shared/admin-2fa-token.ts'
 
 /**
  * Admin 2FA — TOTP-based two-factor authentication
@@ -65,21 +66,6 @@ function intToBytes(num: number): Uint8Array {
   return bytes
 }
 
-async function generateTOTP(secret: string, timeStep: number = 30, digits: number = 6): Promise<string> {
-  const key = base32Decode(secret)
-  const counter = Math.floor(Date.now() / 1000 / timeStep)
-  const message = intToBytes(counter)
-  const hash = await hmacSha1(key, message)
-  const offset = hash[hash.length - 1] & 0x0f
-  const code = (
-    ((hash[offset] & 0x7f) << 24) |
-    ((hash[offset + 1] & 0xff) << 16) |
-    ((hash[offset + 2] & 0xff) << 8) |
-    (hash[offset + 3] & 0xff)
-  ) % Math.pow(10, digits)
-  return code.toString().padStart(digits, '0')
-}
-
 async function verifyTOTP(secret: string, token: string, window: number = 1): Promise<boolean> {
   const timeStep = 30
   const counter = Math.floor(Date.now() / 1000 / timeStep)
@@ -123,12 +109,11 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createAdminClient()
-    const session = await loadAdminSession(adminClient, user.id)
-    if (!session) {
-      return new Response(JSON.stringify({ message: 'No admin access', code: 'FORBIDDEN' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const loaded = await loadAdminSession(adminClient, user.id, { req, skip2faCheck: true })
+    if (loaded.status !== 'ok') {
+      return adminSessionDeniedResponse(loaded)
     }
+    const session = loaded.session
 
     const url = new URL(req.url)
     const action = url.searchParams.get('action')
@@ -178,14 +163,10 @@ Deno.serve(async (req) => {
           .update({ two_factor_secret: secret })
           .eq('id', user.id)
 
-        // Generate current TOTP for verification
-        const currentCode = await generateTOTP(secret)
-
         return new Response(JSON.stringify({
           secret,
           otpauth_url: otpauthUrl,
-          current_code: currentCode,
-          message: 'Scan the QR code or enter the secret in your authenticator app, then verify with the current code.',
+          message: 'Scan the QR code or enter the secret in your authenticator app, then verify with a code from the app.',
         }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -247,6 +228,10 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({
           message: '2FA enabled successfully.',
           recovery_codes: recoveryCodes,
+          ...(await mintAdmin2faStepUpToken(user.id).then((s) => ({
+            step_up_token: s.token,
+            step_up_expires_at: s.expires_at,
+          })).catch(() => ({}))),
         }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -371,7 +356,13 @@ Deno.serve(async (req) => {
           })
         }
 
-        return new Response(JSON.stringify({ verified: true, message: 'Verification successful.' }), {
+        const stepUp = await mintAdmin2faStepUpToken(targetUserId)
+        return new Response(JSON.stringify({
+          verified: true,
+          message: 'Verification successful.',
+          step_up_token: stepUp.token,
+          step_up_expires_at: stepUp.expires_at,
+        }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
