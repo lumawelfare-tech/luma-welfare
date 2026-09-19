@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { NotificationBell } from './NotificationBell'
+import { useHead } from '../lib/seo'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: (
@@ -38,6 +39,7 @@ export function MemberLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
+  useHead('Member Portal', undefined, { noindex: true })
 
   function handleLogout() {
     logout()

@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { api, ApiError } from '../lib/api'
+import { useHead } from '../lib/seo'
 
 export function Login() {
+  useHead('Login', undefined, { noindex: true })
   const { login, signInWithGoogle, member, isAdmin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()

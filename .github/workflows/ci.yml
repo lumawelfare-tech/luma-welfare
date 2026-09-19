@@ -184,6 +184,10 @@ jobs:
         working-directory: frontend
         run: npm run test -- --reporter=verbose
 
+      - name: Run backend qualification tests
+        working-directory: backend
+        run: npm test
+
       - name: Run edge function integration tests
         run: |
           echo "=== Edge Function Integration Tests ==="
@@ -262,8 +266,10 @@ jobs:
       - name: Determine E2E target URL
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "BASE_URL=https://luma-welfare-git-${GITHUB_REF#refs/heads/}-lumawelfaretech.vercel.app" >> $GITHUB_ENV
-            echo "E2E_TARGET=PR preview (branch: ${{ github.head_ref }})"
+            BRANCH="${{ github.head_ref }}"
+            SAFE_BRANCH=$(echo "$BRANCH" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+            echo "BASE_URL=https://luma-welfare-git-${SAFE_BRANCH}-lumawelfaretech.vercel.app" >> $GITHUB_ENV
+            echo "E2E_TARGET=PR preview (branch: $BRANCH)"
           else
             echo "BASE_URL=https://luma-welfare.vercel.app" >> $GITHUB_ENV
             echo "E2E_TARGET=production"

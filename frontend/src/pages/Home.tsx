@@ -1,6 +1,7 @@
 import { type JSX, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { StatBar } from '../components/StatBar'
+import { OrganizationJsonLd } from '../components/OrganizationJsonLd'
 import { useHead } from '../lib/seo'
 
 const offerCodes = ['hospital', 'education', 'business', 'building', 'dowry', 'wedding']
@@ -102,6 +103,7 @@ export function Home() {
   useHead('Home', 'Luma Welfare is a community welfare organization in Kenya. Members contribute monthly to support each other through key life events.')
   return (
     <div>
+      <OrganizationJsonLd />
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-luma-800 via-luma-700 to-luma-900">
         <div className="absolute -right-20 -top-20 h-96 w-96 rounded-full bg-luma-600/20" />

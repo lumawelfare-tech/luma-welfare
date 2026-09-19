@@ -17,6 +17,11 @@
 import { test, expect, type Page } from '@playwright/test'
 
 const BASE = process.env.BASE_URL || 'https://luma-welfare.vercel.app'
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  ''
 
 /**
  * Helper: navigate to a URL and wait for the actual page content (an input
@@ -49,38 +54,51 @@ async function gotoAndWaitForInput(page: Page, url: string, inputSelector: strin
 // ============================================================================
 
 test.describe('Edge Functions — Auth Enforcement', () => {
+  test.skip(!SUPABASE_URL || !SUPABASE_ANON_KEY, 'Set SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to run live EF auth tests')
+
   const protectedEndpoints = [
     'admin-dashboard',
-    'admin-media',
-    'admin-gallery',
     'admin-members',
     'admin-claims',
-    'admin-contributions',
-    'admin-subscriptions',
-    'admin-packages',
-    'admin-news',
-    'admin-2fa',
-    'admin-settings',
-    'admin-reports',
-    'admin-scheduled-reports',
-    'admin-reconciliation',
-    'admin-monitoring',
     'admin-exports',
     'auth-me',
     'member-dashboard',
-    'member-profile',
+    'member-claims',
   ]
 
   for (const fn of protectedEndpoints) {
-    test(`${fn} returns 401 without auth`, async ({ request }) => {
-      // Get API key from the page's config
-      const response = await request.get(`${BASE}`, { timeout: 10000 })
-
-      // We need the Supabase URL — extract it from the page source
-      const apiResponse = await request.get(`${BASE}`)
-      expect(apiResponse.status()).toBe(200)
+    test(`${fn} returns 401 without user JWT`, async ({ request }) => {
+      const response = await request.get(`${SUPABASE_URL}/functions/v1/${fn}`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        failOnStatusCode: false,
+      })
+      // Gateway or handler should reject unauthenticated / anon-as-user calls
+      expect([401, 403]).toContain(response.status())
     })
   }
+
+  test('payments-callback rejects missing callback secret', async ({ request }) => {
+    const response = await request.post(`${SUPABASE_URL}/functions/v1/payments-callback`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      data: { Body: { stkCallback: { MerchantRequestID: 'x', CheckoutRequestID: 'y', ResultCode: 0, ResultDesc: 'test' } } },
+      failOnStatusCode: false,
+    })
+    expect([401, 503]).toContain(response.status())
+  })
+
+  test('health detail rejects missing cron secret', async ({ request }) => {
+    const response = await request.get(`${SUPABASE_URL}/functions/v1/health?detail=true`, {
+      headers: { apikey: SUPABASE_ANON_KEY },
+      failOnStatusCode: false,
+    })
+    expect([401, 503]).toContain(response.status())
+  })
 })
 
 // ============================================================================
