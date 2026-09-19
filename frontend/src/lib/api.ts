@@ -191,7 +191,17 @@ async function apiInternal<T = unknown>(
   }
 
   // Call Edge Function, forwarding any query parameters
-  const url = `${edgeFunctionUrl}/${functionName}${finalSearch}`
+  const base = edgeFunctionUrl.replace(/\/+$/, '')
+  const url = `${base}/${functionName}${finalSearch}`
+
+  if (!config.supabaseUrl || !config.publishableKey) {
+    console.error('[api] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY')
+    throw new ApiError(
+      0,
+      'App configuration is incomplete. Please contact support.',
+      'CONFIG',
+    )
+  }
 
   // Handle FormData (file uploads) vs JSON
   const isFormData = body instanceof FormData
@@ -199,11 +209,29 @@ async function apiInternal<T = unknown>(
     delete headers['Content-Type'] // browser sets multipart boundary automatically
   }
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
+    })
+  } catch (err) {
+    // Browser surfaces CORS / offline / DNS failures as TypeError: Failed to fetch
+    console.error('[api] Network request failed', {
+      functionName,
+      method,
+      supabaseHost: (() => {
+        try { return new URL(config.supabaseUrl).host } catch { return 'invalid-url' }
+      })(),
+      error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+    })
+    throw new ApiError(
+      0,
+      'Unable to reach the server. Check your connection and try again.',
+      'NETWORK',
+    )
+  }
 
   const data = (await res.json().catch(() => null)) as
     | ({ message?: string; code?: string; retry_after?: number } & T)

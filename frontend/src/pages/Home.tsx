@@ -1,7 +1,9 @@
 import { type JSX, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import { StatBar } from '../components/StatBar'
 import { OrganizationJsonLd } from '../components/OrganizationJsonLd'
+import { MotionSection, MotionCard } from '../components/MotionSection'
 import { useHead } from '../lib/seo'
 
 const offerCodes = ['hospital', 'education', 'business', 'building', 'dowry', 'wedding']
@@ -83,14 +85,15 @@ const faqItems = [
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="border-b border-gray-200 last:border-0">
+    <div className="border-b border-gray-200/80 last:border-0">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between py-4 text-left"
         aria-expanded={open}
       >
         <span className="text-sm font-semibold text-gray-900 pr-4">{q}</span>
-        <svg className={`h-5 w-5 flex-shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <svg className={`h-5 w-5 flex-shrink-0 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -99,61 +102,84 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   )
 }
 
+function CtaButton({
+  to,
+  children,
+  variant = 'solid',
+}: {
+  to: string
+  children: React.ReactNode
+  variant?: 'solid' | 'outline' | 'light'
+}) {
+  const reduceMotion = useReducedMotion()
+  const styles =
+    variant === 'solid'
+      ? 'bg-white text-luma-800 shadow-lg hover:bg-gray-100'
+      : variant === 'light'
+        ? 'bg-white text-luma-800 shadow-lg hover:bg-gray-100'
+        : 'border-2 border-white/30 text-white hover:bg-white/10'
+
+  return (
+    <motion.div whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
+      <Link to={to} className={`inline-block rounded-xl px-8 py-3.5 text-sm font-bold transition-all ${styles}`}>
+        {children}
+      </Link>
+    </motion.div>
+  )
+}
+
 export function Home() {
   useHead('Home', 'Luma Welfare is a community welfare organization in Kenya. Members contribute monthly to support each other through key life events.')
+  const reduceMotion = useReducedMotion()
+
   return (
     <div>
       <OrganizationJsonLd />
-      {/* Hero Section */}
+      {/* Hero — keep brand-first green plane */}
       <section className="relative overflow-hidden bg-gradient-to-br from-luma-800 via-luma-700 to-luma-900">
         <div className="absolute -right-20 -top-20 h-96 w-96 rounded-full bg-luma-600/20" />
         <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-luma-500/10" />
         <div className="container-luma relative grid items-center gap-10 py-16 lg:grid-cols-2 lg:py-24">
-          <div className="relative z-10">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-medium text-white/90 backdrop-blur-sm">
+          <motion.div
+            className="relative z-10"
+            initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.5 }}
+          >
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/15 px-4 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
               <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
               WELCOME TO LUMA WELFARE
             </div>
-            <h1 className="text-4xl font-extrabold leading-[1.1] tracking-tight text-white sm:text-5xl lg:text-6xl">
+            <h1 className="text-3xl font-extrabold leading-[1.1] tracking-tight text-white min-[360px]:text-4xl sm:text-5xl lg:text-6xl">
               TOGETHER WE
               <br />
               <span className="text-green-300">BUILD BETTER</span>
               <br />
               LIVES
             </h1>
-            <p className="mt-6 max-w-lg text-lg leading-relaxed text-white/80">
+            <p className="mt-6 max-w-lg text-lg leading-relaxed text-white/90">
               Empowering families through affordable welfare packages that provide financial
               support during key life events — hospital, education, business, building and more.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                to="/register"
-                className="rounded-xl bg-white px-8 py-3.5 text-sm font-bold text-luma-800 shadow-lg hover:bg-gray-100 hover:shadow-xl transition-all"
-              >
-                Join Luma — It&apos;s Free to Start
-              </Link>
-              <Link
-                to="/packages"
-                className="rounded-xl border-2 border-white/30 px-8 py-3.5 text-sm font-bold text-white hover:bg-white/10 transition-all"
-              >
-                View Packages
-              </Link>
+              <CtaButton to="/register" variant="light">Join Luma — It&apos;s Free to Start</CtaButton>
+              <CtaButton to="/packages" variant="outline">View Packages</CtaButton>
             </div>
             <div className="mt-8 flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <svg className="h-5 w-5 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="text-sm font-medium text-white/80">Trusted by Kenyan families</span>
+                <span className="text-sm font-medium text-white/90">Trusted by Kenyan families</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="h-5 w-5 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
-                <span className="text-sm font-medium text-white/80">Secure &amp; Transparent</span>
+                <span className="text-sm font-medium text-white/90">Secure &amp; Transparent</span>
               </div>
             </div>
-          </div>
+          </motion.div>
           <div className="hidden justify-center lg:flex">
             <div className="relative">
               <img
@@ -161,47 +187,47 @@ export function Home() {
                 alt="Luma Welfare — Community Welfare Organization"
                 className="max-h-80 rounded-3xl object-contain shadow-2xl"
               />
-              <div className="absolute -bottom-4 -left-4 rounded-2xl bg-white px-4 py-3 shadow-xl">
+              <div className="glass absolute -bottom-4 -left-4 rounded-2xl px-4 py-3">
                 <div className="text-2xl font-bold text-luma-700">12+</div>
-                <div className="text-xs font-medium text-gray-500">Welfare Packages</div>
+                <div className="text-xs font-medium text-gray-600">Welfare Packages</div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Statistics Bar */}
       <StatBar />
 
       {/* What We Offer */}
-      <section className="bg-gray-50 py-16 lg:py-20">
+      <MotionSection className="py-16 lg:py-20">
         <div className="container-luma">
           <div className="mb-10 flex items-end justify-between">
             <div>
-              <span className="text-sm font-semibold uppercase tracking-wider text-luma-600">What We Offer</span>
+              <span className="text-sm font-semibold uppercase tracking-wider text-luma-700">What We Offer</span>
               <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Our Welfare Packages</h2>
               <div className="mt-3 h-1 w-12 rounded-full bg-luma-500" />
             </div>
-            <Link to="/packages" className="hidden rounded-lg border border-luma-200 px-5 py-2.5 text-sm font-semibold text-luma-700 hover:bg-luma-50 transition-all sm:block">
+            <Link to="/packages" className="hidden rounded-lg border border-luma-200/80 bg-white/50 px-5 py-2.5 text-sm font-semibold text-luma-800 hover:bg-white/80 transition-all sm:block">
               View All Packages →
             </Link>
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {offerCodes.map((code) => (
-              <Link
-                key={code}
-                to="/packages"
-                className="group rounded-2xl border border-gray-200 bg-white p-7 transition-all hover:border-luma-300 hover:shadow-lg hover:-translate-y-1"
-              >
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-luma-50 text-luma-600 group-hover:bg-luma-100 transition-colors">
-                  {offerIcons[code]}
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">{offerNames[code]}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-500">{offerDescriptions[code]}</p>
-                <div className="mt-4 text-sm font-semibold text-luma-600 group-hover:text-luma-700">
-                  Learn more →
-                </div>
-              </Link>
+              <MotionCard key={code}>
+                <Link
+                  to="/packages"
+                  className="glass-card group block p-7 transition-colors hover:border-luma-300"
+                >
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-luma-50/90 text-luma-700 group-hover:bg-luma-100 transition-colors">
+                    {offerIcons[code]}
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">{offerNames[code]}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-600">{offerDescriptions[code]}</p>
+                  <div className="mt-4 text-sm font-semibold text-luma-700 group-hover:text-luma-800">
+                    Learn more →
+                  </div>
+                </Link>
+              </MotionCard>
             ))}
           </div>
           <div className="mt-10 text-center sm:hidden">
@@ -210,13 +236,13 @@ export function Home() {
             </Link>
           </div>
         </div>
-      </section>
+      </MotionSection>
 
       {/* How it Works */}
-      <section className="bg-white py-16 lg:py-20">
+      <MotionSection className="py-16 lg:py-20">
         <div className="container-luma">
           <div className="text-center">
-            <span className="text-sm font-semibold uppercase tracking-wider text-luma-600">How It Works</span>
+            <span className="text-sm font-semibold uppercase tracking-wider text-luma-700">How It Works</span>
             <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Four Simple Steps</h2>
             <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-luma-500" />
           </div>
@@ -227,114 +253,104 @@ export function Home() {
               { step: '03', title: 'Contribute Monthly', text: 'Pay your monthly contribution via M-Pesa. Each package is tracked separately.' },
               { step: '04', title: 'Access Benefits', text: 'Once your waiting period is met, submit a claim and receive support.' },
             ].map((s) => (
-              <div key={s.step} className="relative rounded-2xl border border-gray-100 bg-gray-50 p-6 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-luma-700 text-lg font-bold text-white">
+              <MotionCard key={s.step} className="glass-card relative p-6 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-luma-700 text-lg font-bold text-white shadow-sm shadow-luma-700/30">
                   {s.step}
                 </div>
                 <h3 className="mt-4 text-lg font-bold text-gray-900">{s.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-500">{s.text}</p>
-              </div>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">{s.text}</p>
+              </MotionCard>
             ))}
           </div>
         </div>
-      </section>
+      </MotionSection>
 
       {/* Why Choose Luma */}
-      <section className="bg-gray-50 py-16 lg:py-20">
+      <MotionSection className="py-16 lg:py-20">
         <div className="container-luma">
           <div className="text-center">
-            <span className="text-sm font-semibold uppercase tracking-wider text-luma-600">Why Luma</span>
+            <span className="text-sm font-semibold uppercase tracking-wider text-luma-700">Why Luma</span>
             <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Why Choose Luma Welfare</h2>
             <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-luma-500" />
-            <p className="mx-auto mt-4 max-w-2xl text-gray-500">We combine community values with modern technology to deliver welfare services you can trust.</p>
+            <p className="mx-auto mt-4 max-w-2xl text-gray-600">We combine community values with modern technology to deliver welfare services you can trust.</p>
           </div>
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {whyChooseUs.map((item) => (
-              <div key={item.title} className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg hover:-translate-y-1">
-                <div className="mb-4 text-3xl">{item.icon}</div>
+              <MotionCard key={item.title} className="glass-card p-6">
+                <div className="mb-4 text-3xl" aria-hidden="true">{item.icon}</div>
                 <h3 className="text-lg font-bold text-gray-900">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-500">{item.description}</p>
-              </div>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">{item.description}</p>
+              </MotionCard>
             ))}
           </div>
         </div>
-      </section>
+      </MotionSection>
 
       {/* Trust & Security */}
-      <section className="bg-white py-16 lg:py-20">
+      <MotionSection className="py-16 lg:py-20">
         <div className="container-luma">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div>
-              <span className="text-sm font-semibold uppercase tracking-wider text-luma-600">Your Security</span>
+              <span className="text-sm font-semibold uppercase tracking-wider text-luma-700">Your Security</span>
               <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Built on Trust &amp; Security</h2>
               <div className="mt-3 h-1 w-12 rounded-full bg-luma-500" />
-              <p className="mt-4 text-gray-500 leading-relaxed">
+              <p className="mt-4 text-gray-600 leading-relaxed">
                 Your contributions and personal data are protected by industry-standard security.
                 Every transaction is recorded in an immutable audit ledger. No shortcuts, no compromises.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               {trustFeatures.map((item) => (
-                <div key={item.title} className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-                  <div className="mb-2 text-2xl">{item.icon}</div>
+                <MotionCard key={item.title} className="glass-card p-5" hover={false}>
+                  <div className="mb-2 text-2xl" aria-hidden="true">{item.icon}</div>
                   <h3 className="text-sm font-bold text-gray-900">{item.title}</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-500">{item.description}</p>
-                </div>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-600">{item.description}</p>
+                </MotionCard>
               ))}
             </div>
           </div>
         </div>
-      </section>
+      </MotionSection>
 
       {/* FAQ */}
-      <section className="bg-gray-50 py-16 lg:py-20">
+      <MotionSection className="py-16 lg:py-20">
         <div className="container-luma">
           <div className="grid gap-12 lg:grid-cols-2">
             <div>
-              <span className="text-sm font-semibold uppercase tracking-wider text-luma-600">FAQ</span>
+              <span className="text-sm font-semibold uppercase tracking-wider text-luma-700">FAQ</span>
               <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Frequently Asked Questions</h2>
               <div className="mt-3 h-1 w-12 rounded-full bg-luma-500" />
-              <p className="mt-4 text-gray-500">Everything you need to know about joining and using Luma Welfare.</p>
-              <Link to="/faq" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-luma-600 hover:text-luma-700">
+              <p className="mt-4 text-gray-600">Everything you need to know about joining and using Luma Welfare.</p>
+              <Link to="/faq" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-luma-700 hover:text-luma-800">
                 View all FAQs →
               </Link>
             </div>
-            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+            <div className="glass-card p-6">
               {faqItems.map((item) => (
                 <FaqItem key={item.q} q={item.q} a={item.a} />
               ))}
             </div>
           </div>
         </div>
-      </section>
+      </MotionSection>
 
-      {/* CTA Section */}
-      <section className="bg-luma-700 py-16 lg:py-20">
+      {/* CTA */}
+      <MotionSection className="bg-luma-700 py-16 lg:py-20">
         <div className="container-luma text-center">
           <h2 className="text-3xl font-bold text-white sm:text-4xl">
             Ready to Secure Your Family&apos;s Future?
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-white/80">
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-white/90">
             Join Kenyan families who trust Luma Welfare for affordable, transparent community support.
             Registration is free — pay only when you choose a package.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Link
-              to="/register"
-              className="rounded-xl bg-white px-8 py-3.5 text-sm font-bold text-luma-800 shadow-lg hover:bg-gray-100 transition-all"
-            >
-              Join Now — Free Registration
-            </Link>
-            <Link
-              to="/packages"
-              className="rounded-xl border-2 border-white/30 px-8 py-3.5 text-sm font-bold text-white hover:bg-white/10 transition-all"
-            >
-              Explore Packages
-            </Link>
+            <CtaButton to="/register" variant="light">Join Now — Free Registration</CtaButton>
+            <CtaButton to="/packages" variant="outline">Explore Packages</CtaButton>
           </div>
-          <p className="mt-4 text-xs text-white/60">One-time KSh 300 activation fee after registration</p>
+          <p className="mt-4 text-xs text-white/70">One-time KSh 300 activation fee after registration</p>
         </div>
-      </section>
+      </MotionSection>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { useHead } from '../lib/seo'
 import { AdminNotificationBell } from './AdminNotificationBell'
@@ -52,8 +53,8 @@ function SidebarLink({ to, label, icon, onNavigate }: { to: string; label: strin
       className={({ isActive }) =>
         `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
           isActive
-            ? 'bg-luma-50 text-luma-700'
-            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            ? 'bg-luma-50/90 text-luma-800 shadow-sm'
+            : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
         }`
       }
     >
@@ -112,37 +113,48 @@ export function AdminLayout() {
   }, [sidebarOpen])
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), [])
+  const reduceMotion = useReducedMotion()
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen">
       <ShortcutHelp />
-      {/* Skip navigation link for accessibility */}
       <a href="#admin-main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:rounded-lg focus:bg-luma-700 focus:px-4 focus:py-2 focus:text-sm focus:text-white focus:shadow-lg">
         Skip to main content
       </a>
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="fixed inset-0 bg-black/50" onClick={closeSidebar} />
-          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl">
-            <SidebarContent onClose={closeSidebar} />
-          </div>
-        </div>
-      )}
 
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
+      <AnimatePresence>
+        {sidebarOpen && (
+          <div className="fixed inset-0 z-40 lg:hidden">
+            <motion.div
+              className="fixed inset-0 bg-black/40 backdrop-blur-[2px]"
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeSidebar}
+            />
+            <motion.div
+              className="fixed inset-y-0 left-0 z-50 w-64 shadow-xl"
+              initial={reduceMotion ? false : { x: -256 }}
+              animate={{ x: 0 }}
+              exit={reduceMotion ? undefined : { x: -256 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+            >
+              <SidebarContent onClose={closeSidebar} />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col z-30">
         <SidebarContent />
       </aside>
 
-      {/* Main content */}
       <div className="flex flex-1 flex-col lg:pl-64">
-        {/* Top header */}
-        <header aria-label="Admin header" className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-gray-200 bg-white px-4 shadow-sm lg:px-6">
-          {/* Mobile menu button */}
+        <header aria-label="Admin header" className="glass-header sticky top-0 z-30 flex h-16 items-center gap-4 px-4 lg:px-6">
           <button
+            type="button"
             onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 lg:hidden"
+            className="rounded-lg p-2 text-gray-600 hover:bg-white/60 lg:hidden"
             aria-label="Open menu"
             aria-expanded={sidebarOpen}
           >
@@ -151,67 +163,68 @@ export function AdminLayout() {
             </svg>
           </button>
 
-          {/* Page title */}
           <div className="flex-1">
             <h1 className="text-lg font-semibold text-gray-900">{pageTitle}</h1>
           </div>
 
-          {/* Admin notification bell */}
           <AdminNotificationBell />
 
-          {/* User menu */}
           <div className="relative">
             <button
+              type="button"
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-800 hover:bg-white/60 transition-colors"
               aria-expanded={userMenuOpen}
               aria-haspopup="true"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-luma-700 text-xs font-bold overflow-hidden">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-luma-800 text-xs font-bold overflow-hidden">
                 {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : (member?.full_name?.charAt(0) ?? adminRole?.charAt(0)?.toUpperCase() ?? 'A')}
               </div>
               <span className="hidden md:block">{member?.full_name ?? 'Administrator'}</span>
-              <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </button>
 
-            {userMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
-                <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white py-1 shadow-lg" role="menu">
-                  <div className="border-b border-gray-100 px-4 py-3">
-                    <div className="text-sm font-medium text-gray-900">{member?.full_name ?? 'Administrator'}</div>
-                    <div className="mt-0.5 text-xs text-gray-500">{adminRole ?? 'admin'}</div>
-                  </div>
-                  <Link
-                    to="/admin/settings"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    role="menuitem"
+            <AnimatePresence>
+              {userMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                  <motion.div
+                    className="glass-modal absolute right-0 top-full z-50 mt-1 w-56 py-1"
+                    role="menu"
+                    initial={reduceMotion ? false : { opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Settings
-                  </Link>
-                  <button
-                    onClick={() => { setUserMenuOpen(false); logout() }}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                    role="menuitem"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                    </svg>
-                    Logout
-                  </button>
-                </div>
-              </>
-            )}
+                    <div className="border-b border-white/50 px-4 py-3">
+                      <div className="text-sm font-medium text-gray-900">{member?.full_name ?? 'Administrator'}</div>
+                      <div className="mt-0.5 text-xs text-gray-600">{adminRole ?? 'admin'}</div>
+                    </div>
+                    <Link
+                      to="/admin/settings"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-800 hover:bg-white/60"
+                      role="menuitem"
+                    >
+                      Settings
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => { setUserMenuOpen(false); logout() }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-700 hover:bg-red-50/80"
+                      role="menuitem"
+                    >
+                      Logout
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </header>
 
-        {/* Page content */}
         <main id="admin-main" className="flex-1 overflow-y-auto p-4 lg:p-6" role="main">
           <Outlet />
         </main>
@@ -225,18 +238,17 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const avatarUrl = member?.photo_url as string | undefined
 
   return (
-    <div className="flex h-full flex-col bg-white border-r border-gray-200">
-      {/* Brand */}
-      <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-luma-700 text-xs font-bold text-white">
+    <div className="glass-sidebar flex h-full flex-col">
+      <div className="flex h-16 items-center gap-3 border-b border-white/50 px-5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-luma-700 text-xs font-bold text-white shadow-sm shadow-luma-700/25">
           LW
         </div>
         <div>
           <div className="text-sm font-bold text-gray-900">Luma Welfare</div>
-          <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">Administration</div>
+          <div className="text-[10px] font-medium uppercase tracking-wider text-luma-700">Administration</div>
         </div>
         {onClose && (
-          <button onClick={onClose} className="ml-auto rounded-lg p-1 text-gray-400 hover:bg-gray-100 lg:hidden" aria-label="Close menu">
+          <button type="button" onClick={onClose} className="ml-auto rounded-lg p-1 text-gray-500 hover:bg-white/60 lg:hidden" aria-label="Close menu">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -244,11 +256,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         )}
       </div>
 
-      {/* Navigation */}
       <nav aria-label="Admin sidebar" className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
         {navSections.map((section) => (
           <div key={section.label}>
-            <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+            <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
               {section.label}
             </div>
             <div className="space-y-0.5">
@@ -260,19 +271,19 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-gray-200 p-3">
+      <div className="border-t border-white/50 p-3">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-luma-700 text-xs font-bold overflow-hidden">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-luma-800 text-xs font-bold overflow-hidden">
             {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : (member?.full_name?.charAt(0) ?? adminRole?.charAt(0)?.toUpperCase() ?? 'A')}
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-gray-900 truncate">{member?.full_name ?? 'Administrator'}</div>
-            <div className="text-xs text-gray-500 capitalize">{adminRole ?? 'admin'}</div>
+            <div className="text-xs text-gray-600 capitalize">{adminRole ?? 'admin'}</div>
           </div>
           <button
+            type="button"
             onClick={logout}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600 transition-colors"
+            className="rounded-lg p-1.5 text-gray-500 hover:bg-white/60 hover:text-red-700 transition-colors"
             aria-label="Logout"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">

@@ -199,15 +199,16 @@ function FaqItem({ item, isOpen, onToggle, id }: { item: FAQItem; isOpen: boolea
   const contentRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div className={`rounded-xl border transition-all ${isOpen ? 'border-luma-200 bg-luma-50/50 shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+    <div className={`glass-card transition-all ${isOpen ? 'border-luma-200/80 shadow-sm' : ''}`}>
       <button
+        type="button"
         onClick={onToggle}
         className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
         aria-expanded={isOpen}
         aria-controls={id}
       >
         <span className={`text-sm font-semibold ${isOpen ? 'text-luma-800' : 'text-gray-900'}`}>{item.q}</span>
-        <span className={`flex h-7 w-7 flex-none items-center justify-center rounded-full text-sm font-bold transition-all ${isOpen ? 'bg-luma-600 text-white rotate-45' : 'bg-gray-100 text-gray-500'}`}>+</span>
+        <span className={`flex h-7 w-7 flex-none items-center justify-center rounded-full text-sm font-bold transition-all ${isOpen ? 'bg-luma-600 text-white rotate-45' : 'bg-luma-50 text-gray-600'}`}>+</span>
       </button>
       <div
         ref={contentRef}
@@ -216,7 +217,7 @@ function FaqItem({ item, isOpen, onToggle, id }: { item: FAQItem; isOpen: boolea
         aria-labelledby={`btn-${id}`}
         className={`overflow-hidden transition-all duration-200 ${isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
       >
-        <p className="border-t border-gray-100 px-5 py-4 text-sm leading-relaxed text-gray-600">{item.a}</p>
+        <p className="border-t border-white/50 px-5 py-4 text-sm leading-relaxed text-gray-600">{item.a}</p>
       </div>
     </div>
   )
@@ -252,20 +253,19 @@ export function FAQ() {
 
   return (
     <div>
-      {/* Page Hero */}
-      <section className="bg-gradient-to-br from-luma-800 to-luma-900 py-16 lg:py-20">
-        <div className="container-luma">
-          <span className="text-sm font-semibold uppercase tracking-wider text-luma-300">Support</span>
+      <section className="relative overflow-hidden bg-gradient-to-br from-luma-800 to-luma-900 py-16 lg:py-20">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.08),_transparent_50%)]" />
+        <div className="container-luma relative">
+          <span className="text-sm font-semibold uppercase tracking-wider text-luma-200">Support</span>
           <h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">Frequently Asked Questions</h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/70">
+          <p className="mt-4 max-w-2xl text-lg text-white/85">
             Find answers to common questions about membership, packages, contributions, and claims.
           </p>
           <div className="mt-3 h-1 w-12 rounded-full bg-luma-400" />
 
-          {/* Search */}
           <div className="mt-8 max-w-xl">
             <div className="relative">
-              <svg className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -273,11 +273,11 @@ export function FAQ() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search questions…"
-                className="w-full rounded-xl border border-white/20 bg-white/10 py-3 pl-12 pr-4 text-sm text-white placeholder-white/50 outline-none focus:border-white/40 focus:bg-white/15 transition-all"
+                className="w-full rounded-xl border border-white/25 bg-white/15 py-3 pl-12 pr-4 text-sm text-white placeholder-white/60 outline-none focus:border-white/40 focus:bg-white/20 transition-all backdrop-blur-sm"
                 aria-label="Search frequently asked questions"
               />
               {search && (
-                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white">✕</button>
+                <button type="button" onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white">✕</button>
               )}
             </div>
           </div>
@@ -285,11 +285,11 @@ export function FAQ() {
       </section>
 
       <div className="container-luma py-12">
-        {/* Category filters */}
         <div className="mb-8 flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={() => setActiveCategory(null)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${!activeCategory ? 'bg-luma-700 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${!activeCategory ? 'bg-luma-700 text-white shadow-sm' : 'glass text-gray-700 hover:bg-white/80'}`}
           >
             All ({totalQuestions})
           </button>
@@ -297,7 +297,7 @@ export function FAQ() {
             <button
               key={cat.label}
               onClick={() => setActiveCategory(activeCategory === cat.label ? null : cat.label)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${activeCategory === cat.label ? 'bg-luma-700 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${activeCategory === cat.label ? 'bg-luma-700 text-white shadow-sm' : 'glass text-gray-700 hover:bg-white/80'}`}
             >
               {cat.icon} {cat.label} ({cat.items.length})
             </button>
@@ -338,7 +338,7 @@ export function FAQ() {
         )}
 
         {/* Contact CTA */}
-        <div className="mt-12 rounded-2xl border border-luma-200 bg-luma-50 p-8">
+        <div className="glass-card mt-12 border-luma-200/60 p-8">
           <h2 className="text-xl font-bold text-gray-900">Still have a question?</h2>
           <p className="mt-2 text-sm text-gray-600">
             Contact us on WhatsApp, by phone, or visit the contact page. We are happy to help.
@@ -347,10 +347,10 @@ export function FAQ() {
             <Link to="/contact" className="inline-block rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-all">
               Contact page →
             </Link>
-            <a href="tel:0798635024" className="inline-block rounded-lg border border-luma-300 bg-white px-5 py-2.5 text-sm font-semibold text-luma-700 hover:bg-luma-50 transition-all">
+            <a href="tel:0798635024" className="inline-block rounded-lg border border-white/60 bg-white/60 px-5 py-2.5 text-sm font-semibold text-luma-800 hover:bg-white/90 transition-all">
               📞 0798 635 024
             </a>
-            <a href="https://wa.me/254798635024" target="_blank" rel="noopener noreferrer" className="inline-block rounded-lg border border-green-300 bg-white px-5 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-50 transition-all">
+            <a href="https://wa.me/254798635024" target="_blank" rel="noopener noreferrer" className="inline-block rounded-lg border border-green-300/60 bg-white/60 px-5 py-2.5 text-sm font-semibold text-green-800 hover:bg-white/90 transition-all">
               💬 WhatsApp
             </a>
           </div>

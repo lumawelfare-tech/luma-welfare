@@ -9,8 +9,20 @@ type Notification = {
   subject: string | null
   body: string
   status: string
+  type?: string
+  meta?: Record<string, unknown>
   created_at: string
   sent_at: string | null
+}
+
+function typeLabel(type?: string): string | null {
+  switch (type) {
+    case 'payment_confirmed': return 'Payment'
+    case 'payment_failed': return 'Payment'
+    case 'contribution_reminder': return 'Reminder'
+    case 'admin_announcement': return 'Announcement'
+    default: return null
+  }
 }
 
 export function NotificationBell() {
@@ -170,7 +182,14 @@ export function NotificationBell() {
                     <div className="mt-1 h-2 w-2 rounded-full bg-luma-500 flex-shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-gray-900">{n.subject ?? 'Notification'}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs font-semibold text-gray-900">{n.subject ?? 'Notification'}</div>
+                      {typeLabel(n.type) && (
+                        <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                          {typeLabel(n.type)}
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-0.5 text-xs text-gray-500 line-clamp-2">{n.body}</div>
                     <div className="mt-1 text-[10px] text-gray-400">{timeAgo(n.created_at)}</div>
                   </div>

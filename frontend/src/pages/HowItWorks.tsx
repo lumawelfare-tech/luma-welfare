@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useHead } from '../lib/seo'
+import { PageHero } from '../components/PageHero'
+import { MotionSection, MotionCard } from '../components/MotionSection'
 
 const steps = [
   {
@@ -48,36 +50,31 @@ export function HowItWorks() {
   useHead('How It Works', 'Four steps from joining Luma Welfare to claiming benefits. Register, contribute monthly, wait, and access your benefits.')
   return (
     <div>
-      {/* Page Hero */}
-      <section className="bg-gradient-to-br from-luma-800 to-luma-900 py-16 lg:py-20">
-        <div className="container-luma">
-          <span className="text-sm font-semibold uppercase tracking-wider text-luma-300">Process</span>
-          <h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">How It Works</h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/70">
-            Four simple steps from joining to claiming. The exact waiting period and contribution for each
-            package are on the Packages page.
-          </p>
-          <div className="mt-3 h-1 w-12 rounded-full bg-luma-400" />
-        </div>
-      </section>
+      <PageHero
+        eyebrow="Process"
+        title="How It Works"
+        description="Four simple steps from joining to claiming. The exact waiting period and contribution for each package are on the Packages page."
+      />
 
-      <div className="container-luma py-14">
+      <MotionSection as="div" className="container-luma py-14">
         <ol className="space-y-6">
           {steps.map((s) => (
-            <li key={s.title} className="flex gap-5 rounded-2xl border border-gray-100 bg-gray-50 p-6 transition-all hover:shadow-md hover:border-luma-200">
-              <div className="flex h-14 w-14 flex-none items-center justify-center rounded-2xl bg-luma-700 text-white">
-                {s.icon}
-              </div>
-              <div className="max-w-2xl">
-                <div className="text-xs font-bold uppercase tracking-wider text-luma-500">Step {s.step}</div>
-                <h2 className="mt-1 text-xl font-bold text-gray-900">{s.title}</h2>
-                <p className="mt-2 leading-relaxed text-gray-600">{s.text}</p>
-              </div>
+            <li key={s.title}>
+              <MotionCard className="glass-card flex gap-5 p-6">
+                <div className="flex h-14 w-14 flex-none items-center justify-center rounded-2xl bg-luma-700 text-white shadow-sm shadow-luma-700/30">
+                  {s.icon}
+                </div>
+                <div className="max-w-2xl">
+                  <div className="text-xs font-bold uppercase tracking-wider text-luma-600">Step {s.step}</div>
+                  <h2 className="mt-1 text-xl font-bold text-gray-900">{s.title}</h2>
+                  <p className="mt-2 leading-relaxed text-gray-600">{s.text}</p>
+                </div>
+              </MotionCard>
             </li>
           ))}
         </ol>
 
-        <div className="mt-12 rounded-2xl border border-luma-200 bg-luma-50 p-8 max-w-2xl">
+        <div className="glass-card mt-12 max-w-2xl border-luma-200/60 p-8">
           <h2 className="text-xl font-bold text-gray-900">A note on payouts</h2>
           <p className="mt-3 text-sm leading-relaxed text-gray-600">
             The exact payout amount per package is still being confirmed with the Luma committee.
@@ -89,7 +86,7 @@ export function HowItWorks() {
             Ask us a question →
           </Link>
         </div>
-      </div>
+      </MotionSection>
     </div>
   )
 }

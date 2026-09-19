@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Icon } from './Icon'
 
 type ConfirmDialogProps = {
@@ -46,6 +47,7 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null)
+  const reduceMotion = useReducedMotion()
 
   useEffect(() => {
     if (open) {
@@ -62,42 +64,63 @@ export function ConfirmDialog({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [open, onCancel])
 
-  if (!open) return null
-
   const v = variantStyles[variant]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-      <div className="w-full max-w-md rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-5">
-          <div className="flex items-start gap-3">
-            <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${v.iconBg}`}>
-              <Icon name={v.icon} className={`h-5 w-5 ${v.iconColor}`} aria-hidden="true" />
-            </div>
-            <div className="flex-1">
-              <h3 id="confirm-title" className="text-lg font-semibold text-gray-900">{title}</h3>
-              <div className="mt-1 text-sm text-gray-600">{message}</div>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
-          <button
-            ref={cancelRef}
-            onClick={onCancel}
-            disabled={loading}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-title"
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={reduceMotion ? undefined : { opacity: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.18 }}
+          onClick={onCancel}
+        >
+          <motion.div
+            className="glass-modal w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+            initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
           >
-            {cancelLabel}
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={loading}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${v.confirmBg}`}
-          >
-            {loading ? 'Processing…' : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+            <div className="px-6 py-5">
+              <div className="flex items-start gap-3">
+                <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${v.iconBg}`}>
+                  <Icon name={v.icon} className={`h-5 w-5 ${v.iconColor}`} aria-hidden="true" />
+                </div>
+                <div className="flex-1">
+                  <h3 id="confirm-title" className="text-lg font-semibold text-gray-900">{title}</h3>
+                  <div className="mt-1 text-sm text-gray-600">{message}</div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-white/50 px-6 py-4">
+              <button
+                ref={cancelRef}
+                type="button"
+                onClick={onCancel}
+                disabled={loading}
+                className="rounded-lg border border-white/60 bg-white/50 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-white/80 disabled:opacity-50 transition-colors"
+              >
+                {cancelLabel}
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                disabled={loading}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${v.confirmBg}`}
+              >
+                {loading ? 'Processing…' : confirmLabel}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

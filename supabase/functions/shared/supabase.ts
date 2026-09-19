@@ -132,6 +132,37 @@ export function requirePermission(
 }
 
 /**
+ * Map thrown admin errors to HTTP responses.
+ * `FORBIDDEN:*` from requirePermission must be 403, never 500.
+ */
+export function handleAdminError(err: unknown, logLabel = 'admin'): Response {
+  if (err instanceof Error && err.message.startsWith('FORBIDDEN:')) {
+    return new Response(JSON.stringify({
+      message: err.message.replace(/^FORBIDDEN:\s*/, '') || 'Insufficient permissions',
+      code: 'FORBIDDEN',
+    }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  console.error(`${logLabel} error:`, err)
+  const message = err instanceof Error ? err.message : 'An unexpected error occurred.'
+  if (/not found/i.test(message)) {
+    return new Response(JSON.stringify({ message, code: 'NOT_FOUND' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  return new Response(JSON.stringify({
+    message: 'An unexpected error occurred.',
+    code: 'INTERNAL',
+  }), {
+    status: 500,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
+/**
  * Log an audit entry.
  */
 export async function logAudit(

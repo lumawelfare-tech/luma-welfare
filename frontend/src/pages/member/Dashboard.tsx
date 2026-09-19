@@ -4,6 +4,12 @@ import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useHead } from '../../lib/seo'
 import { supabase } from '../../lib/supabase'
+import {
+  initiateContributionPayment,
+  mapPaymentUiStatus,
+  usePaymentTracker,
+  type PaymentUiStatus,
+} from '../../hooks/usePaymentTracker'
 
 type Qualification = {
   status: 'eligible' | 'not_eligible' | 'at_risk' | 'revoked'
@@ -35,6 +41,38 @@ type Notification = {
   body: string
   status: string
   created_at: string
+}
+
+type DashboardSummary = {
+  total_contributed: number
+  month_status: 'paid' | 'due' | 'overdue'
+  current_period: string
+  package_name: string | null
+  monthly_amount: number | null
+  pending_payment: {
+    id: string
+    status: string
+    subscription_id: string | null
+    amount: number
+    created_at: string
+    ui_status?: PaymentUiStatus
+  } | null
+}
+
+type RecentPayment = {
+  id: string
+  amount: number
+  status: string
+  mpesa_receipt: string | null
+  created_at: string
+  ui_status: PaymentUiStatus
+}
+
+const uiStatusStyle: Record<PaymentUiStatus, string> = {
+  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+  success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  failed: 'bg-red-50 text-red-700 border-red-200',
+  expired: 'bg-gray-50 text-gray-600 border-gray-200',
 }
 
 const claimTypes = [
@@ -89,7 +127,7 @@ function daysUntil(dateStr: string | null): number | null {
 
 function SkeletonCard() {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 animate-pulse">
+    <div className="glass-panel p-5 animate-pulse">
       <div className="flex items-start justify-between">
         <div className="h-5 w-32 rounded bg-gray-200" />
         <div className="h-6 w-20 rounded-full bg-gray-200" />
@@ -116,12 +154,23 @@ export function Dashboard() {
   const [payingFee, setPayingFee] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([])
 
   // Activation payment flow
   const [showPayModal, setShowPayModal] = useState(false)
   const [payPhone, setPayPhone] = useState(member?.phone ?? '')
   const [payStep, setPayStep] = useState<'phone' | 'waiting' | 'success' | 'failed'>('phone')
   const [payError, setPayError] = useState('')
+
+  // Contribution STK flow
+  const [contribPayOpen, setContribPayOpen] = useState(false)
+  const [contribSubId, setContribSubId] = useState('')
+  const [contribPhone, setContribPhone] = useState(member?.phone ?? '')
+  const [contribPaymentId, setContribPaymentId] = useState<string | null>(null)
+  const [contribPayError, setContribPayError] = useState('')
+  const [contribPaying, setContribPaying] = useState(false)
+  const contribTracker = usePaymentTracker(contribPaymentId)
 
   // Quick-claim modal
   const [quickClaimOpen, setQuickClaimOpen] = useState(false)
@@ -137,11 +186,18 @@ export function Dashboard() {
   const loadDashboard = useCallback(async () => {
     try {
       const [dashboard, notifData] = await Promise.all([
-        api<{ cards: Card[]; registration_fee_paid: boolean }>('/member/dashboard', { auth: true }),
+        api<{
+          cards: Card[]
+          registration_fee_paid: boolean
+          summary?: DashboardSummary
+          recent_payments?: RecentPayment[]
+        }>('/member/dashboard', { auth: true }),
         api<{ notifications: Notification[] }>('/member/notifications', { auth: true }).catch(() => ({ notifications: [] })),
       ])
       setCards(dashboard.cards ?? [])
       setRegistrationFeePaid(dashboard.registration_fee_paid ?? false)
+      setSummary(dashboard.summary ?? null)
+      setRecentPayments(dashboard.recent_payments ?? [])
       setNotifications((notifData.notifications ?? []).slice(0, 3))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load dashboard.')
@@ -277,6 +333,69 @@ export function Dashboard() {
     setQuickClaimOpen(true)
   }
 
+  // Reload when contribution STK confirms via Realtime
+  useEffect(() => {
+    if (contribTracker.state === 'success') {
+      loadDashboard()
+    }
+  }, [contribTracker.state, loadDashboard])
+
+  const pendingBlocked = Boolean(summary?.pending_payment)
+    || contribPaying
+    || contribTracker.state === 'waiting'
+
+  async function startContributionPay() {
+    setContribPayError('')
+    if (!contribSubId) {
+      setContribPayError('Select a package to pay for.')
+      return
+    }
+    if (pendingBlocked && !contribPaymentId) {
+      setContribPayError('A payment is already in progress. Please wait.')
+      return
+    }
+    setContribPaying(true)
+    try {
+      const result = await initiateContributionPayment({
+        subscriptionId: contribSubId,
+        phone: contribPhone || undefined,
+      })
+      if (!result.paymentId) {
+        setContribPayError(result.message ?? 'Could not start payment.')
+        return
+      }
+      setContribPaymentId(result.paymentId)
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'PAYMENTS_DISABLED') {
+        setContribPayError(e.message || 'M-Pesa payments are not enabled yet.')
+      } else if (e instanceof ApiError && e.code === 'PAYMENT_IN_PROGRESS') {
+        setContribPayError(e.message)
+        const existingId = (e as ApiError & { paymentId?: string }).message
+        void existingId
+      } else {
+        setContribPayError(e instanceof Error ? e.message : 'Could not start payment.')
+      }
+    } finally {
+      setContribPaying(false)
+    }
+  }
+
+  function openContribPay(subId?: string) {
+    const firstActive = cards.find((c) => c.status === 'active')
+    setContribPayOpen(true)
+    setContribSubId(subId ?? firstActive?.subscription_id ?? '')
+    setContribPhone(member?.phone ?? '')
+    setContribPaymentId(null)
+    setContribPayError('')
+  }
+
+  function closeContribPay() {
+    setContribPayOpen(false)
+    setContribPaymentId(null)
+    setContribPayError('')
+    setContribPaying(false)
+  }
+
   // Focus management for quick claim modal
   useEffect(() => {
     if (quickClaimOpen && claimModalRef.current) {
@@ -338,8 +457,8 @@ export function Dashboard() {
 
         {/* Payment Modal */}
         {showPayModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="Payment">
-            <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4" role="dialog" aria-modal="true" aria-label="Payment">
+            <div className="w-full max-w-md glass-modal">
               {payStep === 'phone' && (
                 <>
                   <div className="px-6 py-5 border-b border-gray-200">
@@ -438,21 +557,139 @@ export function Dashboard() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
       {/* Welcome */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {memberName}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Here's an overview of your Luma Welfare membership.
-        </p>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {memberName}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Here's an overview of your Luma Welfare membership.
+          </p>
+        </div>
+        {activeCards.length > 0 && (
+          <button
+            type="button"
+            onClick={() => openContribPay()}
+            disabled={pendingBlocked}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-luma-800 disabled:opacity-50 min-h-[44px]"
+          >
+            {pendingBlocked ? 'Payment in progress…' : 'Pay now'}
+          </button>
+        )}
       </div>
+
+      {/* Summary cards */}
+      {!loading && !error && summary && (
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="glass-panel p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Total contributed</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">{money(summary.total_contributed)}</p>
+          </div>
+          <div className="glass-panel p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">This month</p>
+            <p className={`mt-1 text-2xl font-bold capitalize ${
+              summary.month_status === 'paid' ? 'text-emerald-700'
+                : summary.month_status === 'overdue' ? 'text-red-700'
+                  : 'text-amber-700'
+            }`}>
+              {summary.month_status}
+            </p>
+            <p className="mt-0.5 text-xs text-gray-500">{summary.current_period}</p>
+          </div>
+          <div className="glass-panel p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Package</p>
+            <p className="mt-1 text-lg font-bold text-gray-900 truncate">{summary.package_name ?? '—'}</p>
+            {summary.monthly_amount != null && summary.monthly_amount > 0 && (
+              <p className="mt-0.5 text-xs text-gray-500">{money(summary.monthly_amount)} / month</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Live pending banner */}
+      {contribTracker.state === 'waiting' && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
+          Waiting for M-Pesa confirmation…
+        </div>
+      )}
+      {(contribTracker.state === 'failed' || contribTracker.state === 'expired') && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+          <p>{contribTracker.message}</p>
+          <button
+            type="button"
+            onClick={() => { setContribPaymentId(null); openContribPay(contribSubId) }}
+            className="mt-2 font-semibold underline"
+          >
+            Retry payment
+          </button>
+        </div>
+      )}
+
+      {/* Payment history */}
+      {!loading && !error && recentPayments.length > 0 && (
+        <div className="mb-6 overflow-hidden glass-panel shadow-sm">
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+            <h2 className="text-sm font-semibold text-gray-900">Contribution payments</h2>
+            <Link to="/contributions" className="text-xs font-medium text-luma-700 hover:underline">View all</Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Date</th>
+                  <th className="px-4 py-2 font-medium">Amount</th>
+                  <th className="px-4 py-2 font-medium">M-Pesa receipt</th>
+                  <th className="px-4 py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentPayments.slice(0, 8).map((p) => {
+                  const ui = p.ui_status ?? mapPaymentUiStatus(p.status, p.created_at)
+                  return (
+                    <tr key={p.id} className="border-t border-gray-50">
+                      <td className="px-4 py-2.5 whitespace-nowrap text-gray-600">
+                        {new Date(p.created_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-2.5 font-medium text-gray-900">{money(p.amount)}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{p.mpesa_receipt ?? '—'}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${uiStatusStyle[ui]}`}>
+                          {ui}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Quick profile */}
+      {!loading && member && (
+        <div className="mb-6 glass-panel p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Profile</h2>
+              <p className="mt-0.5 text-sm text-gray-600">{member.full_name} · {member.phone}</p>
+            </div>
+            <Link
+              to="/profile"
+              className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]"
+            >
+              Update name & phone
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Loading skeleton */}
       {loading && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="rounded-xl border border-gray-200 bg-white p-4 animate-pulse">
+              <div key={i} className="glass-panel p-4 animate-pulse">
                 <div className="h-3 w-20 rounded bg-gray-100" />
                 <div className="mt-2 h-7 w-16 rounded bg-gray-200" />
               </div>
@@ -466,7 +703,14 @@ export function Dashboard() {
       {/* Error */}
       {error && !loading && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-          <p className="text-sm text-red-700">We couldn't load your membership information.</p>
+          <p className="text-sm text-red-700">
+            {error.includes('Failed to fetch') || error.includes('Unable to reach')
+              ? 'Unable to reach the server. Check your connection and try again.'
+              : "We couldn't load your membership information."}
+          </p>
+          {error && !error.includes('Failed to fetch') && !error.includes('Unable to reach') && (
+            <p className="mt-1 text-xs text-red-600/80">{error}</p>
+          )}
           <button onClick={() => { setError(null); setLoading(true); setRegistrationFeeLoading(true); loadDashboard() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 transition-colors min-h-[44px]">
             Try Again
           </button>
@@ -475,7 +719,7 @@ export function Dashboard() {
 
       {/* Empty state */}
       {!loading && !error && cards.length === 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
+        <div className="glass-panel p-12 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-gray-400">
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
@@ -537,7 +781,7 @@ export function Dashboard() {
 
           {/* Summary stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="glass-panel p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-luma-50 text-luma-600 flex-shrink-0">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" /></svg>
@@ -548,7 +792,7 @@ export function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="glass-panel p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 flex-shrink-0">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -559,7 +803,7 @@ export function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="glass-panel p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 flex-shrink-0">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -570,7 +814,7 @@ export function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="glass-panel p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50 text-gray-500 flex-shrink-0">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" /></svg>
@@ -598,7 +842,7 @@ export function Dashboard() {
                   const sc = statusConfig(card)
                   const pct = progressPercent(card)
                   return (
-                    <div key={card.subscription_id} className="rounded-xl border border-gray-200 bg-white p-5 transition-all hover:shadow-md">
+                    <div key={card.subscription_id} className="glass-panel p-5 transition-all hover:shadow-md">
                       {/* Header */}
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -680,7 +924,7 @@ export function Dashboard() {
             {/* Sidebar — Quick Actions + Recent Notifications */}
             <div className="space-y-5">
               {/* Quick Actions */}
-              <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="glass-panel p-5">
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h3>
                 <div className="space-y-2">
                   {qualifiedCount > 0 && (
@@ -716,7 +960,7 @@ export function Dashboard() {
               </div>
 
               {/* Recent Notifications */}
-              <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="glass-panel p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
                   {unreadCount > 0 && (
@@ -751,8 +995,8 @@ export function Dashboard() {
 
       {/* Quick Claim Modal */}
       {quickClaimOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeQuickClaim} role="dialog" aria-modal="true" aria-label="File a claim" onKeyDown={(e) => { if (e.key === 'Escape') closeQuickClaim() }}>
-          <div ref={claimModalRef} className="w-full max-w-md rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()} tabIndex={-1}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4" onClick={closeQuickClaim} role="dialog" aria-modal="true" aria-label="File a claim" onKeyDown={(e) => { if (e.key === 'Escape') closeQuickClaim() }}>
+          <div ref={claimModalRef} className="w-full max-w-md glass-modal" onClick={(e) => e.stopPropagation()} tabIndex={-1}>
             {claimSuccess ? (
               <div className="px-6 py-10 text-center">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
@@ -855,6 +1099,106 @@ export function Dashboard() {
                     </button>
                   </div>
                 </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Contribution Pay Now modal */}
+      {contribPayOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4" role="dialog" aria-modal="true" aria-label="Pay contribution">
+          <div className="w-full max-w-md glass-modal">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">Pay contribution</h3>
+              <button type="button" onClick={closeContribPay} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 min-h-[44px] min-w-[44px]" aria-label="Close">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {contribTracker.state === 'waiting' ? (
+              <div className="px-6 py-10 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
+                  <svg className="h-6 w-6 text-amber-600 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <h4 className="mt-3 text-lg font-semibold text-gray-900">Waiting for M-Pesa confirmation…</h4>
+                <p className="mt-1 text-sm text-gray-500">Enter your M-Pesa PIN on your phone. This screen updates automatically.</p>
+              </div>
+            ) : contribTracker.state === 'success' ? (
+              <div className="px-6 py-10 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+                  <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                </div>
+                <h4 className="mt-3 text-lg font-semibold text-gray-900">Payment confirmed</h4>
+                {contribTracker.receipt && (
+                  <p className="mt-1 text-sm text-gray-500">Receipt: {contribTracker.receipt}</p>
+                )}
+                <button type="button" onClick={closeContribPay} className="mt-5 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 min-h-[44px]">
+                  Done
+                </button>
+              </div>
+            ) : (contribTracker.state === 'failed' || contribTracker.state === 'expired') ? (
+              <div className="px-6 py-10 text-center">
+                <h4 className="text-lg font-semibold text-gray-900">Payment not completed</h4>
+                <p className="mt-1 text-sm text-gray-500">{contribTracker.message}</p>
+                <div className="mt-5 flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setContribPaymentId(null); setContribPayError('') }}
+                    className="rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 min-h-[44px]"
+                  >
+                    Retry
+                  </button>
+                  <button type="button" onClick={closeContribPay} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 min-h-[44px]">
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-4 px-6 py-4">
+                  <div>
+                    <label htmlFor="contrib-sub" className="mb-1 block text-sm font-medium text-gray-700">Package</label>
+                    <select
+                      id="contrib-sub"
+                      value={contribSubId}
+                      onChange={(e) => setContribSubId(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm min-h-[44px]"
+                    >
+                      <option value="">Select package…</option>
+                      {activeCards.map((c) => (
+                        <option key={c.subscription_id} value={c.subscription_id}>
+                          {packageName(c)} — {money(c.monthly_amount)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="contrib-phone" className="mb-1 block text-sm font-medium text-gray-700">M-Pesa phone</label>
+                    <input
+                      id="contrib-phone"
+                      type="tel"
+                      value={contribPhone}
+                      onChange={(e) => setContribPhone(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm min-h-[44px]"
+                      placeholder="07XXXXXXXX"
+                    />
+                  </div>
+                  {contribPayError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{contribPayError}</div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-4">
+                  <button type="button" onClick={closeContribPay} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 min-h-[44px]">Cancel</button>
+                  <button
+                    type="button"
+                    onClick={startContributionPay}
+                    disabled={contribPaying || pendingBlocked || !contribSubId}
+                    className="rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-50 min-h-[44px]"
+                  >
+                    {contribPaying ? 'Sending…' : 'Send STK Push'}
+                  </button>
+                </div>
               </>
             )}
           </div>

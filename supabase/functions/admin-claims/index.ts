@@ -1,5 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { sendNotification } from '../shared/notifications.ts'
 
 Deno.serve(async (req) => {
@@ -190,9 +190,6 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
-    console.error('admin-claims error:', err)
-    const message = err instanceof Error ? err.message : 'An unexpected error occurred.'
-    const status = message.includes('not found') || message.includes('Not found') ? 404 : 500
-    return new Response(JSON.stringify({ message, code: 'INTERNAL' }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return handleAdminError(err, 'admin-claims')
   }
 })

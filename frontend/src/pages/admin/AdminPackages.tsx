@@ -127,7 +127,7 @@ export function AdminPackages() {
       </p>
 
       {showForm && (
-        <form onSubmit={addPackage} className="mt-6 max-w-lg rounded-2xl border border-stone-200 bg-white p-6">
+        <form onSubmit={addPackage} className="mt-6 max-w-lg glass-panel p-6">
           <h2 className="font-semibold text-luma-900">New package</h2>
           <div className="mt-4 space-y-3">
             <input aria-label="Package code" value={newPkg.code} onChange={(e) => setNewPkg((p) => ({ ...p, code: e.target.value }))} placeholder="code (e.g. water_drilling)" required className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-luma-500" />
@@ -158,7 +158,7 @@ export function AdminPackages() {
       ) : (
         <div className="mt-6 space-y-4">
           {packages.map((p) => (
-            <div key={p.id} className={`rounded-2xl border bg-white p-5 ${p.is_active ? 'border-stone-200' : 'border-stone-300 opacity-70'}`}>
+            <div key={p.id} className={`glass-panel p-5 ${p.is_active ? '' : 'opacity-70'}`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="font-semibold text-luma-900">

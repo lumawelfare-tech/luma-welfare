@@ -32,6 +32,10 @@ interface NotificationOptions {
   subject: string
   /** In-app notification body */
   body: string
+  /** Typed category for UI + future SMS/WhatsApp templates */
+  type?: 'payment_confirmed' | 'payment_failed' | 'contribution_reminder' | 'admin_announcement' | 'system'
+  /** Optional structured payload (payment id, receipt, deep link, etc.) */
+  meta?: Record<string, unknown>
   /** Email subject (if different from in-app subject) */
   emailSubject?: string
   /** Email body (if different from in-app body) */
@@ -46,6 +50,8 @@ interface NotificationOptions {
   skipEmail?: boolean
   /** Skip SMS even if enabled */
   skipSms?: boolean
+  /** Skip WhatsApp even if enabled (future) */
+  skipWhatsApp?: boolean
 }
 
 interface NotificationResult {
@@ -53,6 +59,7 @@ interface NotificationResult {
   email: boolean
   sms: boolean
   push: boolean
+  whatsapp: boolean
   errors: string[]
 }
 
@@ -96,7 +103,7 @@ export async function sendNotification(
   adminClient: ReturnType<typeof import('./supabase.ts').createAdminClient>,
   options: NotificationOptions,
 ): Promise<NotificationResult> {
-  const result: NotificationResult = { inApp: false, email: false, sms: false, push: false, errors: [] }
+  const result: NotificationResult = { inApp: false, email: false, sms: false, push: false, whatsapp: false, errors: [] }
 
   // Fetch preferences
   const prefs = await getPreferences(adminClient, options.memberId)
@@ -110,6 +117,8 @@ export async function sendNotification(
         subject: options.subject,
         body: options.body,
         status: 'queued',
+        type: options.type ?? 'system',
+        meta: options.meta ?? {},
       })
       if (error) {
         result.errors.push(`In-app: ${error.message}`)
@@ -191,8 +200,14 @@ export async function sendNotification(
 
   // 4. SMS notification (placeholder — SMS provider not yet integrated)
   if (!options.skipSms && prefs.sms_enabled) {
-    // SMS sending not yet implemented
-    // When implemented, check prefs.sms_enabled before sending
+    // SMS sending not yet implemented.
+    // When wired: map options.type → template, send via provider, set result.sms = true.
+  }
+
+  // 5. WhatsApp notification (placeholder — provider not yet integrated)
+  if (!options.skipWhatsApp) {
+    // WhatsApp sending not yet implemented.
+    // When wired: reuse options.type + options.meta for template variables.
   }
 
   return result

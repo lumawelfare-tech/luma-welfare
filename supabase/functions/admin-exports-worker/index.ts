@@ -1,5 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { createAdminClient } from '../shared/supabase.ts'
+import {createAdminClient, handleAdminError} from '../shared/supabase.ts'
 import { requireCronSecret } from '../shared/internal-auth.ts'
 
 /**
@@ -457,11 +457,6 @@ Deno.serve(async (req) => {
       })
     }
   } catch (err) {
-    console.error('admin-exports-worker error:', err)
-    const message = err instanceof Error ? err.message : 'An unexpected error occurred.'
-    return new Response(JSON.stringify({ message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return handleAdminError(err, 'admin-exports-worker')
   }
 })

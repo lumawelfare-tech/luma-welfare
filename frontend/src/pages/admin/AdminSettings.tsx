@@ -126,7 +126,30 @@ export function AdminSettings() {
     }
   }
 
-  const tabs = ['general', 'security', 'webhooks']
+  const [annTitle, setAnnTitle] = useState('')
+  const [annBody, setAnnBody] = useState('')
+  const [annSending, setAnnSending] = useState(false)
+
+  async function publishAnnouncement() {
+    setAnnSending(true)
+    setError(null)
+    try {
+      const d = await api<{ recipients: number }>('/admin/notifications?action=announce', {
+        method: 'POST',
+        auth: true,
+        body: { title: annTitle, body: annBody },
+      })
+      addToast('success', `Announcement sent to ${d.recipients ?? 0} members.`)
+      setAnnTitle('')
+      setAnnBody('')
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not publish announcement.')
+    } finally {
+      setAnnSending(false)
+    }
+  }
+
+  const tabs = ['general', 'security', 'webhooks', 'announce']
   const filtered = tab === 'general'
     ? settings.filter(s => ['org_contact', 'stats', 'mpesa'].includes(s.key))
     : []
@@ -197,7 +220,7 @@ export function AdminSettings() {
       {tab === 'general' && (
         <div className="space-y-4">
           {filtered.map(s => (
-            <div key={s.key} className="rounded-xl border border-gray-200 bg-white p-4">
+            <div key={s.key} className="glass-panel p-4">
               <label className="text-sm font-medium text-gray-700">{keyLabels[s.key] ?? s.key}</label>
               {keyDescriptions[s.key] && <p className="mt-0.5 text-xs text-gray-400">{keyDescriptions[s.key]}</p>}
               {getInputType(editing[s.key] ?? '') === 'json-fields' ? (
@@ -258,14 +281,53 @@ export function AdminSettings() {
               )}
             </div>
           ))}
-          {filtered.length === 0 && <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-gray-500">No settings in this section.</div>}
+          {filtered.length === 0 && <div className="glass-panel p-10 text-center text-gray-500">No settings in this section.</div>}
         </div>
       )}
 
       {/* Webhooks */}
       {tab === 'webhooks' && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
+        <div className="glass-panel p-6">
           <WebhookSettings />
+        </div>
+      )}
+
+      {/* Member announcements */}
+      {tab === 'announce' && (
+        <div className="glass-panel p-6 space-y-4 max-w-xl">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Member announcement</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Sends an in-app notification to all active members. Requires admin permission.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Title</label>
+            <input
+              value={annTitle}
+              onChange={(e) => setAnnTitle(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-luma-500"
+              maxLength={120}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Message</label>
+            <textarea
+              value={annBody}
+              onChange={(e) => setAnnBody(e.target.value)}
+              rows={4}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-luma-500"
+              maxLength={2000}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={publishAnnouncement}
+            disabled={annSending || !annTitle.trim() || !annBody.trim()}
+            className="rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-60"
+          >
+            {annSending ? 'Sending…' : 'Publish to members'}
+          </button>
         </div>
       )}
 
@@ -273,7 +335,7 @@ export function AdminSettings() {
       {tab === 'security' && (
         <div className="space-y-4">
           {/* 2FA Section */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6">
+          <div className="glass-panel p-6">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Two-Factor Authentication (2FA)</h3>

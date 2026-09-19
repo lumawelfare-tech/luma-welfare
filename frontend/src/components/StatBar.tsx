@@ -60,15 +60,16 @@ export function StatBar() {
   ]
 
   return (
-    <div className="bg-luma-800">
-      <div className="container-luma grid grid-cols-2 gap-6 py-12 sm:grid-cols-4">
+    <div className="relative overflow-hidden bg-luma-800">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(255,255,255,0.08),_transparent_55%)]" />
+      <div className="container-luma relative grid grid-cols-2 gap-6 py-12 sm:grid-cols-4">
         {items.map((item) => (
           <div key={item.label} className="text-center">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/20 text-white">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white backdrop-blur-sm">
               {item.icon}
             </div>
             <div className="text-3xl font-extrabold text-white">{item.value ?? '—'}</div>
-            <div className="mt-1 text-sm font-medium text-white/70">{item.label}</div>
+            <div className="mt-1 text-sm font-medium text-white/80">{item.label}</div>
           </div>
         ))}
       </div>

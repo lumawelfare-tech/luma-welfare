@@ -173,6 +173,32 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Prevent duplicate in-flight STK for the same subscription (last 15 minutes)
+    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+    const { data: inflight } = await adminClient
+      .from('payments')
+      .select('id, status, checkout_request_id, created_at')
+      .eq('member_id', user.id)
+      .eq('subscription_id', subscriptionId)
+      .in('status', ['Pending', 'Processing'])
+      .gte('created_at', fifteenMinAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (inflight) {
+      return new Response(JSON.stringify({
+        message: 'A payment is already in progress. Please wait for M-Pesa confirmation or try again shortly.',
+        code: 'PAYMENT_IN_PROGRESS',
+        paymentId: inflight.id,
+        checkoutRequestId: inflight.checkout_request_id,
+        status: inflight.status === 'Processing' ? 'processing' : 'pending',
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // Idempotent insert — return existing if duplicate
     const { data: inserted, error: insertErr } = await adminClient
       .from('payments')

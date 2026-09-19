@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import { scrollWindowToTop } from './ScrollToTop'
 
 const navLinks = [
   { to: '/', label: 'Home' },
@@ -18,13 +20,13 @@ export function Layout() {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const navigate = useNavigate()
+  const reduceMotion = useReducedMotion()
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault()
     if (q.trim()) navigate(`/packages?q=${encodeURIComponent(q.trim())}`)
   }
 
-  // ESC key closes mobile menu
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && open) {
       setOpen(false)
@@ -36,7 +38,6 @@ export function Layout() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden'
@@ -46,16 +47,20 @@ export function Layout() {
     return () => { document.body.style.overflow = '' }
   }, [open])
 
+  const menuTransition = reduceMotion
+    ? { duration: 0 }
+    : { type: 'spring' as const, stiffness: 380, damping: 32 }
+
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Skip navigation link for accessibility */}
+    <div className="flex min-h-screen w-full max-w-[100vw] flex-col overflow-x-clip">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:rounded-lg focus:bg-luma-700 focus:px-4 focus:py-2 focus:text-sm focus:text-white focus:shadow-lg">
         Skip to main content
       </a>
+
       {/* Top Info Bar */}
       <div className="bg-luma-700 text-white">
-        <div className="container-luma flex items-center justify-between py-2 text-xs">
-          <div className="flex items-center gap-4 md:gap-6">
+        <div className="container-luma flex min-w-0 items-center justify-between gap-2 py-2 text-xs">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4 md:gap-6">
             <a href="tel:0798635024" className="flex items-center gap-1.5 hover:text-luma-200">
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -76,8 +81,8 @@ export function Layout() {
               P.O. Box 12345 – 00100, Nairobi
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-white/70 sm:inline">Building stronger communities together</span>
+          <div className="flex flex-none items-center gap-2 sm:gap-3">
+            <span className="hidden text-white/70 md:inline">Building stronger communities together</span>
             <div className="flex items-center gap-2">
               <a href="#" className="text-white/70 hover:text-white" aria-label="Facebook">
                 <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
@@ -93,15 +98,15 @@ export function Layout() {
         </div>
       </div>
 
-      {/* Main Navigation */}
-      <header className="sticky top-0 z-40 border-b border-gray-100 bg-white shadow-sm">
-        <div className="container-luma flex h-16 items-center justify-between gap-4">
-          <Link to="/" className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-luma-700 font-bold text-white text-sm">
+      {/* Glass main navigation */}
+      <header className="glass-header sticky top-0 z-40">
+        <div className="container-luma flex h-16 min-w-0 items-center justify-between gap-2 sm:gap-4">
+          <Link to="/" onClick={scrollWindowToTop} className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-luma-700 font-bold text-white text-sm shadow-sm shadow-luma-700/25">
               LW
             </span>
-            <div className="hidden sm:block">
-              <span className="block text-lg font-bold tracking-tight text-luma-800">
+            <div className="hidden min-w-0 sm:block">
+              <span className="block truncate text-lg font-bold tracking-tight text-luma-800">
                 Luma Welfare
               </span>
               <span className="block text-[10px] font-medium uppercase tracking-wider text-luma-600">
@@ -115,11 +120,12 @@ export function Layout() {
               <NavLink
                 key={l.label}
                 to={l.to}
+                onClick={l.to === '/' ? scrollWindowToTop : undefined}
                 className={({ isActive }) =>
                   `rounded-lg px-3 py-2 text-sm font-medium transition-all ${
                     isActive
-                      ? 'text-luma-700 border-b-2 border-luma-600'
-                      : 'text-gray-600 hover:text-luma-700 hover:bg-luma-50'
+                      ? 'bg-luma-50/80 text-luma-800 border-b-2 border-luma-600'
+                      : 'text-gray-700 hover:text-luma-700 hover:bg-white/50'
                   }`
                 }
               >
@@ -131,14 +137,14 @@ export function Layout() {
           <div className="flex items-center gap-2">
             <form onSubmit={submitSearch} className="hidden md:block">
               <div className="relative">
-                <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Search packages…"
-                  className="w-44 rounded-full border border-gray-200 bg-gray-50 pl-9 pr-3 py-2 text-sm outline-none focus:border-luma-500 focus:bg-white transition-all"
+                  className="glass-input w-44 rounded-full pl-9 pr-3 py-2 text-sm text-gray-800 placeholder:text-gray-500"
                 />
               </div>
             </form>
@@ -150,7 +156,7 @@ export function Layout() {
                     to="/admin"
                     className={({ isActive }) =>
                       `rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                        isActive ? 'text-luma-700 bg-luma-50' : 'text-gray-600 hover:text-luma-700 hover:bg-luma-50'
+                        isActive ? 'text-luma-800 bg-luma-50/80' : 'text-gray-700 hover:text-luma-700 hover:bg-white/50'
                       }`
                     }
                   >
@@ -161,87 +167,121 @@ export function Layout() {
                   to="/dashboard"
                   className={({ isActive }) =>
                     `rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                      isActive ? 'text-luma-700 bg-luma-50' : 'text-gray-600 hover:text-luma-700 hover:bg-luma-50'
+                      isActive ? 'text-luma-800 bg-luma-50/80' : 'text-gray-700 hover:text-luma-700 hover:bg-white/50'
                     }`
                   }
                 >
                   Dashboard
                 </NavLink>
-                <span className="hidden text-sm text-gray-500 sm:block">{member.full_name}</span>
-                <button
+                <span className="hidden text-sm text-gray-600 sm:block">{member.full_name}</span>
+                <motion.button
+                  type="button"
                   onClick={logout}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                  whileHover={reduceMotion ? undefined : { scale: 1.02 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+                  className="rounded-lg border border-white/60 bg-white/50 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-white/80"
                 >
                   Sign out
-                </button>
+                </motion.button>
               </div>
             ) : (
-              <Link
-                to="/register"
-                className="rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 shadow-sm"
-              >
-                Join Now
-              </Link>
+              <motion.div whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
+                <Link
+                  to="/register"
+                  className="inline-block rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-luma-700/30 hover:bg-luma-800"
+                >
+                  Join Now
+                </Link>
+              </motion.div>
             )}
 
-            <button
-              className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
+            <motion.button
+              type="button"
+              className="rounded-lg p-2 text-gray-700 hover:bg-white/60 lg:hidden"
               onClick={() => setOpen(!open)}
               aria-label="Toggle menu"
+              aria-expanded={open}
+              whileTap={reduceMotion ? undefined : { scale: 0.92 }}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
               </svg>
-            </button>
+            </motion.button>
           </div>
         </div>
 
-        {/* Mobile Menu */}
-        {open && (
-          <nav className="border-t border-gray-100 bg-white shadow-lg lg:hidden">
-            <div className="container-luma flex flex-col py-3">
-              {navLinks.map((l) => (
-                <NavLink
-                  key={l.label}
-                  to={l.to}
-                  onClick={() => setOpen(false)}
-                  className="rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-luma-50 hover:text-luma-700"
-                >
-                  {l.label}
-                </NavLink>
-              ))}
-              {member && isAdmin && (
-                <NavLink
-                  to="/admin"
-                  onClick={() => setOpen(false)}
-                  className="rounded-lg px-4 py-2.5 text-sm font-semibold text-luma-700 hover:bg-luma-50"
-                >
-                  Admin Panel
-                </NavLink>
-              )}
-              {!member && (
-                <Link
-                  to="/register"
-                  onClick={() => setOpen(false)}
-                  className="mt-2 rounded-lg bg-luma-700 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-luma-800"
-                >
-                  Join Now
-                </Link>
-              )}
-            </div>
-          </nav>
-        )}
+        {/* Glass mobile menu */}
+        <AnimatePresence>
+          {open && (
+            <motion.nav
+              key="mobile-menu"
+              aria-label="Mobile navigation"
+              initial={reduceMotion ? { opacity: 1 } : { height: 0, opacity: 0 }}
+              animate={reduceMotion ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+              transition={menuTransition}
+              className="overflow-hidden border-t border-white/50 lg:hidden"
+            >
+              <div className="glass-strong">
+                <div className="container-luma flex flex-col py-3">
+                  {navLinks.map((l, i) => (
+                    <motion.div
+                      key={l.label}
+                      initial={reduceMotion ? false : { opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={reduceMotion ? { duration: 0 } : { delay: 0.03 * i, duration: 0.2 }}
+                    >
+                      <NavLink
+                        to={l.to}
+                        onClick={() => {
+                          setOpen(false)
+                          if (l.to === '/') scrollWindowToTop()
+                        }}
+                        className={({ isActive }) =>
+                          `block rounded-lg px-4 py-2.5 text-sm font-medium ${
+                            isActive
+                              ? 'bg-luma-50 text-luma-800'
+                              : 'text-gray-800 hover:bg-white/70 hover:text-luma-700'
+                          }`
+                        }
+                      >
+                        {l.label}
+                      </NavLink>
+                    </motion.div>
+                  ))}
+                  {member && isAdmin && (
+                    <NavLink
+                      to="/admin"
+                      onClick={() => setOpen(false)}
+                      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-luma-800 hover:bg-luma-50"
+                    >
+                      Admin Panel
+                    </NavLink>
+                  )}
+                  {!member && (
+                    <Link
+                      to="/register"
+                      onClick={() => setOpen(false)}
+                      className="mt-2 rounded-lg bg-luma-700 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-luma-800"
+                    >
+                      Join Now
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </motion.nav>
+          )}
+        </AnimatePresence>
       </header>
 
       <main id="main-content" className="flex-1" role="main">
         <Outlet />
       </main>
 
-      {/* Footer */}
+      {/* Footer — unchanged this step */}
       <footer className="bg-luma-950 text-white">
         <div className="container-luma">
           <div className="grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Brand */}
             <div className="lg:col-span-1">
               <div className="flex items-center gap-2.5">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-luma-700 font-bold text-white text-sm">
@@ -268,7 +308,6 @@ export function Layout() {
               </div>
             </div>
 
-            {/* Quick Links */}
             <div>
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">Quick Links</h3>
               <ul className="space-y-2.5 text-sm">
@@ -280,7 +319,6 @@ export function Layout() {
               </ul>
             </div>
 
-            {/* Information */}
             <div>
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">Information</h3>
               <ul className="space-y-2.5 text-sm">
@@ -291,7 +329,6 @@ export function Layout() {
               </ul>
             </div>
 
-            {/* Packages */}
             <div>
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">Packages</h3>
               <ul className="space-y-2.5 text-sm">
@@ -303,7 +340,6 @@ export function Layout() {
               </ul>
             </div>
 
-            {/* Contact */}
             <div>
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">Contact Us</h3>
               <ul className="space-y-3 text-sm">
@@ -336,7 +372,6 @@ export function Layout() {
         </div>
       </footer>
 
-      {/* Floating WhatsApp Button */}
       <a
         href="https://wa.me/254798635024"
         target="_blank"
@@ -347,9 +382,8 @@ export function Layout() {
         <svg className="h-7 w-7" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
       </a>
 
-      {/* Sticky Mobile CTA — only for non-logged-in users on mobile */}
       {!member && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white px-4 py-3 shadow-lg sm:hidden">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/50 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-sm sm:hidden">
           <Link
             to="/register"
             className="block w-full rounded-xl bg-luma-700 py-3 text-center text-sm font-bold text-white hover:bg-luma-800 transition-colors"

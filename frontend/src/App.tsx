@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { ScrollToTop } from './components/ScrollToTop'
 import { Layout } from './components/Layout'
 import { AdminLayout } from './components/AdminLayout'
 import { RequireMember } from './components/RequireMember'
@@ -73,6 +74,7 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <SWUpdateBanner />
           <SyncStatus />
           <Suspense fallback={<PageLoader />}>
