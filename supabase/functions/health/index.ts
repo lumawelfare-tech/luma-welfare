@@ -10,6 +10,7 @@
 
 import { corsHeaders } from '../shared/cors.ts'
 import { createAdminClient } from '../shared/supabase.ts'
+import { requireCronSecret } from '../shared/internal-auth.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -26,6 +27,12 @@ Deno.serve(async (req) => {
   const startTime = performance.now()
   const url = new URL(req.url)
   const detailed = url.searchParams.get('detail') === 'true'
+
+  // Detailed probes use Auth Admin / storage APIs — require CRON_SECRET
+  if (detailed) {
+    const denied = requireCronSecret(req)
+    if (denied) return denied
+  }
 
   try {
     const adminClient = createAdminClient()

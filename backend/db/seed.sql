@@ -71,14 +71,14 @@ insert into package_rules (package_id, key, value, description) values
 -- Welfare: no fixed waiting period; eligibility is an ongoing condition of
 -- keeping contributions current. Arrears beyond 1 month put cover at risk.
 ((select id from packages where code = 'welfare'), 'waiting_period_months', '', 'No fixed waiting period.'),
-((select id from packages where code = 'welfare'), 'requires_current_contributions', 'True', 'Contributions must stay current to remain covered.'),
+((select id from packages where code = 'welfare'), 'requires_current_contributions', 'true', 'Contributions must stay current to remain covered.'),
 ((select id from packages where code = 'welfare'), 'arrears_allowed_months', '1', 'Cover stays active up to this many unpaid months.'),
 ((select id from packages where code = 'welfare'), 'max_arrears_months', '2', 'Beyond this, burial/emergency cover is at risk.'),
 ((select id from packages where code = 'welfare'), 'min_contributions', '0', 'No minimum count.'),
 -- Standard 12-month packages
 ((select id from packages where code = 'hospital'), 'waiting_period_months', '12', '12 months of contributions.'),
 ((select id from packages where code = 'hospital'), 'min_contributions', '12', 'At least 12 contributions.'),
-((select id from packages where code = 'hospital'), 'requires_current_contributions', 'True', 'Contributions must be current.'),
+((select id from packages where code = 'hospital'), 'requires_current_contributions', 'true', 'Contributions must be current.'),
 ((select id from packages where code = 'business'), 'waiting_period_months', '12', '12 months of contributions.'),
 ((select id from packages where code = 'business'), 'min_contributions', '12', 'At least 12 contributions.'),
 ((select id from packages where code = 'building'), 'waiting_period_months', '12', '12 months of contributions.'),
@@ -100,7 +100,7 @@ insert into package_rules (package_id, key, value, description) values
 -- Shorter waiting period (Education Support)
 ((select id from packages where code = 'education'), 'waiting_period_months', '6', '6 months of contributions.'),
 ((select id from packages where code = 'education'), 'min_contributions', '6', 'At least 6 contributions.'),
-((select id from packages where code = 'education'), 'requires_current_contributions', 'True', 'Contributions must be current.');
+((select id from packages where code = 'education'), 'requires_current_contributions', 'true', 'Contributions must be current.');
 
 -- ---------------------------------------------------------------------------
 -- Roles and permissions

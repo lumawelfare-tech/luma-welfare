@@ -1,5 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, logAudit } from '../shared/supabase.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -10,8 +10,11 @@ Deno.serve(async (req) => {
     if (!user) return new Response(JSON.stringify({ message: 'Not authenticated' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
     const adminClient = createAdminClient()
-    const session = await loadAdminSession(adminClient, user.id)
-    if (!session) return new Response(JSON.stringify({ message: 'No admin access' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    const loaded = await loadAdminSession(adminClient, user.id, { req })
+    if (loaded.status !== 'ok') {
+      return adminSessionDeniedResponse(loaded)
+    }
+    const session = loaded.session
 
     const url = new URL(req.url)
     const resourceId = url.searchParams.get("resource_id")

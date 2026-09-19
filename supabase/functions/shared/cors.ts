@@ -1,35 +1,43 @@
 /**
  * CORS headers for Edge Functions.
- * Supports environment-based origin configuration.
+ * Reflects a single allowlisted Origin (never a comma-separated ACAO value).
  */
 
-function getAllowedOrigin(): string {
-  // Support multiple origins via comma-separated CORS_ALLOWED_ORIGIN
-  // Primary origin for Cloudflare-proxied domain or direct Vercel URL
-  return Deno.env.get('CORS_ALLOWED_ORIGIN') ?? 'https://luma-welfare.vercel.app'
+import { CSP_DIRECTIVES } from './security.ts'
+
+function getAllowedOrigins(): string[] {
+  const raw = Deno.env.get('CORS_ALLOWED_ORIGIN') ?? 'https://luma-welfare.vercel.app'
+  return raw.split(',').map((o) => o.trim()).filter(Boolean)
 }
 
-function isOriginAllowed(origin: string | null): boolean {
+function resolveAllowOrigin(reqOrigin: string | null): string {
+  const allowed = getAllowedOrigins()
+  if (reqOrigin && allowed.includes(reqOrigin)) return reqOrigin
+  // Fall back to primary configured origin for non-browser / same-origin tooling
+  return allowed[0] ?? 'https://luma-welfare.vercel.app'
+}
+
+export function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return false
-  const allowed = getAllowedOrigin().split(',').map(o => o.trim())
-  return allowed.includes(origin)
+  return getAllowedOrigins().includes(origin)
 }
 
-export function getCorsHeaders(): Record<string, string> {
+export function getCorsHeaders(req?: Request): Record<string, string> {
+  const origin = resolveAllowOrigin(req?.headers.get('Origin') ?? null)
   return {
-    'Access-Control-Allow-Origin': getAllowedOrigin(),
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-request-id',
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers':
+      'authorization, x-client-info, apikey, content-type, x-request-id, x-admin-2fa-token, x-callback-secret, x-cron-secret',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
     ...getSecurityHeaders(),
   }
 }
 
-// Backward-compatible export
+/** Static default for modules that import corsHeaders at load time. Prefer getCorsHeaders(req). */
 export const corsHeaders = getCorsHeaders()
-
-import { CSP_DIRECTIVES } from './security.ts'
 
 function getCspNonce(): string {
   return Deno.env.get('CSP_NONCE') ?? ''
@@ -43,7 +51,6 @@ function buildCsp(): string {
     .replace(/'strict-dynamic'/g, `'nonce-${nonce}' 'strict-dynamic'`)
 }
 
-// Security headers for all responses
 export function getSecurityHeaders(): Record<string, string> {
   return {
     'X-Content-Type-Options': 'nosniff',
@@ -57,9 +64,6 @@ export function getSecurityHeaders(): Record<string, string> {
 
 export const securityHeaders = getSecurityHeaders()
 
-/**
- * Add security headers to a response.
- */
 export function withSecurityHeaders(response: Response): Response {
   const headers = new Headers(response.headers)
   for (const [key, value] of Object.entries(securityHeaders)) {
@@ -74,7 +78,14 @@ export function withSecurityHeaders(response: Response): Response {
 
 export function handleCors(req: Request): Response | null {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    const origin = req.headers.get('Origin')
+    if (origin && !isOriginAllowed(origin)) {
+      return new Response(JSON.stringify({ message: 'Origin not allowed' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json', ...getSecurityHeaders() },
+      })
+    }
+    return new Response('ok', { headers: getCorsHeaders(req) })
   }
   return null
 }

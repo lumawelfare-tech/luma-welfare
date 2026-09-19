@@ -1,29 +1,27 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { api, ApiError } from '../lib/api'
+import { api, ApiError, setAdmin2faStepUpToken } from '../lib/api'
 import { AdminLogin } from './AdminLogin'
 
 /**
  * Admin-gated routes. Server-side authorization remains authoritative
- * (every admin API endpoint independently verifies the admins table).
+ * (every admin API endpoint independently verifies the admins table + 2FA step-up).
  * This is a convenience layer — it never grants access on its own.
- *
- * Unauthenticated → show Admin Login inline at /admin (no redirect)
- * Authenticated but not admin → redirect to /dashboard
- * Authenticated admin without 2FA verified → redirect to 2FA setup
- * Authenticated admin with 2FA verified → render children (Outlet)
  */
 export function RequireAdmin() {
   const { member, isAdmin, twoFaVerified, setTwoFaVerified, loading } = useAuth()
   const [requires2fa, setRequires2fa] = useState(false)
+  const [checkError, setCheckError] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
 
-  // Check 2FA status for admins
   useEffect(() => {
     if (!isAdmin || loading) return
     let cancelled = false
 
     async function check2fa() {
+      setChecking(true)
+      setCheckError(null)
       try {
         const d = await api<{ two_factor_enabled: boolean }>('/admin/2fa', { auth: true })
         if (cancelled) return
@@ -33,7 +31,14 @@ export function RequireAdmin() {
           setTwoFaVerified(true)
         }
       } catch {
-        if (!cancelled) setTwoFaVerified(true) // If 2FA check fails, allow access (server-side still enforces)
+        // Fail closed — never grant admin UI when the 2FA status check fails
+        if (!cancelled) {
+          setTwoFaVerified(false)
+          setRequires2fa(false)
+          setCheckError('Unable to verify admin security settings. Please refresh and try again.')
+        }
+      } finally {
+        if (!cancelled) setChecking(false)
       }
     }
 
@@ -41,7 +46,7 @@ export function RequireAdmin() {
     return () => { cancelled = true }
   }, [isAdmin, loading, setTwoFaVerified])
 
-  if (loading) {
+  if (loading || (isAdmin && checking && !twoFaVerified && !requires2fa && !checkError)) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-sm text-stone-500">
         Checking your account…
@@ -49,10 +54,16 @@ export function RequireAdmin() {
     )
   }
 
-  // Admins may not have a members record (e.g. the original admin account).
-  // Check isAdmin first so superadmins are not stuck on the login page.
   if (isAdmin) {
-    // If 2FA is required but not verified, show 2FA verification flow
+    if (checkError) {
+      return (
+        <div className="flex min-h-[50vh] items-center justify-center px-4">
+          <div role="alert" className="max-w-md rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {checkError}
+          </div>
+        </div>
+      )
+    }
     if (requires2fa && !twoFaVerified) {
       return <TwoFaVerification onVerified={() => { setTwoFaVerified(true); setRequires2fa(false) }} />
     }
@@ -63,14 +74,9 @@ export function RequireAdmin() {
     return <AdminLogin />
   }
 
-  // Authenticated but not admin
   return <Navigate to="/dashboard" replace />
 }
 
-/**
- * Inline 2FA verification for admin route access.
- * Shows a code input form that verifies the TOTP code server-side.
- */
 function TwoFaVerification({ onVerified }: { onVerified: () => void }) {
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -84,7 +90,14 @@ function TwoFaVerification({ onVerified }: { onVerified: () => void }) {
     setLoading(true)
     setError(null)
     try {
-      await api('/admin/2fa?action=verify', { method: 'POST', auth: true, body: { code } })
+      const result = await api<{
+        verified?: boolean
+        step_up_token?: string
+        step_up_expires_at?: number
+      }>('/admin/2fa?action=verify', { method: 'POST', auth: true, body: { code } })
+      if (result.step_up_token) {
+        setAdmin2faStepUpToken(result.step_up_token, result.step_up_expires_at)
+      }
       onVerified()
     } catch (e) {
       if (e instanceof ApiError) {
@@ -117,7 +130,7 @@ function TwoFaVerification({ onVerified }: { onVerified: () => void }) {
         </div>
 
         {error && (
-          <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div role="alert" className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
 
         <div className="mt-6">

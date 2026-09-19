@@ -16,7 +16,7 @@
  */
 
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, loadAdminSession, requirePermission, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, logAudit } from '../shared/supabase.ts'
 
 // ─── Configuration ──────────────────────────────────────────
 
@@ -57,10 +57,11 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createAdminClient()
-    const session = await loadAdminSession(adminClient, user.id)
-    if (!session) {
-      return jsonResp({ message: 'No admin access', code: 'FORBIDDEN' }, 403)
+    const loaded = await loadAdminSession(adminClient, user.id, { req })
+    if (loaded.status !== 'ok') {
+      return adminSessionDeniedResponse(loaded)
     }
+    const session = loaded.session
 
     requirePermission(session, 'members', 'read')
 

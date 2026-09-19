@@ -2,7 +2,7 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import {
   getAuthenticatedUser,
   createAdminClient,
-  loadAdminSession,
+  loadAdminSession, adminSessionDeniedResponse,
   requirePermission,
   logAudit,
 } from '../shared/supabase.ts'
@@ -269,8 +269,11 @@ Deno.serve(async (req) => {
     if (!user) return jsonResponse({ message: 'Not authenticated' }, 401)
 
     const adminClient = createAdminClient()
-    const session = await loadAdminSession(adminClient, user.id)
-    if (!session) return jsonResponse({ message: 'No admin access' }, 403)
+    const loaded = await loadAdminSession(adminClient, user.id, { req })
+    if (loaded.status !== 'ok') {
+      return adminSessionDeniedResponse(loaded)
+    }
+    const session = loaded.session
 
     if (req.method !== 'GET') return jsonResponse({ message: 'Method not allowed' }, 405)
 

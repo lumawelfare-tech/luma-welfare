@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from './cors.ts'
+import { extractAdmin2faStepUpToken, verifyAdmin2faStepUpToken } from './admin-2fa-token.ts'
 
 /**
  * Create a Supabase client with the user's JWT (RLS enforced).
@@ -34,32 +36,47 @@ export async function getAuthenticatedUser(req: Request): Promise<{ id: string; 
   return { id: user.id, email: user.email }
 }
 
-/**
- * Load the admin session for the authenticated user.
- * Uses a single query with join to load admin + permissions in one round-trip.
- */
-export async function loadAdminSession(
-  adminClient: SupabaseClient,
-  userId: string,
-): Promise<{
+export type AdminSession = {
   id: string
   display_name: string
   role_id: string
   role_name: string
   is_superadmin: boolean
   permissions: Set<string>
-} | null> {
-  // Query 1: Load admin profile with role name (uses existing idx)
+  two_factor_enabled: boolean
+}
+
+export type LoadAdminSessionResult =
+  | { status: 'ok'; session: AdminSession }
+  | { status: 'forbidden' }
+  | { status: '2fa_required' }
+
+/**
+ * Load the admin session for the authenticated user.
+ * When two_factor_enabled and skip2faCheck is false, requires a valid
+ * x-admin-2fa-token step-up header.
+ */
+export async function loadAdminSession(
+  adminClient: SupabaseClient,
+  userId: string,
+  opts?: { req?: Request; skip2faCheck?: boolean },
+): Promise<LoadAdminSessionResult> {
   const { data: admin, error } = await adminClient
     .from('admins')
-    .select('id, display_name, role_id, is_superadmin, is_active, roles(name)')
+    .select('id, display_name, role_id, is_superadmin, is_active, two_factor_enabled, roles(name)')
     .eq('id', userId)
     .eq('is_active', true)
     .single()
 
-  if (error || !admin) return null
+  if (error || !admin) return { status: 'forbidden' }
 
-  // Query 2: Load permissions for this role (small table, fast)
+  const twoFactorEnabled = admin.two_factor_enabled === true
+  if (twoFactorEnabled && !opts?.skip2faCheck) {
+    const token = opts?.req ? extractAdmin2faStepUpToken(opts.req) : null
+    const ok = await verifyAdmin2faStepUpToken(userId, token)
+    if (!ok) return { status: '2fa_required' }
+  }
+
   const { data: perms } = await adminClient
     .from('permissions')
     .select('resource, action')
@@ -70,13 +87,34 @@ export async function loadAdminSession(
   )
 
   return {
-    id: admin.id,
-    display_name: admin.display_name,
-    role_id: admin.role_id,
-    role_name: (admin.roles as unknown as { name: string })?.name ?? 'unknown',
-    is_superadmin: admin.is_superadmin,
-    permissions,
+    status: 'ok',
+    session: {
+      id: admin.id,
+      display_name: admin.display_name,
+      role_id: admin.role_id,
+      role_name: (admin.roles as unknown as { name: string })?.name ?? 'unknown',
+      is_superadmin: admin.is_superadmin,
+      permissions,
+      two_factor_enabled: twoFactorEnabled,
+    },
   }
+}
+
+/** Standard responses for loadAdminSession failures. */
+export function adminSessionDeniedResponse(result: Exclude<LoadAdminSessionResult, { status: 'ok' }>): Response {
+  if (result.status === '2fa_required') {
+    return new Response(JSON.stringify({
+      message: 'Two-factor authentication required',
+      code: 'ADMIN_2FA_REQUIRED',
+    }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  return new Response(JSON.stringify({ message: 'No admin access', code: 'FORBIDDEN' }), {
+    status: 403,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
 }
 
 /**

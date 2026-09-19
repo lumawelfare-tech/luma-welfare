@@ -10,8 +10,9 @@
  * - Reconciliation exception creation for mismatches
  *
  * Security:
- * - Always returns 200 to M-Pesa (it retries on non-200)
- * - Validates required fields before processing
+ * - Requires MPESA_CALLBACK_SECRET (query ?secret= or x-callback-secret header)
+ * - Short-circuits when PAYMENTS_ENABLED !== 'true' (does not mutate financial state)
+ * - Always returns 200 to M-Pesa after auth succeeds (it retries on non-200)
  * - Never trusts callback data without validation
  *
  * Idempotency:
@@ -38,6 +39,48 @@ type MpesaCallback = {
       }
     }
   }
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return diff === 0
+}
+
+/** Authenticate Daraja callback via shared secret. Fail closed if unset. */
+function authorizeCallback(req: Request): Response | null {
+  const expected = Deno.env.get('MPESA_CALLBACK_SECRET')?.trim()
+  if (!expected) {
+    safeLog('payments-callback', 'MPESA_CALLBACK_SECRET is not configured — rejecting callback')
+    return new Response(JSON.stringify({
+      message: 'Callback authentication is not configured',
+      code: 'SERVICE_UNAVAILABLE',
+    }), {
+      status: 503,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const url = new URL(req.url)
+  const presented =
+    url.searchParams.get('secret')?.trim() ||
+    req.headers.get('x-callback-secret')?.trim() ||
+    ''
+
+  if (!presented || !timingSafeEqual(presented, expected)) {
+    return new Response(JSON.stringify({
+      message: 'Unauthorized',
+      code: 'UNAUTHORIZED',
+    }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  return null
 }
 
 /** Extract metadata items from M-Pesa callback */
@@ -72,6 +115,18 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ message: 'Method not allowed' }), {
       status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const authError = authorizeCallback(req)
+  if (authError) return authError
+
+  // Do not mutate financial state while payments are disabled.
+  if (Deno.env.get('PAYMENTS_ENABLED') !== 'true') {
+    safeLog('payments-callback', 'Payments disabled — acknowledging without processing')
+    return new Response(JSON.stringify({ message: 'Payments disabled', code: 'PAYMENTS_DISABLED' }), {
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
@@ -119,12 +174,33 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Record webhook event
+    // Record webhook event (redact phone from stored payload)
+    const redactedPayload = {
+      Body: {
+        stkCallback: {
+          MerchantRequestID,
+          CheckoutRequestID,
+          ResultCode,
+          ResultDesc,
+          AccountReference,
+          CallbackMetadata: meta.amount != null || meta.mpesaReceipt
+            ? {
+                Item: [
+                  ...(meta.mpesaReceipt ? [{ Name: 'MpesaReceiptNumber', Value: meta.mpesaReceipt }] : []),
+                  ...(meta.amount != null ? [{ Name: 'Amount', Value: meta.amount }] : []),
+                  ...(meta.transactionDate ? [{ Name: 'TransactionDate', Value: meta.transactionDate }] : []),
+                ],
+              }
+            : undefined,
+        },
+      },
+    }
+
     await adminClient.from('webhook_events').upsert({
       provider: 'mpesa',
       event_id: eventId,
       event_type: 'stk_callback',
-      payload: body as unknown as Record<string, unknown>,
+      payload: redactedPayload as unknown as Record<string, unknown>,
       status: 'processing',
     }, { onConflict: 'provider,event_id' })
 
@@ -132,7 +208,6 @@ Deno.serve(async (req) => {
     const isRegistrationFee = (AccountReference ?? '').startsWith('LUMA-REG-')
 
     if (isRegistrationFee) {
-      // ── Registration fee callback — use atomic function ──
       const { data: result } = await adminClient
         .rpc('process_registration_fee_callback', {
           p_checkout_request_id: CheckoutRequestID,
@@ -145,7 +220,6 @@ Deno.serve(async (req) => {
       const memberId = result?.[0]?.member_id
 
       if (success && memberId) {
-        // Send notification (respects channel preferences)
         await sendNotification(adminClient, {
           memberId,
           subject: 'Membership Activated',
@@ -154,7 +228,6 @@ Deno.serve(async (req) => {
           emailButtonUrl: 'https://luma-welfare.vercel.app/join',
         })
 
-        // Create ledger entry
         await adminClient.from('financial_ledger').insert({
           transaction_type: 'registration_fee',
           member_id: memberId,
@@ -174,14 +247,12 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Update webhook event status
       await adminClient
         .from('webhook_events')
         .update({ status: success ? 'processed' : 'failed', processed_at: new Date().toISOString() })
         .eq('provider', 'mpesa')
         .eq('event_id', eventId)
     } else {
-      // ── Package payment callback — use v2 atomic function with amount validation ──
       const { data: result } = await adminClient
         .rpc('process_payment_callback_v2', {
           p_checkout_request_id: CheckoutRequestID,
@@ -214,7 +285,6 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Update webhook event status
       await adminClient
         .from('webhook_events')
         .update({ status: success ? 'processed' : 'failed', processed_at: new Date().toISOString() })
@@ -222,7 +292,6 @@ Deno.serve(async (req) => {
         .eq('event_id', eventId)
     }
 
-    // Always return 200 to M-Pesa — it retries on non-200
     return new Response(JSON.stringify({ message: 'Callback processed' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -232,7 +301,6 @@ Deno.serve(async (req) => {
       error: err instanceof Error ? err.message : 'Unknown error',
     })
 
-    // Return 200 to prevent M-Pesa retries on internal errors
     return new Response(JSON.stringify({ message: 'Callback received' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
