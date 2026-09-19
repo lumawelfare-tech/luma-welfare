@@ -172,43 +172,67 @@ BEGIN
   END LOOP;
 END $$;
 
--- Export worker helpers (signatures from 20260901100000)
-REVOKE ALL ON FUNCTION can_start_export(UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION can_start_export(UUID) TO service_role;
-
-REVOKE ALL ON FUNCTION claim_export_job(TEXT) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION claim_export_job(TEXT) TO service_role;
-
-REVOKE ALL ON FUNCTION complete_export_job(UUID, TEXT, TEXT, BIGINT, INT, TEXT) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION complete_export_job(UUID, TEXT, TEXT, BIGINT, INT, TEXT) TO service_role;
-
-REVOKE ALL ON FUNCTION increment_export_hourly_count(UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION increment_export_hourly_count(UUID) TO service_role;
+-- Export worker helpers — revoke by name so missing/altered signatures cannot fail the migration
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname IN (
+        'can_start_export',
+        'claim_export_job',
+        'complete_export_job',
+        'increment_export_hourly_count'
+      )
+  LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', r.sig);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', r.sig);
+  END LOOP;
+END $$;
 
 -- ============================================================================
 -- 2. export_jobs — drop weak policies; admin-only INSERT/SELECT
+--    (table may be absent on some environments — skip safely)
 -- ============================================================================
-DROP POLICY IF EXISTS "export_jobs_select_own" ON export_jobs;
-DROP POLICY IF EXISTS "export_jobs_insert_admin" ON export_jobs;
-DROP POLICY IF EXISTS "export_jobs_admin_read" ON export_jobs;
-DROP POLICY IF EXISTS "export_jobs_admin_insert" ON export_jobs;
-DROP POLICY IF EXISTS "export_jobs_admin_update" ON export_jobs;
+DO $$
+BEGIN
+  IF to_regclass('public.export_jobs') IS NULL THEN
+    RAISE NOTICE 'export_jobs missing — skipping export_jobs RLS hardening';
+    RETURN;
+  END IF;
 
-CREATE POLICY "export_jobs_admin_read" ON export_jobs
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM admins a WHERE a.id = auth.uid() AND a.is_active = true)
-  );
+  EXECUTE 'DROP POLICY IF EXISTS "export_jobs_select_own" ON export_jobs';
+  EXECUTE 'DROP POLICY IF EXISTS "export_jobs_insert_admin" ON export_jobs';
+  EXECUTE 'DROP POLICY IF EXISTS "export_jobs_admin_read" ON export_jobs';
+  EXECUTE 'DROP POLICY IF EXISTS "export_jobs_admin_update" ON export_jobs';
+  EXECUTE 'DROP POLICY IF EXISTS "export_jobs_admin_insert" ON export_jobs';
 
-CREATE POLICY "export_jobs_admin_insert" ON export_jobs
-  FOR INSERT WITH CHECK (
-    created_by = auth.uid()
-    AND EXISTS (SELECT 1 FROM admins a WHERE a.id = auth.uid() AND a.is_active = true)
-  );
+  EXECUTE $pol$
+    CREATE POLICY "export_jobs_admin_read" ON export_jobs
+      FOR SELECT USING (
+        EXISTS (SELECT 1 FROM admins a WHERE a.id = auth.uid() AND a.is_active = true)
+      )
+  $pol$;
 
-CREATE POLICY "export_jobs_admin_update" ON export_jobs
-  FOR UPDATE USING (
-    EXISTS (SELECT 1 FROM admins a WHERE a.id = auth.uid() AND a.is_active = true)
-  );
+  EXECUTE $pol$
+    CREATE POLICY "export_jobs_admin_insert" ON export_jobs
+      FOR INSERT WITH CHECK (
+        created_by = auth.uid()
+        AND EXISTS (SELECT 1 FROM admins a WHERE a.id = auth.uid() AND a.is_active = true)
+      )
+  $pol$;
+
+  EXECUTE $pol$
+    CREATE POLICY "export_jobs_admin_update" ON export_jobs
+      FOR UPDATE USING (
+        EXISTS (SELECT 1 FROM admins a WHERE a.id = auth.uid() AND a.is_active = true)
+      )
+  $pol$;
+END $$;
 
 -- ============================================================================
 -- 3. registration_fees — cannot self-insert as paid
@@ -287,8 +311,9 @@ CREATE TRIGGER trg_prevent_member_privileged_column_self_update
 
 REVOKE ALL ON FUNCTION public.prevent_member_privileged_column_self_update() FROM PUBLIC, anon, authenticated;
 
--- Normalize legacy boolean package_rules values so parsers match
+-- Normalize legacy boolean package_rules string values so parsers match
 UPDATE package_rules
-SET value = lower(value)
+SET value = to_jsonb(lower(value #>> '{}'))
 WHERE key = 'requires_current_contributions'
-  AND lower(value) IN ('true', 'false');
+  AND jsonb_typeof(value) = 'string'
+  AND lower(value #>> '{}') IN ('true', 'false');
