@@ -86,7 +86,7 @@ describe('Phase 1 — public settings allowlist', () => {
 })
 
 describe('Phase 1 — RLS containment migration', () => {
-  const migration = read('supabase/migrations/20260907000000_phase1_security_containment.sql')
+  const migration = read('supabase/migrations/20260918091409_phase1_security_containment.sql')
 
   it('constrains payment and contribution inserts to Pending', () => {
     expect(migration).toMatch(/payments_insert_own[\s\S]*status = 'Pending'/)
