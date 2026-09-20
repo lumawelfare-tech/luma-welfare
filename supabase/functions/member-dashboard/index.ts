@@ -197,8 +197,14 @@ Deno.serve(async (req) => {
         else if (waitingMet) qualStatus = 'eligible'
         else qualStatus = 'not_eligible'
 
+        // Date-only calendar math (UTC) — avoid local TZ shifting eligible_from by a day in CI.
         const eligibleFrom = waitingMonths && startedAt
-          ? new Date(startedAt.getFullYear(), startedAt.getMonth() + waitingMonths, startedAt.getDate()).toISOString().slice(0, 10)
+          ? (() => {
+              const y = startedAt.getUTCFullYear()
+              const m = startedAt.getUTCMonth()
+              const d = startedAt.getUTCDate()
+              return new Date(Date.UTC(y, m + waitingMonths, d)).toISOString().slice(0, 10)
+            })()
           : startedAt?.toISOString().slice(0, 10) ?? null
 
         return {

@@ -44,11 +44,24 @@ function bool(ruleMap: RuleMap, key: string, fallback: boolean): boolean {
 }
 
 function monthsBetween(start: Date, end: Date): number {
+  // Use UTC components so ISO date-only inputs are timezone-stable in CI.
   return Math.max(
     0,
-    (end.getFullYear() - start.getFullYear()) * 12 +
-      (end.getMonth() - start.getMonth()),
+    (end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+      (end.getUTCMonth() - start.getUTCMonth()),
   )
+}
+
+/** Add calendar months to a YYYY-MM-DD (or ISO) date without local TZ drift. */
+function addMonthsDateOnly(isoDate: string, months: number): string {
+  const [y, m, d] = isoDate.slice(0, 10).split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1 + months, d))
+  return dt.toISOString().slice(0, 10)
+}
+
+function toDateOnly(isoDate: string | null | undefined): string | null {
+  if (!isoDate) return null
+  return isoDate.slice(0, 10)
 }
 
 export function evaluateQualification(
@@ -110,15 +123,9 @@ export function evaluateQualification(
   }
 
   const eligibleFrom =
-    !waitingPeriodIsNone && startedAt
-      ? new Date(
-          startedAt.getFullYear(),
-          startedAt.getMonth() + waitingPeriod,
-          startedAt.getDate(),
-        )
-          .toISOString()
-          .slice(0, 10)
-      : startedAt?.toISOString().slice(0, 10) ?? null
+    !waitingPeriodIsNone && input.startedAt
+      ? addMonthsDateOnly(input.startedAt, waitingPeriod)
+      : toDateOnly(input.startedAt)
 
   return {
     status,

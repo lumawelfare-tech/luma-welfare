@@ -14,10 +14,10 @@ import { evaluateQualification } from '../qualify.ts'
 
 function makeContrib(status, count, startPeriod = '2025-01') {
   return Array.from({ length: count }, (_, i) => {
-    const d = new Date(`${startPeriod}-01`)
-    d.setMonth(d.getMonth() + i)
-    const year = d.getFullYear()
-    const month = String(d.getMonth() + 1).padStart(2, '01')
+    const [y, m] = startPeriod.split('-').map(Number)
+    const d = new Date(Date.UTC(y, m - 1 + i, 1))
+    const year = d.getUTCFullYear()
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0')
     return { status, period: `${year}-${month}` }
   })
 }
@@ -41,7 +41,7 @@ describe('Qualification Engine', () => {
     const contribs = makeContrib('Paid', 12, '2024-01')
     const result = evaluateQualification(rules, input, contribs)
     assert.strictEqual(result.status, 'eligible')
-    assert.strictEqual(result.eligibleFrom, '2024-12-31')
+    assert.strictEqual(result.eligibleFrom, '2025-01-01')
   })
 
   it('not_eligible with only 11 of 12 required contributions', () => {
@@ -70,7 +70,7 @@ describe('Qualification Engine', () => {
     const contribs = makeContrib('Paid', 6, '2024-07')
     const result = evaluateQualification(rules, input, contribs)
     assert.strictEqual(result.status, 'eligible')
-    assert.strictEqual(result.eligibleFrom, '2024-12-31')
+    assert.strictEqual(result.eligibleFrom, '2025-01-01')
   })
 
   it('not_eligible at 5 of 6 required (Education)', () => {
