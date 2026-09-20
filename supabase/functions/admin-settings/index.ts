@@ -102,7 +102,11 @@ Deno.serve(async (req) => {
     }
 
     // GET /admin-settings/audit-logs
-    if (req.method === 'GET' && (resource === 'audit-logs' || resourceParam === 'audit_logs')) {
+    if (
+      req.method === 'GET' &&
+      (resource === 'audit-logs' || resource === 'audit_logs' ||
+        resourceParam === 'audit-logs' || resourceParam === 'audit_logs')
+    ) {
       requirePermission(session, 'audit_logs', 'read')
       const pageParam = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1)
       const perPage = Math.min(200, Math.max(1, parseInt(url.searchParams.get('per_page') ?? '50', 10) || 50))

@@ -43,12 +43,18 @@ export function AdminAuditLogs() {
         `/admin/settings?${qs.toString()}`,
         { auth: true }
       )
-      setLogs(d.items ?? [])
-      setTotalCount(d.total ?? (d.items?.length ?? 0))
-      setTotalPages(d.pages ?? 1)
-      if (d.actions) setUniqueActions(d.actions)
+      setLogs(d?.items ?? [])
+      setTotalCount(d?.total ?? (d?.items?.length ?? 0))
+      setTotalPages(d?.pages ?? 1)
+      if (d?.actions) setUniqueActions(d.actions)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load audit logs.')
+      setError(
+        e instanceof ApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : 'Could not load audit logs.',
+      )
     } finally {
       setLoading(false)
     }
