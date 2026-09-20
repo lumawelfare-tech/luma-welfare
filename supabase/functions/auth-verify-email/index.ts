@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     const { data: member } = await adminClient
       .from('members')
       .select('id, status')
-      .ilike('email', email)
+      .eq('email', email)
       .maybeSingle()
 
     if (!member) {
@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
     const { data: member } = await adminClient
       .from('members')
       .select('id, status')
-      .ilike('email', email)
+      .eq('email', email)
       .maybeSingle()
 
     if (!member) {

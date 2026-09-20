@@ -16,6 +16,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { timingSafeEqual } from 'node:crypto'
 
 // ── Configuration ──────────────────────────────────────────────────────────
 const BATCH_SIZE_NOTIFICATIONS = 1000
@@ -24,6 +25,16 @@ const BATCH_SIZE_EXPORT_JOBS = 100
 const BATCH_SIZE_EMAIL_VERIFICATIONS = 500
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+/** Constant-time Bearer cron auth. Fail closed on length mismatch. */
+function authorizeCron(authHeader: string | undefined, cronSecret: string): boolean {
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  if (!token) return false
+  const a = Buffer.from(token)
+  const b = Buffer.from(cronSecret)
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
+}
 
 function getServiceKey(): string {
   return (
@@ -181,7 +192,7 @@ export default async function handler(
   }
 
   // Vercel sends: Authorization: Bearer <CRON_SECRET>
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  if (!authorizeCron(authHeader, cronSecret)) {
     console.warn('[CLEANUP] Unauthorized cron request')
     res.status(401).json({ error: 'Unauthorized' })
     return

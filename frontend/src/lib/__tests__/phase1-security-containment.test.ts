@@ -57,6 +57,23 @@ describe('Phase 1 — JWT deploy strategy is allowlisted', () => {
   })
 })
 
+describe('CORS — exact origin allowlist', () => {
+  it('does not reflect arbitrary *.vercel.app preview origins', () => {
+    const src = read('supabase/functions/shared/cors.ts')
+    expect(src).toContain('Exact allowlist only')
+    expect(src).not.toContain("endsWith('.vercel.app')")
+    expect(src).toContain('getAllowedOrigins().includes(origin)')
+  })
+})
+
+describe('auth-verify-email — exact email match', () => {
+  it('looks up members by eq(email), not ilike wildcards', () => {
+    const src = read('supabase/functions/auth-verify-email/index.ts')
+    expect(src).toContain(".eq('email', email)")
+    expect(src).not.toContain(".ilike('email'")
+  })
+})
+
 describe('Phase 1 — OAuth provisioning disabled', () => {
   it('auth-oauth-provision returns 410 and never inserts members', () => {
     const src = read('supabase/functions/auth-oauth-provision/index.ts')

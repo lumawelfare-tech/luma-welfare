@@ -19,11 +19,56 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { timingSafeEqual } from 'node:crypto'
 
 // ── Configuration ──────────────────────────────────────────────────────────
 
 const HEALTH_ENDPOINT_TIMEOUT_MS = 10_000
 const ADMIN_MONITORING_TIMEOUT_MS = 15_000
+
+/** Constant-time Bearer cron auth. Fail closed on length mismatch. */
+function authorizeCron(authHeader: string | undefined, cronSecret: string): boolean {
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  if (!token) return false
+  const a = Buffer.from(token)
+  const b = Buffer.from(cronSecret)
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
+}
+
+/**
+ * Block SSRF to localhost / private / link-local / metadata hosts.
+ * Admin-configured webhook URLs must be public HTTPS.
+ */
+function isAllowedWebhookUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw)
+    if (u.protocol !== 'https:') return false
+    const host = u.hostname.toLowerCase()
+    if (
+      host === 'localhost' ||
+      host === '0.0.0.0' ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      host.endsWith('.localhost') ||
+      host === 'metadata.google.internal' ||
+      /^127\./.test(host) ||
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^169\.254\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host) ||
+      host === '::1' ||
+      host.startsWith('fc') ||
+      host.startsWith('fd') ||
+      host.startsWith('[')
+    ) {
+      return false
+    }
+    return true
+  } catch {
+    return false
+  }
+}
 
 // Thresholds for alert conditions
 const ALERT_THRESHOLDS = {
@@ -492,6 +537,11 @@ async function sendWebhookAlerts(
   let sent = 0
   for (const webhook of webhooks) {
     try {
+      if (!isAllowedWebhookUrl(webhook.url)) {
+        console.warn(`[HEALTH-CHECK] Skipping webhook ${webhook.name}: URL not allowed`)
+        continue
+      }
+
       let payload: Record<string, unknown>
       switch (webhook.type) {
         case 'slack': payload = buildSlackPayload(overall, results); break
@@ -596,7 +646,7 @@ export default async function handler(
     return
   }
 
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  if (!authorizeCron(authHeader, cronSecret)) {
     console.warn('[HEALTH-CHECK] Unauthorized cron request')
     res.status(401).json({ error: 'Unauthorized' })
     return
