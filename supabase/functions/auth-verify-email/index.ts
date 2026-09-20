@@ -336,16 +336,18 @@ Deno.serve(async (req) => {
     // Deliver the new code.
     const result = await sendEmail(email, 'Luma Welfare Verification Code', buildOtpEmail(code, OTP_TTL_MINUTES))
     if (!result.success) {
+      const emailErrorCode = result.errorCode ?? 'PROVIDER_REJECTED'
       await logAudit(adminClient, {
         actor_id: member.id,
         action: 'EMAIL_DELIVERY_FAILED',
         resource: 'email_verification',
         resource_id: member.id,
-        meta: { context: 'resend', reason: result.error ?? 'unknown' },
+        meta: { context: 'resend', errorCode: emailErrorCode },
       })
       return json(502, {
         message: 'We could not send the verification email. Please try again shortly.',
         code: 'EMAIL_FAILED',
+        emailErrorCode,
       })
     }
 

@@ -101,7 +101,7 @@ Set required secrets in **Supabase Dashboard → Project Settings → Edge Funct
 |---|---|
 | `RESEND_API_KEY` | Resend API key for transactional email |
 | `OTP_HASH_SECRET` | 32+ char random secret for HMAC-SHA256 OTP hashing |
-| `EMAIL_FROM` | Sender address (e.g. `Luma Welfare <onboarding@resend.dev>`) |
+| `EMAIL_FROM` | Sender on a **Resend-verified domain**, e.g. `Luma Welfare <noreply@lumawelfare.or.ke>` (not `*.vercel.app`) |
 | `EMAIL_TEST_MODE` | Set to `true` to route all email to `delivered@resend.dev` |
 
 M-Pesa secrets (`MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`, etc.) are only needed when `PAYMENTS_ENABLED=true`.

@@ -123,8 +123,10 @@ Deno.serve(async (req) => {
       }, { onConflict: 'user_id' })
 
     let emailSent = false
+    let emailErrorCode: string | undefined
     if (otpError) {
       console.error('Failed to store verification code:', otpError.message)
+      emailErrorCode = 'OTP_STORE_FAILED'
     } else {
       const result = await sendEmail(
         email,
@@ -140,13 +142,15 @@ Deno.serve(async (req) => {
           resource_id: userId,
         })
       } else {
-        console.error('Verification email failed:', result.error)
+        // Do not log OTP or raw provider secrets — only safe error codes.
+        emailErrorCode = result.errorCode ?? 'PROVIDER_REJECTED'
+        console.error('Verification email failed:', emailErrorCode)
         await logAudit(adminClient, {
           actor_id: userId,
           action: 'EMAIL_DELIVERY_FAILED',
           resource: 'email_verification',
           resource_id: userId,
-          meta: { context: 'register', reason: result.error ?? 'unknown' },
+          meta: { context: 'register', errorCode: emailErrorCode },
         })
       }
     }
@@ -170,6 +174,7 @@ Deno.serve(async (req) => {
       userId,
       email: email.toLowerCase(),
       emailSent,
+      ...(emailSent ? {} : { emailErrorCode: emailErrorCode ?? 'PROVIDER_REJECTED' }),
     })
   } catch (_err) {
     return json(500, { message: 'Internal server error', code: 'INTERNAL' })

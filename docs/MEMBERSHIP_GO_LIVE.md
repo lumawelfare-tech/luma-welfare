@@ -24,7 +24,8 @@ Dashboard → Project Settings → Edge Functions → Secrets (or `supabase secr
 | `CRON_SECRET` | Yes (cron + health detail + workers) | Yes |
 | `OTP_HASH_SECRET` | Yes (email OTP) | Falls back to service role (avoid) |
 | `RESEND_API_KEY` | Yes (email) | Yes |
-| `EMAIL_FROM` | Yes | Depends |
+| `EMAIL_FROM` | Yes — must be on a **Resend-verified domain** (not `*.vercel.app`) | Depends |
+| `EMAIL_TEST_MODE` | No (leave unset in prod). `true` redirects all mail to `delivered@resend.dev` | N/A |
 | `CORS_ALLOWED_ORIGIN` | Yes (prod domain(s), comma-separated OK) | Defaults to vercel.app |
 | `ADMIN_2FA_STEPUP_SECRET` | Recommended | Falls back to OTP/service role |
 | `MPESA_CALLBACK_SECRET` | Yes even while payments off | Callback rejects (503) |
@@ -41,6 +42,22 @@ curl -s -o /dev/null -w "%{http_code}" \
   "$SUPABASE_URL/functions/v1/health?detail=true"
 # Expect 401
 ```
+
+### Resend domain verification (required for OTP email)
+
+OTP mail is sent by Edge Functions via Resend (`shared/email.ts`), **not** Supabase Auth.
+
+1. In [Resend Domains](https://resend.com/domains), add and verify your org domain (e.g. `lumawelfare.or.ke`) — SPF/DKIM DNS as shown by Resend.
+2. Set the Edge Function secret (do not use `*.vercel.app` — Resend cannot verify it):
+
+```bash
+supabase secrets set EMAIL_FROM="Luma Welfare <noreply@YOUR_VERIFIED_DOMAIN>"
+```
+
+3. Confirm `EMAIL_TEST_MODE` is **unset** or `false` in production.
+4. Redeploy `auth-register` and `auth-verify-email` after secret changes if needed, then register a test account and confirm inbox delivery (and Resend dashboard → Emails shows Accepted).
+
+Status: **REQUIRES MANUAL RESEND DOMAIN VERIFICATION** until steps 1–4 succeed.
 
 ## 3. Vercel
 

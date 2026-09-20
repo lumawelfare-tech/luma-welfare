@@ -33,17 +33,30 @@ export function VerifyEmail() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
 
-  const stateEmail = (location.state as { email?: string } | null)?.email
+  const state = (location.state as {
+    email?: string
+    emailSent?: boolean
+    emailErrorCode?: string
+  } | null) ?? null
+  const stateEmail = state?.email
   const initialEmail = stateEmail ?? searchParams.get('email') ?? ''
+  const initialDeliveryFailed = state?.emailSent === false
 
   const [email, setEmail] = useState(initialEmail)
   const [emailInput, setEmailInput] = useState('')
   const [code, setCode] = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [phase, setPhase] = useState<Phase>('input')
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(
+    initialDeliveryFailed
+      ? 'We could not deliver the verification email. Use Resend code below, and check spam if it still does not arrive.'
+      : null,
+  )
   const [resending, setResending] = useState(false)
-  const [countdown, setCountdown] = useState(initialEmail ? RESEND_SECONDS : 0)
+  // Start countdown only when an email was actually sent; otherwise allow immediate resend.
+  const [countdown, setCountdown] = useState(
+    initialEmail && !initialDeliveryFailed ? RESEND_SECONDS : 0,
+  )
 
   const inputsRef = useRef<(HTMLInputElement | null)[]>([])
 
@@ -274,8 +287,18 @@ export function VerifyEmail() {
             </h1>
             {phase !== 'success' && (
               <p className="mt-2 text-sm text-gray-500">
-                Enter the 6-digit code sent to{' '}
-                <span className="font-semibold text-gray-700">{email}</span>
+                {initialDeliveryFailed ? (
+                  <>
+                    Enter the 6-digit code for{' '}
+                    <span className="font-semibold text-gray-700">{email}</span> once it arrives.
+                    Delivery failed on signup — use Resend below.
+                  </>
+                ) : (
+                  <>
+                    Enter the 6-digit code sent to{' '}
+                    <span className="font-semibold text-gray-700">{email}</span>
+                  </>
+                )}
               </p>
             )}
           </div>
@@ -336,7 +359,15 @@ export function VerifyEmail() {
                 <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
               )}
               {notice && (
-                <div className="mt-4 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">{notice}</div>
+                <div
+                  className={`mt-4 rounded-xl px-4 py-3 text-sm ${
+                    initialDeliveryFailed && notice.startsWith('We could not deliver')
+                      ? 'bg-amber-50 text-amber-900'
+                      : 'bg-green-50 text-green-700'
+                  }`}
+                >
+                  {notice}
+                </div>
               )}
 
               {/* Verify */}

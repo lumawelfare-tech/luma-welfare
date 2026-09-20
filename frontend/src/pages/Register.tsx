@@ -50,7 +50,7 @@ export function Register() {
 
     setBusy(true)
     try {
-      await register({
+      const result = await register({
         fullName: form.fullName.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
@@ -58,7 +58,11 @@ export function Register() {
         password: form.password,
       })
       navigate('/verify-email', {
-        state: { email: form.email.trim() },
+        state: {
+          email: form.email.trim(),
+          emailSent: result.emailSent,
+          emailErrorCode: result.emailErrorCode,
+        },
         replace: true,
       })
     } catch (err) {

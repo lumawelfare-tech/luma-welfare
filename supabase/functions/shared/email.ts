@@ -7,17 +7,60 @@
  *   domain (or onboarding@resend.dev for testing only).
  * Test mode: set EMAIL_TEST_MODE=true to force all mail to delivered@resend.dev
  * (sandbox testing). Default (unset/false) delivers to real recipients.
+ *
+ * Production requirement: verify a custom domain in Resend (e.g. lumawelfare.or.ke)
+ * and set EMAIL_FROM to an address on that domain. vercel.app senders are rejected.
  */
 
+/** Fallback only — not a Resend-verifiable domain; production MUST set EMAIL_FROM. */
 const DEFAULT_SENDER = 'Luma Welfare <noreply@luma-welfare.vercel.app>'
 const TEST_RECIPIENT = 'delivered@resend.dev'
 const MAX_SUBJECT = 200
 const MAX_HTML = 100_000
 
+export type EmailErrorCode =
+  | 'NOT_CONFIGURED'
+  | 'INVALID_RECIPIENT'
+  | 'INVALID_SUBJECT'
+  | 'INVALID_BODY'
+  | 'DOMAIN_NOT_VERIFIED'
+  | 'INVALID_API_KEY'
+  | 'RATE_LIMITED'
+  | 'PROVIDER_REJECTED'
+  | 'NETWORK'
+
 /** Returns the configured sender from EMAIL_FROM, or the production default. */
 export function getSender(): string {
   const from = Deno.env.get('EMAIL_FROM')
   return from && from.trim() ? from.trim() : DEFAULT_SENDER
+}
+
+/** True when the From address cannot be verified on Resend (e.g. *.vercel.app). */
+export function senderNeedsDomainVerification(from: string = getSender()): boolean {
+  const addr = from.toLowerCase()
+  return (
+    addr.includes('vercel.app') ||
+    addr.includes('localhost') ||
+    addr.includes('example.com')
+  )
+}
+
+export function classifyResendError(status: number, message?: string): EmailErrorCode {
+  const m = (message ?? '').toLowerCase()
+  if (status === 401) return 'INVALID_API_KEY'
+  if (
+    m.includes('domain is not verified') ||
+    m.includes('not verified') ||
+    m.includes('from domain') ||
+    m.includes('invalid `from`') ||
+    m.includes('invalid from') ||
+    (status === 403 && (m.includes('domain') || m.includes('from')))
+  ) {
+    return 'DOMAIN_NOT_VERIFIED'
+  }
+  if (status === 429) return 'RATE_LIMITED'
+  if (status === 403) return 'PROVIDER_REJECTED'
+  return 'PROVIDER_REJECTED'
 }
 
 export interface EmailAttachment {
@@ -30,6 +73,7 @@ export interface EmailResult {
   success: boolean
   id?: string
   error?: string
+  errorCode?: EmailErrorCode
 }
 
 /**
@@ -49,17 +93,25 @@ export async function sendEmail(
   const apiKey = Deno.env.get('RESEND_API_KEY')
   if (!apiKey) {
     console.error('send-email: RESEND_API_KEY not configured')
-    return { success: false, error: 'Email service not configured' }
+    return { success: false, error: 'Email service not configured', errorCode: 'NOT_CONFIGURED' }
   }
 
   if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-    return { success: false, error: 'Invalid recipient email' }
+    return { success: false, error: 'Invalid recipient email', errorCode: 'INVALID_RECIPIENT' }
   }
   if (!subject || subject.length > MAX_SUBJECT) {
-    return { success: false, error: 'Invalid subject' }
+    return { success: false, error: 'Invalid subject', errorCode: 'INVALID_SUBJECT' }
   }
   if (!html || html.length > MAX_HTML) {
-    return { success: false, error: 'Invalid HTML body' }
+    return { success: false, error: 'Invalid HTML body', errorCode: 'INVALID_BODY' }
+  }
+
+  const from = getSender()
+  if (senderNeedsDomainVerification(from)) {
+    console.error(
+      'send-email: EMAIL_FROM uses an unverifiable sender domain (e.g. vercel.app). ' +
+        'Verify a custom domain in Resend and set EMAIL_FROM to an address on that domain.',
+    )
   }
 
   const testMode = (Deno.env.get('EMAIL_TEST_MODE') ?? '').toLowerCase() === 'true'
@@ -67,7 +119,7 @@ export async function sendEmail(
 
   try {
     const payload: Record<string, unknown> = {
-      from: getSender(),
+      from,
       to: [recipient],
       subject,
       html,
@@ -91,17 +143,22 @@ export async function sendEmail(
       body: JSON.stringify(payload),
     })
 
-    const data = await response.json() as { id?: string; message?: string }
+    const data = await response.json() as { id?: string; message?: string; name?: string }
 
     if (!response.ok) {
-      console.error('send-email: Resend API error:', response.status, data.message)
-      return { success: false, error: data.message ?? 'Email send failed' }
+      const errorCode = classifyResendError(response.status, data.message ?? data.name)
+      console.error('send-email: Resend API error:', response.status, errorCode, data.message ?? data.name)
+      return {
+        success: false,
+        error: data.message ?? 'Email send failed',
+        errorCode,
+      }
     }
 
     return { success: true, id: data.id }
   } catch (err) {
     console.error('send-email: Network error:', err instanceof Error ? err.message : err)
-    return { success: false, error: 'Network error sending email' }
+    return { success: false, error: 'Network error sending email', errorCode: 'NETWORK' }
   }
 }
 

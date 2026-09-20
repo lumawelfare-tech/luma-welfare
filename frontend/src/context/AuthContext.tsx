@@ -49,7 +49,7 @@ type AuthState = {
     fullName: string
     phone: string
     idNumber?: string
-  }) => Promise<void>
+  }) => Promise<{ emailSent: boolean; emailErrorCode?: string }>
   logout: () => void
   setTwoFaVerified: (v: boolean) => void
 }
@@ -243,8 +243,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fullName: string
     phone: string
     idNumber?: string
-  }): Promise<void> {
-    await api('/auth/register', { method: 'POST', body: input })
+  }): Promise<{ emailSent: boolean; emailErrorCode?: string }> {
+    const data = await api<{ emailSent?: boolean; emailErrorCode?: string }>(
+      '/auth/register',
+      { method: 'POST', body: input },
+    )
+    return {
+      emailSent: data.emailSent === true,
+      emailErrorCode: data.emailErrorCode,
+    }
   }
 
   function logout() {
