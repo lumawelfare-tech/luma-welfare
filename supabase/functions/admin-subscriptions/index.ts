@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
+import { evaluateQualification } from '../shared/qualify.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -18,7 +19,70 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url)
     const resourceId = url.searchParams.get("resource_id")
+    const action = url.searchParams.get('action')
     const subId = resourceId
+
+    // POST /admin-subscriptions/:id/evaluate — run qualification engine and persist
+    if (req.method === 'POST' && subId && action === 'evaluate') {
+      requirePermission(session, 'members', 'read')
+
+      const { data: sub, error: subError } = await adminClient
+        .from('subscriptions')
+        .select('id, member_id, package_id, started_at, status, members(status)')
+        .eq('id', subId)
+        .single()
+      if (subError || !sub) {
+        return new Response(JSON.stringify({ message: 'Subscription not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const { data: rules } = await adminClient.from('package_rules').select('key, value').eq('package_id', sub.package_id)
+      const { data: contributions } = await adminClient.from('contributions').select('status, period').eq('subscription_id', subId)
+      const { data: existing } = await adminClient.from('qualifications').select('id').eq('subscription_id', subId).maybeSingle()
+
+      const ruleMap: Record<string, unknown> = {}
+      for (const r of rules ?? []) ruleMap[r.key] = r.value
+
+      const memberRow = sub.members as unknown as { status: string } | { status: string }[] | null
+      const memberStatus = Array.isArray(memberRow)
+        ? (memberRow[0]?.status ?? 'pending_approval')
+        : (memberRow?.status ?? 'pending_approval')
+
+      const result = evaluateQualification(
+        ruleMap,
+        {
+          memberStatus,
+          subscriptionStatus: sub.status,
+          startedAt: sub.started_at,
+        },
+        (contributions ?? []) as { status: string; period: string }[],
+      )
+
+      const payload = {
+        subscription_id: subId,
+        member_id: sub.member_id,
+        package_id: sub.package_id,
+        status: result.status,
+        eligible_from: result.eligibleFrom,
+        criteria_met: result.criteriaMet,
+        evaluated_at: new Date().toISOString(),
+        evaluated_by: session.id,
+      }
+
+      const { data: saved, error: saveError } = existing
+        ? await adminClient.from('qualifications').update(payload).eq('id', existing.id).select().single()
+        : await adminClient.from('qualifications').insert(payload).select().single()
+      if (saveError) throw new Error(saveError.message)
+
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: 'evaluated_qualification',
+        resource: 'subscription',
+        resource_id: subId,
+        meta: { status: result.status },
+      })
+      return new Response(JSON.stringify({ qualification: saved, criteria_met: result.criteriaMet }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     // GET /admin-subscriptions — list subscriptions
     if (req.method === 'GET' && !subId) {

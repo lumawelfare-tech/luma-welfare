@@ -9,8 +9,9 @@
  * 5. Authorization (RBAC enforcement)
  * 6. Export security (signed URLs, ownership)
  *
- * Run: npx tsx src/tests/security-test-suite.ts
- * Requires: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+ * Run: npx tsx scripts/security-test-suite.ts
+ * Requires: SUPABASE_URL, SUPABASE_ANON_KEY (or PUBLISHABLE), SUPABASE_SERVICE_ROLE_KEY (or SECRET)
+ * Live integration script — not run in CI by default.
  */
 
 import { createClient } from '@supabase/supabase-js'

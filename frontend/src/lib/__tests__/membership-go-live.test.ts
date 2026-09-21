@@ -58,6 +58,5 @@ describe('Payments remain disabled by default', () => {
   it('initiate and callback respect PAYMENTS_ENABLED', () => {
     expect(read('supabase/functions/payments-initiate/index.ts')).toContain("PAYMENTS_ENABLED') !== 'true'")
     expect(read('supabase/functions/payments-callback/index.ts')).toContain("PAYMENTS_ENABLED') !== 'true'")
-    expect(read('backend/.env.example')).toMatch(/PAYMENTS_ENABLED=false/)
   })
 })

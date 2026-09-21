@@ -1,4 +1,9 @@
 /**
+ * Relocated from backend/src/__tests__ during Supabase-only migration.
+ * Live / DATABASE_URL required — not run in CI.
+ * Run: node --test --import tsx <this-file>
+ */
+/**
  * Phase 2C Pre-Flight Tests
  * Run: node --test src/__tests__/preflight.test.mjs
  */

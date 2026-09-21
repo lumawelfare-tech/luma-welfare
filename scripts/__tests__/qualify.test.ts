@@ -5,12 +5,12 @@
  * Covers: waiting periods, current-contribution rules, minimums,
  * arrears thresholds, at_risk, and revoked states.
  *
- * Run: node --test src/lib/__tests__/qualify.test.ts
+ * Run: npm run test:qualify
  */
 
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { evaluateQualification } from '../qualify.ts'
+import { evaluateQualification } from '../../supabase/functions/shared/qualify.ts'
 
 function makeContrib(status, count, startPeriod = '2025-01') {
   return Array.from({ length: count }, (_, i) => {

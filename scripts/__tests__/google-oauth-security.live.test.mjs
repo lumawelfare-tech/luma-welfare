@@ -1,12 +1,17 @@
 /**
+ * Relocated from backend/src/__tests__ during Supabase-only migration.
+ * Live / DATABASE_URL required — not run in CI.
+ * Run: node --test --import tsx <this-file>
+ */
+/**
  * Google OAuth Security Tests
  *
  * Proves that:
- * 1. Existing member + matching Google email â†’ ALLOW
- * 2. Existing member + different Google email â†’ DENY
- * 3. No member record + Google email â†’ DENY
- * 4. Existing member + incomplete registration â†’ DENY
- * 5. Existing member + suspended/ineligible status â†’ DENY
+ * 1. Existing member + matching Google email GåÆ ALLOW
+ * 2. Existing member + different Google email GåÆ DENY
+ * 3. No member record + Google email GåÆ DENY
+ * 4. Existing member + incomplete registration GåÆ DENY
+ * 5. Existing member + suspended/ineligible status GåÆ DENY
  * 6. Google user cannot create members automatically
  * 7. Google user cannot create registration_fees automatically
  * 8. Member A cannot authenticate as Member B
@@ -73,11 +78,11 @@ after(async () => {
   await client.end()
 })
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 // Authorization Logic Tests (simulating auth-google-authorize)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 
-describe('TEST 1: Existing member + matching email â†’ ALLOW', () => {
+describe('TEST 1: Existing member + matching email GåÆ ALLOW', () => {
   it('Member A with matching email passes authorization', async () => {
     if (!client) return
 
@@ -92,7 +97,7 @@ describe('TEST 1: Existing member + matching email â†’ ALLOW', () => {
     assert.ok(rows[0].full_name?.length >= 2, 'full_name present')
     assert.ok(rows[0].phone, 'phone present')
 
-    // All checks pass â†’ authorize
+    // All checks pass GåÆ authorize
     const authorized = rows[0].status === 'active'
       && rows[0].email
       && rows[0].full_name?.length >= 2
@@ -101,7 +106,7 @@ describe('TEST 1: Existing member + matching email â†’ ALLOW', () => {
   })
 })
 
-describe('TEST 2: Existing member + different email â†’ DENY', () => {
+describe('TEST 2: Existing member + different email GåÆ DENY', () => {
   it('Member A with wrong Google email is denied', async () => {
     if (!client) return
 
@@ -112,11 +117,11 @@ describe('TEST 2: Existing member + different email â†’ DENY', () => {
     )
 
     const emailMatch = googleEmail.toLowerCase() === rows[0].email.toLowerCase()
-    assert.equal(emailMatch, false, 'Email mismatch â†’ denied')
+    assert.equal(emailMatch, false, 'Email mismatch GåÆ denied')
   })
 })
 
-describe('TEST 3: No member record â†’ DENY', () => {
+describe('TEST 3: No member record GåÆ DENY', () => {
   it('Google-only user without member record is denied', async () => {
     if (!client) return
 
@@ -126,11 +131,11 @@ describe('TEST 3: No member record â†’ DENY', () => {
       [FAKE_MEMBER]
     )
     assert.equal(rows.length, 0, 'No member record exists')
-    // Authorization check: member must exist â†’ DENY
+    // Authorization check: member must exist GåÆ DENY
   })
 })
 
-describe('TEST 4: Incomplete registration â†’ DENY', () => {
+describe('TEST 4: Incomplete registration GåÆ DENY', () => {
   it('Member with missing phone is denied', async () => {
     if (!client) return
 
@@ -147,8 +152,8 @@ describe('TEST 4: Incomplete registration â†’ DENY', () => {
     if (!rows[0].email) missing.push('email')
     if (!rows[0].phone) missing.push('phone')
 
-    assert.ok(missing.includes('phone'), 'Phone missing â†’ denied')
-    assert.equal(missing.length > 0, true, 'Incomplete â†’ denied')
+    assert.ok(missing.includes('phone'), 'Phone missing GåÆ denied')
+    assert.equal(missing.length > 0, true, 'Incomplete GåÆ denied')
 
     // Restore
     await client.query('UPDATE members SET phone = \'0711111111\' WHERE id = $1', [MEMBER_A])
@@ -165,14 +170,14 @@ describe('TEST 4: Incomplete registration â†’ DENY', () => {
     )
 
     assert.ok(rows[0].full_name.length < 2, 'Name too short')
-    // Authorization check: full_name must be >= 2 chars â†’ DENY
+    // Authorization check: full_name must be >= 2 chars GåÆ DENY
 
     // Restore
     await client.query('UPDATE members SET full_name = \'Test Member A\' WHERE id = $1', [MEMBER_A])
   })
 })
 
-describe('TEST 5: Suspended/ineligible status â†’ DENY', () => {
+describe('TEST 5: Suspended/ineligible status GåÆ DENY', () => {
   it('Suspended member is denied', async () => {
     if (!client) return
 
@@ -183,7 +188,7 @@ describe('TEST 5: Suspended/ineligible status â†’ DENY', () => {
       [MEMBER_A]
     )
     assert.equal(rows[0].status, 'suspended')
-    assert.notEqual(rows[0].status, 'active', 'Not active â†’ denied')
+    assert.notEqual(rows[0].status, 'active', 'Not active GåÆ denied')
 
     // Restore
     await client.query('UPDATE members SET status = \'active\' WHERE id = $1', [MEMBER_A])
@@ -199,7 +204,7 @@ describe('TEST 5: Suspended/ineligible status â†’ DENY', () => {
       [MEMBER_A]
     )
     assert.equal(rows[0].status, 'closed')
-    assert.notEqual(rows[0].status, 'active', 'Not active â†’ denied')
+    assert.notEqual(rows[0].status, 'active', 'Not active GåÆ denied')
 
     // Restore
     await client.query('UPDATE members SET status = \'active\' WHERE id = $1', [MEMBER_A])

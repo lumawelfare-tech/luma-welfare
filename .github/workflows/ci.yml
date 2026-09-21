@@ -132,10 +132,16 @@ jobs:
         working-directory: frontend
         run: npx tsc --noEmit
 
-      - name: TypeScript check (backend)
-        working-directory: backend
-        run: npx tsc --noEmit 2>&1 || true
-        # Backend may have Deno-specific imports that tsc can't resolve
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.1.4
+
+      - name: Typecheck Edge Functions (Deno)
+        run: |
+          # Pure shared module + migrated admin-subscriptions entrypoint
+          deno check --no-lock supabase/functions/shared/qualify.ts
+          deno check --no-lock supabase/functions/admin-subscriptions/index.ts
 
   # ============================================================================
   # LINT
@@ -184,9 +190,8 @@ jobs:
         working-directory: frontend
         run: npm run test -- --reporter=verbose
 
-      - name: Run backend qualification tests
-        working-directory: backend
-        run: npm test
+      - name: Run qualification engine tests
+        run: npm run test:qualify
 
       - name: Run edge function integration tests
         run: |

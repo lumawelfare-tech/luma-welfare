@@ -9,8 +9,9 @@
  * - Input validation
  * - Financial integrity
  *
- * Run with: npx tsx src/tests/security-audit.ts
- * Requires: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY env vars
+ * Run with: npx tsx scripts/security-audit.ts
+ * Requires: SUPABASE_URL, SUPABASE_ANON_KEY (or PUBLISHABLE), SUPABASE_SERVICE_ROLE_KEY (or SECRET) env vars
+ * Live integration script — not run in CI by default.
  */
 
 import { createClient } from '@supabase/supabase-js'
