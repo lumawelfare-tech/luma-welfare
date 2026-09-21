@@ -13,6 +13,7 @@ const ADMIN_FNS = [
   'admin-dashboard',
   'admin-members',
   'admin-delete-member',
+  'manage-user-role',
   'admin-reveal-member-id',
   'admin-claims',
   'admin-contributions',
@@ -37,7 +38,8 @@ describe('Edge auth contracts', () => {
     for (const fn of ADMIN_FNS) {
       const src = readFn(fn)
       expect(src, fn).toMatch(/loadAdminSession|getAdminSession|requireAdmin/)
-      expect(src, fn).toMatch(/requirePermission|handleAdminError/)
+      // Superadmin-only functions may use is_superadmin instead of requirePermission
+      expect(src, fn).toMatch(/requirePermission|handleAdminError|is_superadmin/)
     }
   })
 

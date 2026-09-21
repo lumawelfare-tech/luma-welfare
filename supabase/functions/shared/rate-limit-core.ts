@@ -37,6 +37,7 @@ export const FAIL_CLOSED_IDENTIFIERS = new Set([
   'admin-scheduled-reports-mutation',
   'admin-exports',
   'admin-webhook-test',
+  'manage-user-role',
 ])
 
 /**

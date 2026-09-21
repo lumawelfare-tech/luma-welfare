@@ -108,6 +108,9 @@ verify_jwt = true
 [functions.admin-delete-member]
 verify_jwt = true
 
+[functions.manage-user-role]
+verify_jwt = true
+
 [functions.admin-reveal-member-id]
 verify_jwt = true
 

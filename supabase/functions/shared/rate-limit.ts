@@ -81,6 +81,7 @@ export const ENDPOINT_LIMITS: Record<string, { windowMs: number; max: number }> 
   'admin-scheduled-reports-mutation': { windowMs: 60_000, max: 20 },
   'admin-exports': { windowMs: 300_000, max: 5 },
   'admin-webhook-test': { windowMs: 60_000, max: 10 },
+  'manage-user-role': { windowMs: 60_000, max: 20 },
 }
 
 const memoryStore = new Map<string, MemoryEntry>()

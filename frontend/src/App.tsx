@@ -9,6 +9,7 @@ import { AdminLayout } from './components/AdminLayout'
 import { RequireMember } from './components/RequireMember'
 import { MemberLayout } from './components/MemberLayout'
 import { RequireAdmin } from './components/RequireAdmin'
+import { RequireSuperadmin } from './components/RequireSuperadmin'
 import { SWUpdateBanner } from './components/SWUpdateBanner'
 import { SyncStatus } from './components/SyncStatus'
 
@@ -61,6 +62,7 @@ const AdminScheduledReports = lazy(() => import('./pages/admin/AdminScheduledRep
 const AdminReconciliation = lazy(() => import('./pages/admin/AdminReconciliation').then(m => ({ default: m.AdminReconciliation })))
 const AdminMedia = lazy(() => import('./pages/admin/AdminMedia').then(m => ({ default: m.AdminMedia })))
 const AdminHealthCheck = lazy(() => import('./pages/admin/AdminHealthCheck').then(m => ({ default: m.AdminHealthCheck })))
+const AdminStaffRoles = lazy(() => import('./pages/admin/AdminStaffRoles').then(m => ({ default: m.AdminStaffRoles })))
 
 function PageLoader() {
   // Route-level Suspense only — keep compact; full-screen boot uses AppBootLoader.
@@ -138,6 +140,9 @@ export default function App() {
                   <Route path="audit-logs" element={<AdminAuditLogs />} />
                   <Route path="reconciliation" element={<AdminReconciliation />} />
                   <Route path="health" element={<AdminHealthCheck />} />
+                  <Route element={<RequireSuperadmin />}>
+                    <Route path="staff-roles" element={<AdminStaffRoles />} />
+                  </Route>
                 </Route>
               </Route>
             </Routes>

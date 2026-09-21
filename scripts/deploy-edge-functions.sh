@@ -99,6 +99,7 @@ ALL_FUNCTIONS=(
   admin-contributions
   admin-dashboard
   admin-delete-member
+  manage-user-role
   admin-gallery
   admin-media
   admin-members

@@ -285,3 +285,94 @@ export function parseVerifyEmailBody(
   }
   return { action: 'verify', email, code: codeRaw }
 }
+
+/** Roles managed via Staff & Roles (admins.role_id → roles.name). */
+export const STAFF_ROLE_NAMES = [
+  'superadmin',
+  'admin',
+  'finance',
+  'claims_reviewer',
+  'support',
+] as const
+
+export type StaffRoleName = (typeof STAFF_ROLE_NAMES)[number]
+
+/** Exact confirmation string required when granting/promoting to superadmin. */
+export const SUPERADMIN_GRANT_CONFIRM = 'GRANT SUPERADMIN'
+
+export type ManageUserRoleAction = 'grant' | 'change_role' | 'revoke'
+
+export type ManageUserRoleInput = {
+  action: ManageUserRoleAction
+  targetId: string
+  roleName?: StaffRoleName
+  reason?: string
+  confirmSuperadmin?: string
+}
+
+export function parseUuid(raw: unknown, label = 'id'): string {
+  if (typeof raw !== 'string' || !UUID_RE.test(raw.trim())) {
+    throw new ValidationError(`A valid ${label} is required.`)
+  }
+  return raw.trim()
+}
+
+export function parseStaffRoleName(raw: unknown): StaffRoleName {
+  if (typeof raw !== 'string' || !raw.trim()) {
+    throw new ValidationError('Role is required.')
+  }
+  const name = raw.trim().toLowerCase()
+  if (!(STAFF_ROLE_NAMES as readonly string[]).includes(name)) {
+    throw new ValidationError('Invalid role.')
+  }
+  return name as StaffRoleName
+}
+
+/**
+ * Parse Staff & Roles mutation body.
+ * Accepts snake_case or camelCase keys.
+ */
+export function parseManageUserRoleBody(input: unknown): ManageUserRoleInput {
+  const body = asRecord(input)
+  const actionRaw = typeof body.action === 'string' ? body.action.trim().toLowerCase() : ''
+  if (actionRaw !== 'grant' && actionRaw !== 'change_role' && actionRaw !== 'revoke') {
+    throw new ValidationError('Invalid action. Use grant, change_role, or revoke.')
+  }
+  const action = actionRaw as ManageUserRoleAction
+
+  const targetRaw = body.targetId ?? body.target_id ?? body.userId ?? body.user_id
+  const targetId = parseUuid(targetRaw, 'target user id')
+
+  let reason: string | undefined
+  if (body.reason !== undefined && body.reason !== null) {
+    if (typeof body.reason !== 'string') {
+      throw new ValidationError('Reason must be a string.')
+    }
+    reason = body.reason.trim().slice(0, 500) || undefined
+  }
+
+  if (action === 'revoke') {
+    return { action, targetId, reason }
+  }
+
+  const roleName = parseStaffRoleName(body.roleName ?? body.role_name ?? body.role)
+
+  let confirmSuperadmin: string | undefined
+  const confirmRaw = body.confirmSuperadmin ?? body.confirm_superadmin
+  if (confirmRaw !== undefined && confirmRaw !== null) {
+    if (typeof confirmRaw !== 'string') {
+      throw new ValidationError('Superadmin confirmation must be a string.')
+    }
+    confirmSuperadmin = confirmRaw.trim()
+  }
+
+  if (roleName === 'superadmin') {
+    if (confirmSuperadmin !== SUPERADMIN_GRANT_CONFIRM) {
+      throw new ValidationError(
+        `Granting superadmin requires typing ${SUPERADMIN_GRANT_CONFIRM} exactly.`,
+      )
+    }
+  }
+
+  return { action, targetId, roleName, reason, confirmSuperadmin }
+}
