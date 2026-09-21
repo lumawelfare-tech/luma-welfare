@@ -64,24 +64,24 @@ const offerIcons: Record<string, JSX.Element> = {
 
 const whyChooseUs = [
   { title: 'Transparent Operations', description: 'Every contribution, waiting period, and payout is tracked and visible to you. No hidden terms.', icon: 'eye' as const },
-  { title: 'M-Pesa Ready', description: 'Pay contributions directly via M-Pesa when payments are enabled. Fast, secure, and familiar.', icon: 'credit-card' as const },
+  { title: 'Clear contribution records', description: 'Record monthly contributions in your account; administrators verify them against your packages.', icon: 'document' as const },
   { title: '12 Welfare Packages', description: 'Choose from hospital, education, business, building, bereavement, wedding, and more.', icon: 'folder' as const },
   { title: 'Community First', description: 'Members help each other. Your contributions directly support families in need.', icon: 'users' as const },
 ]
 
 const trustFeatures = [
-  { title: 'Secure Payments', description: 'All transactions are processed through encrypted channels. Your money is handled with care.', icon: 'lock' as const },
-  { title: 'Audit Trail', description: 'Every financial transaction is recorded in an immutable ledger for complete accountability.', icon: 'document' as const },
-  { title: 'Data Protection', description: 'Your personal information is encrypted and never shared with third parties.', icon: 'shield' as const },
-  { title: 'Verified Claims', description: 'Every claim is reviewed and verified before approval. Fair and consistent process.', icon: 'check-circle' as const },
+  { title: 'Account security', description: 'Sessions use encrypted connections and secure authentication. Keep your password private.', icon: 'lock' as const },
+  { title: 'Audit Trail', description: 'Administrative actions are recorded so membership changes can be reviewed.', icon: 'document' as const },
+  { title: 'Data Protection', description: 'Personal data is protected with access controls; see our Privacy Policy for details.', icon: 'shield' as const },
+  { title: 'Verified Claims', description: 'Every claim is reviewed before approval. Fair and consistent process.', icon: 'check-circle' as const },
 ]
 
 const faqItems = [
   { q: 'What is Luma Welfare?', a: 'Luma Welfare is a community welfare organisation that helps members support each other through key life events — hospital bills, education costs, business support, and more.' },
-  { q: 'How do I join?', a: 'Click "Join Now", create a free account, verify your email, pay the KSh 300 activation fee, then choose a welfare package that suits your needs.' },
-  { q: 'How do contributions work?', a: 'Each package has a monthly contribution amount. Pay via M-Pesa. Your payments are tracked automatically and you can see your history anytime.' },
+  { q: 'How do I join?', a: 'Click "Join Luma", create a free account, verify your email, pay the KSh 300 activation fee, then choose a welfare package that suits your needs.' },
+  { q: 'How do contributions work?', a: 'Each package has a monthly contribution amount. Record your payment in your account; administrators verify it. You can see your contribution history anytime.' },
   { q: 'When can I submit a claim?', a: 'Each package has a waiting period. Once you have made enough contributions and the waiting period has passed, you become eligible to submit claims.' },
-  { q: 'Is my money safe?', a: 'Yes. All payments are processed through secure M-Pesa integration. Every transaction is recorded in an immutable audit ledger.' },
+  { q: 'Is my information protected?', a: 'Sessions use encrypted connections and secure authentication. Administrative actions are logged. See our Privacy Policy for details.' },
   { q: 'Can I have multiple packages?', a: 'Yes. You can subscribe to multiple welfare packages simultaneously. Each package tracks contributions and eligibility independently.' },
 ]
 
@@ -171,11 +171,6 @@ export function Home() {
               </MotionCard>
             ))}
           </div>
-          <div className="mt-10 text-center sm:hidden">
-            <Link to="/packages" className="rounded-lg bg-luma-700 px-6 py-3 text-sm font-semibold text-white hover:bg-luma-800">
-              View all packages
-            </Link>
-          </div>
         </div>
       </MotionSection>
 
@@ -191,7 +186,7 @@ export function Home() {
             {[
               { step: '01', title: 'Register', text: 'Create your account with your name, email and phone number. It\'s free.' },
               { step: '02', title: 'Choose a Package', text: 'Browse 12 welfare packages and pick the ones that fit your family needs.' },
-              { step: '03', title: 'Contribute Monthly', text: 'Pay your monthly contribution via M-Pesa. Each package is tracked separately.' },
+              { step: '03', title: 'Contribute Monthly', text: 'Record your monthly contribution in your account. Each package is tracked separately.' },
               { step: '04', title: 'Access Benefits', text: 'Once your waiting period is met, submit a claim and receive support.' },
             ].map((s) => (
               <MotionCard key={s.step} className="glass-card relative p-6 text-center">
@@ -238,8 +233,8 @@ export function Home() {
               <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Built on Trust &amp; Security</h2>
               <div className="mt-3 h-1 w-12 rounded-full bg-luma-500" />
               <p className="mt-4 text-gray-600 leading-relaxed">
-                Your contributions and personal data are protected by industry-standard security.
-                Every transaction is recorded in an immutable audit ledger. No shortcuts, no compromises.
+                Your account uses encrypted connections and secure authentication. Contribution and
+                claim records are visible to you; administrative actions are logged for accountability.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -289,9 +284,11 @@ export function Home() {
             Register for free, choose a welfare package that fits your family, and contribute monthly
             with transparent tracking for every package you hold.
           </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <CtaButton to="/register" variant="light">Join Now — Free Registration</CtaButton>
-            <CtaButton to="/packages" variant="outline">Explore Packages</CtaButton>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <CtaButton to="/register" variant="light">Join Luma</CtaButton>
+            <Link to="/packages" className="text-sm font-semibold text-white/90 underline-offset-4 hover:underline">
+              Explore packages
+            </Link>
           </div>
           <p className="mt-4 text-xs text-white/70">One-time KSh 300 activation fee after registration</p>
         </div>

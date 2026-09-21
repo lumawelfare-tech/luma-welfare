@@ -324,14 +324,3 @@ a, button {
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
 }
-
-/* Bottom pad when guest sticky CTA is present (Layout) */
-.main-pad-mobile-cta {
-  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
-}
-
-@media (min-width: 640px) {
-  .main-pad-mobile-cta {
-    padding-bottom: 0;
-  }
-}

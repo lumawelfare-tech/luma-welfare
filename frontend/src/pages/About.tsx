@@ -1,14 +1,15 @@
 import { useHead } from '../lib/seo'
 import { PageHero } from '../components/PageHero'
 import { MotionSection, MotionCard } from '../components/MotionSection'
+import { Icon } from '../components/Icon'
 
 const values = [
-  { name: 'Integrity', text: 'We do what we say, and we keep records members can check.', icon: '🤝' },
-  { name: 'Compassion', text: 'Members help each other through difficult times without delay.', icon: '💚' },
-  { name: 'Teamwork', text: 'Contributions pool together; support goes where it is needed.', icon: '👥' },
-  { name: 'Transparency', text: 'Contributions, waiting periods and payouts are shown per member, per package.', icon: '🔍' },
-  { name: 'Accountability', text: 'Money collected is accounted for, and every payout is recorded.', icon: '📋' },
-  { name: 'Excellence', text: 'We run the welfare fund the way members deserve — properly.', icon: '⭐' },
+  { name: 'Integrity', text: 'We do what we say, and we keep records members can check.', icon: 'check-circle' as const },
+  { name: 'Compassion', text: 'Members help each other through difficult times without delay.', icon: 'heart' as const },
+  { name: 'Teamwork', text: 'Contributions pool together; support goes where it is needed.', icon: 'users' as const },
+  { name: 'Transparency', text: 'Contributions, waiting periods and payouts are shown per member, per package.', icon: 'eye' as const },
+  { name: 'Accountability', text: 'Money collected is accounted for, and every payout is recorded.', icon: 'document' as const },
+  { name: 'Excellence', text: 'We run the welfare fund the way members deserve — properly.', icon: 'star' as const },
 ]
 
 export function About() {
@@ -51,7 +52,9 @@ export function About() {
           <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {values.map((v) => (
               <MotionCard key={v.name} className="glass-card p-6">
-                <div className="text-3xl" aria-hidden="true">{v.icon}</div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-luma-50 text-luma-700" aria-hidden="true">
+                  <Icon name={v.icon} className="h-5 w-5" />
+                </div>
                 <h3 className="mt-3 font-bold text-gray-900">{v.name}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-gray-600">{v.text}</p>
               </MotionCard>

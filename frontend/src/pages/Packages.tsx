@@ -81,6 +81,14 @@ export function PackagesPage() {
         Twelve support packages, each with its own monthly contribution, coverage and waiting
         period. Members can hold more than one package at a time.
       </p>
+      <div className="mt-6">
+        <Link
+          to="/register"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-luma-700 px-6 py-3 text-sm font-bold text-white shadow-sm shadow-luma-700/20 transition-colors hover:bg-luma-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-600 focus-visible:ring-offset-2"
+        >
+          Join Luma
+        </Link>
+      </div>
       {q && !loading && !error && (
         <p className="mt-4 text-sm text-gray-600">
           {filtered.length} result{filtered.length === 1 ? '' : 's'} for “{q}”
@@ -157,14 +165,12 @@ export function PackagesPage() {
                   )}
 
                   <div className="mt-auto border-t border-white/50 pt-4 mt-6">
-                    <motion.div whileHover={reduceMotion ? undefined : { scale: 1.02 }} whileTap={reduceMotion ? undefined : { scale: 0.98 }} className="inline-block">
-                      <Link
-                        to="/register"
-                        className="inline-block rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-luma-700/25 hover:bg-luma-800"
-                      >
-                        Join this package
-                      </Link>
-                    </motion.div>
+                    <Link
+                      to="/register"
+                      className="text-sm font-semibold text-luma-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-600 focus-visible:ring-offset-2 rounded"
+                    >
+                      Register to join →
+                    </Link>
                   </div>
                 </motion.div>
               </MotionCard>

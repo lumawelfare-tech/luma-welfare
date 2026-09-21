@@ -195,6 +195,15 @@ test.describe('Responsive Design', () => {
     const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]')
     await expect(emailInput.first()).toBeVisible()
   })
+
+  test('homepage has no floating WhatsApp FAB or sticky guest Join bar', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await page.goto(`${BASE}/`)
+    await page.waitForSelector('main', { timeout: 15000 })
+
+    await expect(page.getByRole('link', { name: 'Chat on WhatsApp' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: /Join Luma — Free Registration/i })).toHaveCount(0)
+  })
 })
 
 // ============================================================================

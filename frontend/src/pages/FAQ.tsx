@@ -4,12 +4,11 @@ import { useHead } from '../lib/seo'
 
 type FAQItem = { q: string; a: string }
 
-type FAQCategory = { label: string; icon: string; items: FAQItem[] }
+type FAQCategory = { label: string; items: FAQItem[] }
 
 const categories: FAQCategory[] = [
   {
     label: 'General',
-    icon: 'ℹ️',
     items: [
       {
         q: 'What is Luma Welfare?',
@@ -25,7 +24,7 @@ const categories: FAQCategory[] = [
       },
       {
         q: 'How do I create an account?',
-        a: 'Click "Join Now" on the website and fill in your name, email, phone number, and create a password. After registering, you will receive a one-time passcode (OTP) via email. Enter this code on the verification page to confirm your address. Once verified, sign in and complete the one-time KSh 300 activation fee to unlock package access.',
+        a: 'Click "Join Luma" on the website and fill in your name, email, phone number, and create a password. After registering, you will receive a one-time passcode (OTP) via email. Enter this code on the verification page to confirm your address. Once verified, sign in and complete the one-time KSh 300 activation fee to unlock package access.',
       },
       {
         q: 'Is registration free?',
@@ -47,7 +46,6 @@ const categories: FAQCategory[] = [
   },
   {
     label: 'Packages',
-    icon: '📦',
     items: [
       {
         q: 'What are Luma Welfare packages?',
@@ -81,7 +79,6 @@ const categories: FAQCategory[] = [
   },
   {
     label: 'Contributions',
-    icon: '💰',
     items: [
       {
         q: 'How do I make a contribution?',
@@ -103,7 +100,6 @@ const categories: FAQCategory[] = [
   },
   {
     label: 'Claims & Benefits',
-    icon: '✅',
     items: [
       {
         q: 'How do I submit a claim?',
@@ -129,7 +125,6 @@ const categories: FAQCategory[] = [
   },
   {
     label: 'Account',
-    icon: '👤',
     items: [
       {
         q: 'How do I update my profile?',
@@ -155,7 +150,6 @@ const categories: FAQCategory[] = [
   },
   {
     label: 'Security & Privacy',
-    icon: '🔒',
     items: [
       {
         q: 'How is my information protected?',
@@ -177,7 +171,6 @@ const categories: FAQCategory[] = [
   },
   {
     label: 'Payments',
-    icon: '💳',
     items: [
       {
         q: 'How do I pay my activation fee?',
@@ -304,7 +297,7 @@ export function FAQ() {
               onClick={() => setActiveCategory(activeCategory === cat.label ? null : cat.label)}
               className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${activeCategory === cat.label ? 'bg-luma-700 text-white shadow-sm' : 'glass text-gray-700 hover:bg-white/80'}`}
             >
-              {cat.icon} {cat.label} ({cat.items.length})
+              {cat.label} ({cat.items.length})
             </button>
           ))}
         </div>
@@ -320,8 +313,8 @@ export function FAQ() {
           <div className="space-y-8">
             {filteredCategories.map(cat => (
               <div key={cat.label}>
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
-                  <span>{cat.icon}</span> {cat.label}
+                <h2 className="mb-4 text-lg font-bold text-gray-900">
+                  {cat.label}
                 </h2>
                 <div className="space-y-2">
                   {cat.items.map((item, i) => {
@@ -346,18 +339,12 @@ export function FAQ() {
         <div className="glass-card mt-12 border-luma-200/60 p-8">
           <h2 className="text-xl font-bold text-gray-900">Still have a question?</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Contact us on WhatsApp, by phone, or visit the contact page. We are happy to help.
+            Visit the contact page for phone, WhatsApp, email, or a written message.
           </p>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4">
             <Link to="/contact" className="inline-block rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-all">
-              Contact page →
+              Contact us
             </Link>
-            <a href="tel:0798635024" className="inline-block rounded-lg border border-white/60 bg-white/60 px-5 py-2.5 text-sm font-semibold text-luma-800 hover:bg-white/90 transition-all">
-              📞 0798 635 024
-            </a>
-            <a href="https://wa.me/254798635024" target="_blank" rel="noopener noreferrer" className="inline-block rounded-lg border border-green-300/60 bg-white/60 px-5 py-2.5 text-sm font-semibold text-green-800 hover:bg-white/90 transition-all">
-              💬 WhatsApp
-            </a>
           </div>
         </div>
       </div>

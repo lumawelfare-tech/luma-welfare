@@ -36,19 +36,19 @@ const channels: {
   external?: boolean
 }[] = [
   {
+    label: 'WhatsApp',
+    value: PHONE_DISPLAY,
+    href: WHATSAPP,
+    icon: 'whatsapp',
+    hint: 'Primary contact — fastest for quick questions',
+    external: true,
+  },
+  {
     label: 'Phone',
     value: PHONE_DISPLAY,
     href: `tel:${PHONE_TEL}`,
     icon: 'phone',
     hint: 'Office line',
-  },
-  {
-    label: 'WhatsApp',
-    value: PHONE_DISPLAY,
-    href: WHATSAPP,
-    icon: 'whatsapp',
-    hint: 'Fastest for quick questions',
-    external: true,
   },
   {
     label: 'Email',
@@ -153,33 +153,7 @@ export function Contact() {
         </div>
 
         <div className="container-luma relative py-12 sm:py-16">
-          <div className="flex flex-wrap gap-3">
-            <a
-              href={WHATSAPP}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#25D366] px-6 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#1ebe57] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-600 focus-visible:ring-offset-2"
-            >
-              <WhatsAppGlyph className="h-4 w-4" />
-              Chat on WhatsApp
-            </a>
-            <a
-              href={`tel:${PHONE_TEL}`}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-luma-700 px-6 py-3 text-sm font-bold text-white shadow-sm shadow-luma-700/20 transition-colors hover:bg-luma-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-600 focus-visible:ring-offset-2"
-            >
-              <Icon name="phone" className="h-4 w-4" />
-              Call {PHONE_DISPLAY}
-            </a>
-            <a
-              href={`mailto:${EMAIL}`}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border-2 border-luma-600 bg-white px-6 py-3 text-sm font-bold text-luma-700 transition-colors hover:bg-luma-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-600 focus-visible:ring-offset-2"
-            >
-              <Icon name="mail" className="h-4 w-4" />
-              Email us
-            </a>
-          </div>
-
-          <div className="mt-10 grid gap-8 lg:grid-cols-5 lg:gap-10">
+          <div className="grid gap-8 lg:grid-cols-5 lg:gap-10">
             <div className="lg:col-span-3">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-luma-700">
                 Contact channels
@@ -262,9 +236,9 @@ export function Contact() {
                 </p>
                 <Link
                   to="/login"
-                  className="mt-5 inline-flex min-h-10 items-center justify-center rounded-full bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-luma-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-600 focus-visible:ring-offset-2"
+                  className="mt-5 inline-flex min-h-10 items-center text-sm font-semibold text-luma-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-600 focus-visible:ring-offset-2 rounded"
                 >
-                  Sign in to dashboard
+                  Sign in to dashboard →
                 </Link>
               </div>
             </div>
