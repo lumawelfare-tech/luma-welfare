@@ -28,6 +28,7 @@ describe('parseRegisterBody', () => {
     password: 'Password1',
     fullName: 'Jane Doe',
     phone: '0712345678',
+    idNumber: '12345678',
     acceptedPrivacy: true as const,
     acceptedTerms: true as const,
     privacyPolicyVersion: '2026-09-21.1',
@@ -38,6 +39,7 @@ describe('parseRegisterBody', () => {
     const r = parseRegisterBody(good)
     expect(r.email).toBe('member@example.com')
     expect(r.phone).toBe('0712345678')
+    expect(r.idNumber).toBe('12345678')
     expect(r.acceptedPrivacy).toBe(true)
     expect(r.acceptedTerms).toBe(true)
   })
@@ -45,6 +47,11 @@ describe('parseRegisterBody', () => {
   it('rejects weak passwords and bad phones', () => {
     expect(() => parseRegisterBody({ ...good, password: 'short' })).toThrow(ValidationError)
     expect(() => parseRegisterBody({ ...good, phone: '123' })).toThrow(ValidationError)
+  })
+
+  it('rejects missing or invalid National ID', () => {
+    expect(() => parseRegisterBody({ ...good, idNumber: '' })).toThrow(ValidationError)
+    expect(() => parseRegisterBody({ ...good, idNumber: '12' })).toThrow(ValidationError)
   })
 
   it('requires privacy and terms consent', () => {

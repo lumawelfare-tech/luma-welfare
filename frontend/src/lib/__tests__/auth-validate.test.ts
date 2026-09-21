@@ -52,6 +52,7 @@ describe('parseRegisterBody', () => {
         password: 'Secret12',
         fullName: 'A',
         phone: '0712345678',
+        idNumber: '12345678',
       }),
     ).toThrow(/Privacy Policy/)
   })
@@ -63,6 +64,7 @@ describe('parseRegisterBody', () => {
         password: 'short',
         fullName: 'A',
         phone: '0712345678',
+        idNumber: '12345678',
         acceptedPrivacy: true,
         acceptedTerms: true,
         privacyPolicyVersion: '2026-09-21.1',
@@ -75,6 +77,7 @@ describe('parseRegisterBody', () => {
         password: 'Secret12',
         fullName: 'A',
         phone: '123',
+        idNumber: '12345678',
         acceptedPrivacy: true,
         acceptedTerms: true,
         privacyPolicyVersion: '2026-09-21.1',
