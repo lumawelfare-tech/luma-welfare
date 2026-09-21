@@ -5,10 +5,11 @@
 # 1. security-audit — npm audit for dependency vulnerabilities
 # 2. typecheck — TypeScript type checking
 # 3. lint — Code linting
-# 4. test — Unit and integration tests
-# 5. build — Production build verification
-# 6. edge-function-check — Verify all Edge Functions are deployed (also on PRs)
-# 7. e2e — Playwright smoke tests on production (also on PRs against preview deploys)
+# 4. test — Unit and qualification tests
+# 5. build — Production build (runs even if tests fail, as long as typecheck+lint pass)
+# 6. edge-function-check — Verify Edge Function sources exist
+# 7. e2e — Playwright smoke tests (requires a successful build)
+# 8. security-summary — Always runs; aggregates upstream results
 
 name: CI
 
@@ -39,10 +40,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -104,7 +105,7 @@ jobs:
 
       - name: Upload audit reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: security-audit-reports
           path: |
@@ -121,10 +122,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -155,10 +156,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -179,10 +180,10 @@ jobs:
     needs: [typecheck]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -198,6 +199,7 @@ jobs:
         run: npm run test:qualify
         env:
           # Date arithmetic in qualify.ts is UTC; pin TZ so CI matches everywhere.
+          # (Previous failures: runner local TZ shifted eligibleFrom by one calendar day.)
           TZ: UTC
 
       - name: Run edge function integration tests
@@ -211,18 +213,19 @@ jobs:
           echo ""
 
   # ============================================================================
-  # BUILD
+  # BUILD — does not block on test failures (still requires typecheck + lint)
   # ============================================================================
   build:
     name: "🏗️ Build"
     runs-on: ubuntu-latest
     needs: [typecheck, lint, test]
+    if: always() && needs.typecheck.result == 'success' && needs.lint.result == 'success'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -245,7 +248,7 @@ jobs:
           echo "✅ Build successful"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: frontend-build
           path: frontend/dist/
@@ -258,13 +261,16 @@ jobs:
     name: "🎭 E2E Tests"
     runs-on: ubuntu-latest
     needs: [build]
-    if: github.event_name == 'pull_request' || (github.ref == 'refs/heads/main' && github.event_name == 'push')
+    if: |
+      always()
+      && needs.build.result == 'success'
+      && (github.event_name == 'pull_request' || (github.ref == 'refs/heads/main' && github.event_name == 'push'))
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -295,7 +301,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-report-${{ github.run_id }}
           path: playwright-report/
@@ -310,7 +316,7 @@ jobs:
     if: github.event_name == 'pull_request' || (github.ref == 'refs/heads/main' && github.event_name == 'push')
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check Edge Functions exist locally
         run: |
@@ -373,7 +379,7 @@ jobs:
           echo "✅ Migration files look correct."
 
   # ============================================================================
-  # SECURITY SCORECARD (summary)
+  # SECURITY SCORECARD (summary) — always runs; handles skipped/cancelled/missing
   # ============================================================================
   security-summary:
     name: "📊 Security Summary"
@@ -382,40 +388,74 @@ jobs:
     if: always()
     steps:
       - name: Check all jobs
+        env:
+          SECURITY_AUDIT: ${{ needs.security-audit.result }}
+          TYPECHECK: ${{ needs.typecheck.result }}
+          LINT: ${{ needs.lint.result }}
+          TESTS: ${{ needs.test.result }}
+          BUILD: ${{ needs.build.result }}
         run: |
           echo "============================================="
           echo "  CI PIPELINE SUMMARY"
           echo "============================================="
           echo ""
-          echo "Security Audit:    ${{ needs.security-audit.result }}"
-          echo "Typecheck:         ${{ needs.typecheck.result }}"
-          echo "Lint:              ${{ needs.lint.result }}"
-          echo "Tests:             ${{ needs.test.result }}"
-          echo "Build:             ${{ needs.build.result }}"
+
+          # Normalize empty/missing results (can happen if a needed job was cancelled early).
+          SECURITY_AUDIT="${SECURITY_AUDIT:-missing}"
+          TYPECHECK="${TYPECHECK:-missing}"
+          LINT="${LINT:-missing}"
+          TESTS="${TESTS:-missing}"
+          BUILD="${BUILD:-missing}"
+
+          echo "Security Audit:    $SECURITY_AUDIT"
+          echo "Typecheck:         $TYPECHECK"
+          echo "Lint:              $LINT"
+          echo "Tests:             $TESTS"
+          echo "Build:             $BUILD"
           echo ""
 
-          if [ "${{ needs.security-audit.result }}" = "failure" ]; then
-            echo "❌ Security audit failed — deployment blocked"
-            exit 1
-          fi
+          FAILED=0
 
-          if [ "${{ needs.typecheck.result }}" = "failure" ]; then
-            echo "❌ Typecheck failed — deployment blocked"
-            exit 1
-          fi
+          check_required() {
+            local name="$1"
+            local result="$2"
+            case "$result" in
+              success)
+                echo "✅ $name"
+                ;;
+              failure)
+                echo "❌ $name failed — deployment blocked"
+                FAILED=1
+                ;;
+              cancelled)
+                echo "❌ $name cancelled — deployment blocked"
+                FAILED=1
+                ;;
+              skipped)
+                # Build is allowed to skip only when typecheck/lint already failed.
+                if [ "$name" = "Build" ] && { [ "$TYPECHECK" != "success" ] || [ "$LINT" != "success" ]; }; then
+                  echo "⚠️  $name skipped (typecheck/lint did not succeed)"
+                else
+                  echo "❌ $name skipped unexpectedly — deployment blocked"
+                  FAILED=1
+                fi
+                ;;
+              *)
+                echo "❌ $name result missing/unknown ($result) — deployment blocked"
+                FAILED=1
+                ;;
+            esac
+          }
 
-          if [ "${{ needs.lint.result }}" = "failure" ]; then
-            echo "❌ Lint failed — deployment blocked"
-            exit 1
-          fi
+          check_required "Security Audit" "$SECURITY_AUDIT"
+          check_required "Typecheck" "$TYPECHECK"
+          check_required "Lint" "$LINT"
+          check_required "Tests" "$TESTS"
+          check_required "Build" "$BUILD"
+          echo ""
 
-          if [ "${{ needs.test.result }}" = "failure" ]; then
-            echo "❌ Tests failed — deployment blocked"
-            exit 1
-          fi
-
-          if [ "${{ needs.build.result }}" = "failure" ]; then
-            echo "❌ Build failed — deployment blocked"
+          if [ "$FAILED" -ne 0 ]; then
+            echo "❌ Pipeline blocked — fix failing jobs before deploy"
             exit 1
           fi
 
