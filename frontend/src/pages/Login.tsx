@@ -6,13 +6,14 @@ import { api, ApiError } from '../lib/api'
 import { useHead } from '../lib/seo'
 import { AuthCard, fieldClass, alertErrorClass, alertSuccessClass, alertWarnClass } from '../components/PageHero'
 import { lumaPress } from '../lib/lumaMotion'
+import { safeInternalPath } from '../lib/sanitize'
 
 export function Login() {
   useHead('Login', undefined, { noindex: true })
   const { login, signInWithGoogle, member, isAdmin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: string })?.from ?? '/dashboard'
+  const from = safeInternalPath((location.state as { from?: string })?.from, '/dashboard')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

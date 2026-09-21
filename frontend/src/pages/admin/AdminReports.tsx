@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useHead } from '../../lib/seo'
 import { api, ApiError } from '../../lib/api'
+import { sanitizeExportCell, sanitizeSpreadsheetCell, escapeXml } from '../../lib/sanitize'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -52,13 +53,7 @@ function statusOptions(type: ReportType): string[] {
   }
 }
 
-function escapeCSV(val: string): string {
-  if (/^[=+\-@\t\r]/.test(val)) return `'${val}`
-  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-    return `"${val.replace(/"/g, '""')}"`
-  }
-  return val
-}
+const escapeCSV = sanitizeExportCell
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -410,7 +405,7 @@ export function AdminReports() {
   function exportExcel() {
     const headers = getHeaders()
     const title = reportTypes.find(r => r.value === reportType)?.label ?? reportType
-    const headerRow = headers.map(h => `<Cell><Data ss:Type="String">${escapeCSV(headerLabel(h))}</Data></Cell>`).join('')
+    const headerRow = headers.map(h => `<Cell><Data ss:Type="String">${sanitizeSpreadsheetCell(headerLabel(h))}</Data></Cell>`).join('')
     const dataRows = data.map(row =>
       `<Row>${headers.map(h => {
         const v = row[h]
@@ -418,10 +413,10 @@ export function AdminReports() {
         const num = Number(val)
         return !isNaN(num) && val !== '' && val !== '—'
           ? `<Cell><Data ss:Type="Number">${num}</Data></Cell>`
-          : `<Cell><Data ss:Type="String">${escapeCSV(val)}</Data></Cell>`
+          : `<Cell><Data ss:Type="String">${sanitizeSpreadsheetCell(val)}</Data></Cell>`
       }).join('')}</Row>`
     ).join('')
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="${escapeCSV(title)}"><Table><Row>${headerRow}</Row>${dataRows}</Table></Worksheet></Workbook>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="${escapeXml(title)}"><Table><Row>${headerRow}</Row>${dataRows}</Table></Worksheet></Workbook>`
     downloadBlob(new Blob([xml], { type: 'application/vnd.ms-excel' }), `${title.replace(/\s+/g, '_')}.xls`)
   }
 
@@ -511,15 +506,15 @@ export function AdminReports() {
       {/* KPI Overview */}
       {kpi && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <div className="rounded-xl border border-gray-100 bg-white px-4 py-3.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <div className="rounded-xl border border-gray-100 bg-white px-4 py-3.5 shadow-sm transition-all duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-md">
             <div className="text-xl font-extrabold tabular-nums text-gray-900 sm:text-2xl">{kpi.total_members.toLocaleString()}</div>
             <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Total Members</div>
           </div>
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3.5 shadow-sm transition-all duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-md">
             <div className="text-xl font-extrabold tabular-nums text-blue-700 sm:text-2xl">{kpi.active_subscriptions.toLocaleString()}</div>
             <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-blue-600">Active Subscriptions</div>
           </div>
-          <div className="rounded-xl border border-luma-100 bg-luma-50 px-4 py-3.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <div className="rounded-xl border border-luma-100 bg-luma-50 px-4 py-3.5 shadow-sm transition-all duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-md">
             <div className="text-xl font-extrabold tabular-nums text-luma-700 sm:text-2xl">KSh {kpi.total_contributions.toLocaleString()}</div>
             <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-luma-600">Total Contributions</div>
             <div className="mt-0.5 text-[11px] text-gray-500">
@@ -531,12 +526,12 @@ export function AdminReports() {
               )}
             </div>
           </div>
-          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3.5 shadow-sm transition-all duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-md">
             <div className="text-xl font-extrabold tabular-nums text-amber-700 sm:text-2xl">KSh {kpi.registration_fees_collected.toLocaleString()}</div>
             <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600">Registration Fees</div>
             <div className="mt-0.5 text-[11px] text-gray-500">{kpi.paid_registration_fees} paid · {kpi.unpaid_registration_fees} unpaid</div>
           </div>
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3.5 shadow-sm transition-all duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-md">
             <div className="text-xl font-extrabold tabular-nums text-emerald-700 sm:text-2xl">KSh {kpi.total_claims_approved.toLocaleString()}</div>
             <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Claims Approved</div>
             <div className="mt-0.5 text-[11px] text-gray-500">
@@ -552,7 +547,7 @@ export function AdminReports() {
               )}
             </div>
           </div>
-          <div className="rounded-xl border border-purple-100 bg-purple-50 px-4 py-3.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <div className="rounded-xl border border-purple-100 bg-purple-50 px-4 py-3.5 shadow-sm transition-all duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-md">
             <div className="flex items-baseline gap-1.5">
               <div className="text-xl font-extrabold tabular-nums text-purple-700 sm:text-2xl">{kpi.pending_contributions}</div>
               <div className="text-sm text-purple-400">/</div>
@@ -576,7 +571,7 @@ export function AdminReports() {
                 type="button"
                 onClick={() => setReportType(r.value)}
                 aria-pressed={selected}
-                className={`rounded-xl border p-3.5 text-left transition-all duration-200 ${
+                className={`rounded-xl border p-3.5 text-left transition-all duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none ${
                   selected
                     ? 'border-luma-600 bg-luma-100/90 shadow-sm ring-2 ring-luma-600/30'
                     : 'border-gray-200 bg-white hover:-translate-y-0.5 hover:border-luma-300 hover:bg-luma-50/40 hover:shadow-sm'

@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
+import { detectAllowedUpload, looksLikeScriptableMarkup } from '../shared/file-upload.ts'
 import { assertMemberActive } from '../shared/member-status.ts'
 import { withSignedClaimDocumentUrls } from '../shared/storage-signed.ts'
 
@@ -165,10 +166,16 @@ Deno.serve(async (req) => {
       }
 
       const body = await req.json()
-      const { fileName, fileData, fileType, documentType } = body
+      const { fileName, fileData, documentType } = body
 
-      if (!fileName || !fileData) {
+      if (!fileName || typeof fileName !== 'string' || !fileData || typeof fileData !== 'string') {
         return new Response(JSON.stringify({ message: 'fileName and fileData (base64) are required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (fileName.length > 200) {
+        return new Response(JSON.stringify({ message: 'File name is too long' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
@@ -182,21 +189,43 @@ Deno.serve(async (req) => {
       }
 
       // Decode base64
-      const binaryStr = atob(fileData)
-      const bytes = new Uint8Array(binaryStr.length)
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i)
+      let bytes: Uint8Array
+      try {
+        const binaryStr = atob(fileData)
+        bytes = new Uint8Array(binaryStr.length)
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i)
+        }
+      } catch {
+        return new Response(JSON.stringify({ message: 'Invalid file data encoding' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
 
-      // Generate safe storage path
-      const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const storagePath = `${claimId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
+      if (looksLikeScriptableMarkup(bytes)) {
+        return new Response(JSON.stringify({ message: 'This file type is not allowed' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const detected = detectAllowedUpload(bytes)
+      if (!detected) {
+        return new Response(JSON.stringify({
+          message: 'Only JPEG, PNG, WebP, PDF, or DOCX files are allowed',
+        }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Generate safe storage path (random prefix; do not trust original name for type)
+      const safeBase = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^.]+$/, '')
+      const storagePath = `${claimId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeBase}.${detected.ext}`
 
       // Upload to Supabase Storage
       const { error: uploadErr } = await adminClient.storage
         .from('claim-documents')
         .upload(storagePath, bytes, {
-          contentType: fileType || 'application/octet-stream',
+          contentType: detected.mime,
           upsert: false,
         })
 
@@ -212,12 +241,12 @@ Deno.serve(async (req) => {
         .from('claim_documents')
         .insert({
           claim_id: claimId,
-          file_name: fileName,
+          file_name: `${safeBase}.${detected.ext}`,
           file_url: storedPath,
-          file_type: fileType || null,
+          file_type: detected.mime,
           size_bytes: decodedSize,
           uploaded_by: user.id,
-          document_type: documentType || 'supporting_document',
+          document_type: typeof documentType === 'string' ? documentType.slice(0, 64) : 'supporting_document',
         })
         .select()
         .single()

@@ -1,15 +1,7 @@
+import { sanitizeExportCell as sanitizeCell } from './sanitize'
+
 // ─── CSV Helpers ────────────────────────────────────────────
 // PDF and Excel imports are lazy-loaded to reduce initial bundle size
-
-function sanitizeCell(val: string | number | null | undefined): string {
-  const str = String(val ?? '')
-  // Prevent CSV formula injection
-  if (/^[=+\-@\t\r]/.test(str)) return `'${str}`
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`
-  }
-  return str
-}
 
 function downloadCSV(filename: string, headers: string[], rows: (string | number | null | undefined)[][]) {
   const csv = [

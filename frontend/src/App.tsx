@@ -9,6 +9,7 @@ import { AdminLayout } from './components/AdminLayout'
 import { RequireMember } from './components/RequireMember'
 import { MemberLayout } from './components/MemberLayout'
 import { RequireAdmin } from './components/RequireAdmin'
+import { RequirePermission } from './components/RequirePermission'
 import { RequireSuperadmin } from './components/RequireSuperadmin'
 import { SWUpdateBanner } from './components/SWUpdateBanner'
 import { SyncStatus } from './components/SyncStatus'
@@ -123,25 +124,27 @@ export default function App() {
               {/* ===== ADMIN PORTAL ===== */}
               <Route path="/admin" element={<RequireAdmin />}>
                 <Route element={<AdminLayout />}>
-                  <Route index element={<Navigate to="dashboard" replace />} />
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="members" element={<AdminMembers />} />
-                  <Route path="registration-fees" element={<AdminRegistrationFees />} />
-                  <Route path="packages" element={<AdminPackages />} />
-                  <Route path="contributions" element={<AdminContributions />} />
-                  <Route path="claims" element={<AdminClaims />} />
-                  <Route path="subscriptions" element={<AdminSubscriptions />} />
-                  <Route path="news" element={<AdminNews />} />
-                  <Route path="gallery" element={<AdminGallery />} />
-                  <Route path="media" element={<AdminMedia />} />
-                  <Route path="reports" element={<AdminReports />} />
-                  <Route path="scheduled-reports" element={<AdminScheduledReports />} />
-                  <Route path="settings" element={<AdminSettings />} />
-                  <Route path="audit-logs" element={<AdminAuditLogs />} />
-                  <Route path="reconciliation" element={<AdminReconciliation />} />
-                  <Route path="health" element={<AdminHealthCheck />} />
-                  <Route element={<RequireSuperadmin />}>
-                    <Route path="staff-roles" element={<AdminStaffRoles />} />
+                  <Route element={<RequirePermission />}>
+                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="members" element={<AdminMembers />} />
+                    <Route path="registration-fees" element={<AdminRegistrationFees />} />
+                    <Route path="packages" element={<AdminPackages />} />
+                    <Route path="contributions" element={<AdminContributions />} />
+                    <Route path="claims" element={<AdminClaims />} />
+                    <Route path="subscriptions" element={<AdminSubscriptions />} />
+                    <Route path="news" element={<AdminNews />} />
+                    <Route path="gallery" element={<AdminGallery />} />
+                    <Route path="media" element={<AdminMedia />} />
+                    <Route path="reports" element={<AdminReports />} />
+                    <Route path="scheduled-reports" element={<AdminScheduledReports />} />
+                    <Route path="settings" element={<AdminSettings />} />
+                    <Route path="audit-logs" element={<AdminAuditLogs />} />
+                    <Route path="reconciliation" element={<AdminReconciliation />} />
+                    <Route path="health" element={<AdminHealthCheck />} />
+                    <Route element={<RequireSuperadmin />}>
+                      <Route path="staff-roles" element={<AdminStaffRoles />} />
+                    </Route>
                   </Route>
                 </Route>
               </Route>

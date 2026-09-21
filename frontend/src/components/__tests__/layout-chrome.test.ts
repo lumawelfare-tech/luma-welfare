@@ -35,4 +35,10 @@ describe('Layout marketing chrome', () => {
     expect(layoutSrc).not.toMatch(/role="contentinfo"/)
     expect(footerSrc).toMatch(/role="contentinfo"/)
   })
+
+  it('uses sticky footer flex layout (min-height + main flex-1)', () => {
+    expect(layoutSrc).toMatch(/min-h-dvh/)
+    expect(layoutSrc).toMatch(/flex-1/)
+    expect(layoutSrc).toMatch(/<main[^>]*className="[^"]*flex-1/)
+  })
 })

@@ -44,6 +44,8 @@ type AuthState = {
   isAdmin: boolean
   adminRole: string | null
   isSuperadmin: boolean
+  /** Permission keys from auth-me (`resource:action`). Empty for non-admins. */
+  adminPermissions: string[]
   registrationFeePaid: boolean
   loading: boolean
   twoFaVerified: boolean
@@ -89,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRole, setAdminRole] = useState<string | null>(null)
   const [isSuperadmin, setIsSuperadmin] = useState(false)
+  const [adminPermissions, setAdminPermissions] = useState<string[]>([])
   const [registrationFeePaid, setRegistrationFeePaid] = useState(false)
   const [twoFaVerified, setTwoFaVerified] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -99,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin: boolean
     adminRole: string | null
     isSuperadmin: boolean
+    adminPermissions: string[]
     registrationFeePaid: boolean
   }> {
     try {
@@ -107,20 +111,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin?: boolean
         adminRole?: string | null
         isSuperadmin?: boolean
+        adminPermissions?: string[]
         registrationFeePaid?: boolean
       }>('/auth/me', { auth: true })
       const role = data.adminRole ?? null
       const superFlag = data.isSuperadmin === true || role === 'superadmin'
+      const perms = Array.isArray(data.adminPermissions)
+        ? data.adminPermissions.filter((p): p is string => typeof p === 'string')
+        : []
       return {
         member: data.member,
         isAdmin: data.isAdmin === true,
         adminRole: role,
         isSuperadmin: superFlag,
+        adminPermissions: perms,
         registrationFeePaid: data.registrationFeePaid === true,
       }
     } catch {
-      return { member: null, isAdmin: false, adminRole: null, isSuperadmin: false, registrationFeePaid: false }
+      return {
+        member: null,
+        isAdmin: false,
+        adminRole: null,
+        isSuperadmin: false,
+        adminPermissions: [],
+        registrationFeePaid: false,
+      }
     }
+  }
+
+  function applyProfile(profile: Awaited<ReturnType<typeof loadProfile>>) {
+    setMember(profile.member)
+    setIsAdmin(profile.isAdmin)
+    setAdminRole(profile.adminRole)
+    setIsSuperadmin(profile.isSuperadmin)
+    setAdminPermissions(profile.adminPermissions)
+    setRegistrationFeePaid(profile.registrationFeePaid)
+  }
+
+  function clearAuthState() {
+    setMember(null)
+    setIsAdmin(false)
+    setAdminRole(null)
+    setIsSuperadmin(false)
+    setAdminPermissions([])
+    setRegistrationFeePaid(false)
   }
 
   useEffect(() => {
@@ -138,11 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const profile = await loadProfile()
       if (!cancelled) {
-        setMember(profile.member)
-        setIsAdmin(profile.isAdmin)
-        setAdminRole(profile.adminRole)
-        setIsSuperadmin(profile.isSuperadmin)
-        setRegistrationFeePaid(profile.registrationFeePaid)
+        applyProfile(profile)
         if (profile.member?.id) {
           setSentryUser({
             id: profile.member.id,
@@ -159,10 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (cancelled) return
 
       if (event === 'SIGNED_OUT' || !session) {
-        setMember(null)
-        setIsAdmin(false)
-        setAdminRole(null)
-        setIsSuperadmin(false)
+        clearAuthState()
         clearSession()
         clearSentryUser()
         return
@@ -178,11 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const authResult = await authorizeGoogleLogin()
           if (!authResult.authorized) {
             // Unauthorized — sign out and store error for display
-            setMember(null)
-            setIsAdmin(false)
-            setAdminRole(null)
-            setIsSuperadmin(false)
-            setRegistrationFeePaid(false)
+            clearAuthState()
             clearSession()
             supabase.auth.signOut()
             // Store the authorization error so the login page can display it
@@ -193,11 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const profile = await loadProfile()
-        setMember(profile.member)
-        setIsAdmin(profile.isAdmin)
-        setAdminRole(profile.adminRole)
-        setIsSuperadmin(profile.isSuperadmin)
-        setRegistrationFeePaid(profile.registrationFeePaid)
+        applyProfile(profile)
         if (profile.member?.id) {
           setSentryUser({
             id: profile.member.id,
@@ -240,21 +259,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const me = await loadProfile()
-    setMember(me.member)
-    setIsAdmin(me.isAdmin)
-    setAdminRole(me.adminRole)
-    setIsSuperadmin(me.isSuperadmin)
-    setRegistrationFeePaid(me.registrationFeePaid)
+    applyProfile(me)
 
     // Suspended/closed members may not use the portal (admins without member rows still allowed)
     if (me.member && (me.member.status === 'suspended' || me.member.status === 'closed') && !me.isAdmin) {
       clearSession()
       await supabase.auth.signOut()
-      setMember(null)
-      setIsAdmin(false)
-      setAdminRole(null)
-      setIsSuperadmin(false)
-      setRegistrationFeePaid(false)
+      clearAuthState()
       throw new ApiError(403, 'Your account is suspended or closed. Contact Luma Welfare support.', 'ACCOUNT_INACTIVE')
     }
 
@@ -304,26 +315,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function refreshMember(): Promise<void> {
     const profile = await loadProfile()
-    setMember(profile.member)
-    setIsAdmin(profile.isAdmin)
-    setAdminRole(profile.adminRole)
-    setIsSuperadmin(profile.isSuperadmin)
-    setRegistrationFeePaid(profile.registrationFeePaid)
+    applyProfile(profile)
   }
 
   function logout() {
     clearSession()
     clearSentryUser()
     supabase.auth.signOut()
-    setMember(null)
-    setIsAdmin(false)
-    setAdminRole(null)
-    setIsSuperadmin(false)
-    setRegistrationFeePaid(false)
+    clearAuthState()
     setTwoFaVerified(false)
   }
   return (
-    <AuthContext.Provider value={{ member, isAdmin, adminRole, isSuperadmin, registrationFeePaid, twoFaVerified, loading, login, signInWithGoogle, register, logout, setTwoFaVerified, refreshMember }}>
+    <AuthContext.Provider value={{ member, isAdmin, adminRole, isSuperadmin, adminPermissions, registrationFeePaid, twoFaVerified, loading, login, signInWithGoogle, register, logout, setTwoFaVerified, refreshMember }}>
       {children}
     </AuthContext.Provider>
   )

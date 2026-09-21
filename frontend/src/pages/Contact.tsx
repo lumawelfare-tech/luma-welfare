@@ -10,6 +10,7 @@ import {
 import { MotionSection } from '../components/MotionSection'
 import { Icon } from '../components/Icon'
 import { api, ApiError } from '../lib/api'
+import { safeHref } from '../lib/sanitize'
 
 const PHONE_DISPLAY = '0798 635 024'
 const PHONE_TEL = '0798635024'
@@ -189,9 +190,11 @@ export function Contact() {
 
                   return (
                     <li key={c.label}>
-                      {c.href ? (
+                      {(() => {
+                        const href = c.href ? safeHref(c.href) : null
+                        return href ? (
                         <a
-                          href={c.href}
+                          href={href}
                           className={className}
                           {...(c.external
                             ? { target: '_blank', rel: 'noopener noreferrer' }
@@ -199,9 +202,10 @@ export function Contact() {
                         >
                           {body}
                         </a>
-                      ) : (
+                        ) : (
                         <div className={className}>{body}</div>
-                      )}
+                        )
+                      })()}
                     </li>
                   )
                 })}

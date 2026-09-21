@@ -32,17 +32,24 @@ jobs:
       - name: Install
         run: npm ci
       - name: Audit root (omit dev)
-        run: npm audit --omit=dev
-        continue-on-error: true
-      - name: Audit frontend (omit dev)
-        working-directory: frontend
-        run: npm audit --omit=dev
-        continue-on-error: true
-      - name: Fail on critical (root)
         run: |
           CRITICAL=$(npm audit --json --omit=dev 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const j=JSON.parse(s);console.log(j.metadata?.vulnerabilities?.critical||0)}catch{console.log(0)}})")
-          echo "critical=$CRITICAL"
-          if [ "$CRITICAL" != "0" ]; then exit 1; fi
+          HIGH=$(npm audit --json --omit=dev 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const j=JSON.parse(s);console.log(j.metadata?.vulnerabilities?.high||0)}catch{console.log(0)}})")
+          echo "critical=$CRITICAL high=$HIGH"
+          if [ "$CRITICAL" != "0" ] || [ "$HIGH" != "0" ]; then
+            npm audit --omit=dev || true
+            exit 1
+          fi
+      - name: Audit frontend (omit dev)
+        working-directory: frontend
+        run: |
+          CRITICAL=$(npm audit --json --omit=dev 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const j=JSON.parse(s);console.log(j.metadata?.vulnerabilities?.critical||0)}catch{console.log(0)}})")
+          HIGH=$(npm audit --json --omit=dev 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const j=JSON.parse(s);console.log(j.metadata?.vulnerabilities?.high||0)}catch{console.log(0)}})")
+          echo "critical=$CRITICAL high=$HIGH"
+          if [ "$CRITICAL" != "0" ] || [ "$HIGH" != "0" ]; then
+            npm audit --omit=dev || true
+            exit 1
+          fi
 
   rls-live:
     name: Live RLS isolation

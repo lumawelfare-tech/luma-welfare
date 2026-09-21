@@ -376,3 +376,57 @@ export function parseManageUserRoleBody(input: unknown): ManageUserRoleInput {
 
   return { action, targetId, roleName, reason, confirmSuperadmin }
 }
+
+export type ImportMemberRowInput = {
+  email: string
+  fullName: string
+  phone: string
+  idNumber: string | null
+}
+
+/** Validate one CSV-import member row (strict field types + Kenya formats). */
+export function parseImportMemberRow(input: unknown, rowLabel = 'Row'): ImportMemberRowInput {
+  if (input == null || typeof input !== 'object' || Array.isArray(input)) {
+    throw new ValidationError(`${rowLabel}: invalid row object.`)
+  }
+  const row = input as Record<string, unknown>
+  const emailRaw = row.email
+  const fullNameRaw = row.full_name ?? row.fullName
+  const phoneRaw = row.phone
+  const idRaw = row.id_number ?? row.idNumber
+
+  if (typeof emailRaw !== 'string' || !emailRaw.trim()) {
+    throw new ValidationError(`${rowLabel}: email is required.`)
+  }
+  const email = emailRaw.trim().toLowerCase()
+  if (!EMAIL_RE.test(email) || email.length > 254) {
+    throw new ValidationError(`${rowLabel}: enter a valid email address.`)
+  }
+
+  if (typeof fullNameRaw !== 'string' || !fullNameRaw.trim()) {
+    throw new ValidationError(`${rowLabel}: full name is required.`)
+  }
+  const fullName = fullNameRaw.trim()
+  if (fullName.length > 120) {
+    throw new ValidationError(`${rowLabel}: full name is too long.`)
+  }
+
+  if (typeof phoneRaw !== 'string' || !phoneRaw.trim()) {
+    throw new ValidationError(`${rowLabel}: phone is required.`)
+  }
+  const phone = normalizeKenyanPhone(phoneRaw)
+  if (!KENYA_PHONE_RE.test(phone)) {
+    throw new ValidationError(`${rowLabel}: enter a valid Kenyan phone number.`)
+  }
+
+  let idNumber: string | null = null
+  if (idRaw != null && idRaw !== '') {
+    if (typeof idRaw !== 'string') {
+      throw new ValidationError(`${rowLabel}: ID number must be a string.`)
+    }
+    idNumber = parseKenyanNationalId(idRaw, `${rowLabel}: ID number`)
+  }
+
+  return { email, fullName, phone, idNumber }
+}
+

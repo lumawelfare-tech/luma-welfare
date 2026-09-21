@@ -144,6 +144,8 @@ describe('AuthContext', () => {
       member: mockAdminMember,
       isAdmin: true,
       adminRole: 'super_admin',
+      isSuperadmin: true,
+      adminPermissions: ['members:read', 'claims:read'],
       registrationFeePaid: true,
     })
 
@@ -156,6 +158,8 @@ describe('AuthContext', () => {
     expect(result.current.member).toEqual(mockAdminMember)
     expect(result.current.isAdmin).toBe(true)
     expect(result.current.adminRole).toBe('super_admin')
+    expect(result.current.adminPermissions).toEqual(['members:read', 'claims:read'])
+    expect(result.current.isSuperadmin).toBe(true)
   })
 
   // ── pending_approval state ─────────────────────────────────────────────────

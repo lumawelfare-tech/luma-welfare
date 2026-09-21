@@ -51,9 +51,10 @@ Deno.serve(async (req) => {
     // Check admin status — server queries the admins table
     let isAdmin = false
     let adminRole: string | null = null
+    let adminPermissions: string[] = []
     const { data: adminRecord } = await adminClient
       .from('admins')
-      .select('id, is_active, is_superadmin, roles(name)')
+      .select('id, is_active, is_superadmin, role_id, roles(name)')
       .eq('id', userId)
       .eq('is_active', true)
       .maybeSingle()
@@ -61,6 +62,15 @@ Deno.serve(async (req) => {
     if (adminRecord) {
       isAdmin = true
       adminRole = (adminRecord.roles as unknown as { name: string } | null)?.name ?? null
+      if (adminRecord.role_id) {
+        const { data: perms } = await adminClient
+          .from('permissions')
+          .select('resource, action')
+          .eq('role_id', adminRecord.role_id)
+        adminPermissions = (perms ?? []).map(
+          (p: { resource: string; action: string }) => `${p.resource}:${p.action}`,
+        )
+      }
     }
 
     return new Response(JSON.stringify({
@@ -69,6 +79,7 @@ Deno.serve(async (req) => {
       isAdmin,
       adminRole,
       isSuperadmin: adminRecord?.is_superadmin === true,
+      adminPermissions,
       registrationFeePaid,
     }), {
       status: 200,

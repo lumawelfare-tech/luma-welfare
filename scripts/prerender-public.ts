@@ -69,75 +69,116 @@ function injectPrerenderBody(html: string, title: string, description: string, p
   if (/<div id="root"><\/div>/i.test(html)) {
     return html.replace(/<div id="root"><\/div>/i, shell)
   }
-  if (/<div id="root">[\s\S]*?<\/div>/i.test(html)) {
-    return html.replace(/<div id="root">[\s\S]*?<\/div>/i, shell)
+
+  // Replace the entire #root element, accounting for nested divs in the
+  // pre-hydrate boot splash. A naive non-greedy <\/div> match stops at the
+  // first nested close and leaves .app-boot-static__wordmark/__tag as orphans
+  // under <body> — visible as a white brand block below the site footer.
+  return replaceRootElement(html, shell)
+}
+
+export function replaceRootElement(html: string, replacement: string): string {
+  const openRe = /<div\s+id=["']root["'][^>]*>/i
+  const openMatch = openRe.exec(html)
+  if (!openMatch || openMatch.index === undefined) return html
+
+  const start = openMatch.index
+  let i = start + openMatch[0].length
+  let depth = 1
+  const lower = html.toLowerCase()
+
+  while (i < html.length && depth > 0) {
+    const nextOpen = lower.indexOf('<div', i)
+    const nextClose = lower.indexOf('</div>', i)
+    if (nextClose === -1) return html
+
+    if (nextOpen !== -1 && nextOpen < nextClose) {
+      depth += 1
+      i = nextOpen + 4
+    } else {
+      depth -= 1
+      i = nextClose + 6
+      if (depth === 0) {
+        return html.slice(0, start) + replacement + html.slice(i)
+      }
+    }
   }
   return html
 }
 
-if (!existsSync(join(dist, 'index.html'))) {
-  console.error('frontend/dist/index.html missing — run vite build first')
-  process.exit(2)
-}
+function runPrerender(): void {
+  if (!existsSync(join(dist, 'index.html'))) {
+    console.error('frontend/dist/index.html missing — run vite build first')
+    process.exit(2)
+  }
 
-const template = readFileSync(join(dist, 'index.html'), 'utf8')
-let count = 0
+  const template = readFileSync(join(dist, 'index.html'), 'utf8')
+  let count = 0
 
-for (const route of PUBLIC_ROUTES) {
-  const fullTitle = formatTitle(route.title)
-  const url = route.path === '/' ? `${site}/` : `${site}${route.path}`
+  for (const route of PUBLIC_ROUTES) {
+    const fullTitle = formatTitle(route.title)
+    const url = route.path === '/' ? `${site}/` : `${site}${route.path}`
 
-  let html = template
-  html = upsertTitle(html, fullTitle)
-  html = upsertMeta(html, 'name', 'description', route.description)
-  html = upsertMeta(html, 'name', 'robots', 'index, follow')
-  html = upsertLinkCanonical(html, url)
-  html = upsertMeta(html, 'property', 'og:title', fullTitle)
-  html = upsertMeta(html, 'property', 'og:description', route.description)
-  html = upsertMeta(html, 'property', 'og:url', url)
-  html = upsertMeta(html, 'property', 'og:type', 'website')
-  html = upsertMeta(html, 'property', 'og:site_name', 'Luma Welfare')
-  html = upsertMeta(html, 'property', 'og:locale', 'en_KE')
-  html = upsertMeta(html, 'property', 'og:image', ogImage)
-  html = upsertMeta(html, 'property', 'og:image:width', '1200')
-  html = upsertMeta(html, 'property', 'og:image:height', '630')
-  html = upsertMeta(html, 'property', 'og:image:alt', 'Luma Welfare — Community welfare in Kenya')
-  html = upsertMeta(html, 'name', 'twitter:card', 'summary_large_image')
-  html = upsertMeta(html, 'name', 'twitter:title', fullTitle)
-  html = upsertMeta(html, 'name', 'twitter:description', route.description)
-  html = upsertMeta(html, 'name', 'twitter:image', ogImage)
-  html = upsertMeta(html, 'name', 'twitter:image:alt', 'Luma Welfare — Community welfare in Kenya')
+    let html = template
+    html = upsertTitle(html, fullTitle)
+    html = upsertMeta(html, 'name', 'description', route.description)
+    html = upsertMeta(html, 'name', 'robots', 'index, follow')
+    html = upsertLinkCanonical(html, url)
+    html = upsertMeta(html, 'property', 'og:title', fullTitle)
+    html = upsertMeta(html, 'property', 'og:description', route.description)
+    html = upsertMeta(html, 'property', 'og:url', url)
+    html = upsertMeta(html, 'property', 'og:type', 'website')
+    html = upsertMeta(html, 'property', 'og:site_name', 'Luma Welfare')
+    html = upsertMeta(html, 'property', 'og:locale', 'en_KE')
+    html = upsertMeta(html, 'property', 'og:image', ogImage)
+    html = upsertMeta(html, 'property', 'og:image:width', '1200')
+    html = upsertMeta(html, 'property', 'og:image:height', '630')
+    html = upsertMeta(html, 'property', 'og:image:alt', 'Luma Welfare — Community welfare in Kenya')
+    html = upsertMeta(html, 'name', 'twitter:card', 'summary_large_image')
+    html = upsertMeta(html, 'name', 'twitter:title', fullTitle)
+    html = upsertMeta(html, 'name', 'twitter:description', route.description)
+    html = upsertMeta(html, 'name', 'twitter:image', ogImage)
+    html = upsertMeta(html, 'name', 'twitter:image:alt', 'Luma Welfare — Community welfare in Kenya')
 
-  html = injectJsonLd(html, 'luma-prerender-webpage', {
-    '@context': 'https://schema.org',
-    '@type': 'WebPage',
-    name: fullTitle,
-    description: route.description,
-    url,
-    isPartOf: { '@type': 'WebSite', name: 'Luma Welfare', url: `${site}/` },
-  })
-
-  if (route.path !== '/') {
-    html = injectJsonLd(html, 'luma-prerender-breadcrumb', {
+    html = injectJsonLd(html, 'luma-prerender-webpage', {
       '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: `${site}/` },
-        { '@type': 'ListItem', position: 2, name: route.title, item: url },
-      ],
+      '@type': 'WebPage',
+      name: fullTitle,
+      description: route.description,
+      url,
+      isPartOf: { '@type': 'WebSite', name: 'Luma Welfare', url: `${site}/` },
     })
+
+    if (route.path !== '/') {
+      html = injectJsonLd(html, 'luma-prerender-breadcrumb', {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: `${site}/` },
+          { '@type': 'ListItem', position: 2, name: route.title, item: url },
+        ],
+      })
+    }
+
+    html = injectPrerenderBody(html, fullTitle, route.description, route.path)
+
+    if (route.path === '/') {
+      writeFileSync(join(dist, 'index.html'), html, 'utf8')
+    } else {
+      const dir = join(dist, route.path.replace(/^\//, ''))
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'index.html'), html, 'utf8')
+    }
+    count++
   }
 
-  html = injectPrerenderBody(html, fullTitle, route.description, route.path)
-
-  if (route.path === '/') {
-    writeFileSync(join(dist, 'index.html'), html, 'utf8')
-  } else {
-    const dir = join(dist, route.path.replace(/^\//, ''))
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, 'index.html'), html, 'utf8')
-  }
-  count++
+  console.log(`Prerendered ${count} public routes into ${dist} (site=${site})`)
 }
 
-console.log(`Prerendered ${count} public routes into ${dist} (site=${site})`)
+const isDirectRun =
+  Boolean(process.argv[1]) &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1]!)
+
+if (isDirectRun) {
+  runPrerender()
+}

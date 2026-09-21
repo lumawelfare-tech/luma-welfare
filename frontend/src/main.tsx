@@ -23,3 +23,11 @@ createRoot(document.getElementById('root')!).render(
     </ToastProvider>
   </StrictMode>,
 )
+
+// Defense in depth: remove any orphaned pre-hydrate / prerender boot nodes
+// left as <body> siblings (legacy bug from incomplete #root replacement).
+document
+  .querySelectorAll(
+    'body > .app-boot-static, body > .app-boot-static__wordmark, body > .app-boot-static__tag',
+  )
+  .forEach((el) => el.remove())

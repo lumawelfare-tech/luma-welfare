@@ -94,13 +94,14 @@ jobs:
           fi
 
           if [ "$HIGH" -gt 0 ]; then
-            echo "⚠️  HIGH vulnerabilities found."
+            echo "❌ HIGH vulnerabilities found!"
             echo "Review audit-full.txt for details."
             echo ""
             cat audit-full.txt
+            exit 1
           fi
 
-          echo "✅ No critical vulnerabilities found."
+          echo "✅ No critical or high vulnerabilities found."
           echo ""
 
       - name: Upload audit reports
@@ -144,9 +145,13 @@ jobs:
 
       - name: Typecheck Edge Functions (Deno)
         run: |
-          # Pure shared module + migrated admin-subscriptions entrypoint
+          set -euo pipefail
           deno check --no-lock supabase/functions/shared/qualify.ts
-          deno check --no-lock supabase/functions/admin-subscriptions/index.ts
+          # All Edge Function entrypoints (skip non-index helpers)
+          for f in supabase/functions/*/index.ts; do
+            echo "Checking $f"
+            deno check --no-lock "$f"
+          done
 
   # ============================================================================
   # LINT

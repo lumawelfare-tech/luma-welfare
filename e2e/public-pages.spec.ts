@@ -261,6 +261,115 @@ test.describe('Site footer', () => {
 })
 
 // ============================================================================
+// FOOTER IS LAST — NO ORPHAN BOOT BRAND
+// ============================================================================
+
+const PUBLIC_CHECK_ROUTES = [
+  '/',
+  '/about',
+  '/packages',
+  '/how-it-works',
+  '/faq',
+  '/contact',
+  '/privacy',
+  '/terms',
+  '/register',
+] as const
+
+test.describe('Footer is last on public routes', () => {
+  for (const route of PUBLIC_CHECK_ROUTES) {
+    for (const viewport of [
+      { width: 375, height: 812, label: '375px' },
+      { width: 1280, height: 800, label: '1280px' },
+    ] as const) {
+      test(`${route} @ ${viewport.label}: footer last, no orphan boot brand`, async ({ page }) => {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height })
+        await page.goto(`${BASE}${route === '/' ? '/' : route}`, { waitUntil: 'networkidle' })
+        await page.waitForSelector('[data-testid="site-footer"], footer[role="contentinfo"]', {
+          timeout: 20_000,
+        })
+
+        // Wait for SPA to replace prerender shell
+        await page.waitForFunction(() => !document.querySelector('main[data-prerender="true"]'), null, {
+          timeout: 20_000,
+        }).catch(() => {})
+
+        const result = await page.evaluate(() => {
+          const footer = document.querySelector('[data-testid="site-footer"], footer[role="contentinfo"]')
+          if (!footer) return { ok: false, reason: 'no-footer' as const }
+
+          const orphans = Array.from(
+            document.querySelectorAll(
+              'body > .app-boot-static, body > .app-boot-static__wordmark, body > .app-boot-static__tag',
+            ),
+          ).map((el) => (el.textContent || '').trim())
+
+          // Last meaningful content node in body (ignore empty toast hosts)
+          const bodyKids = Array.from(document.body.children).filter((el) => {
+            const text = (el.textContent || '').trim()
+            const cls = String(el.className || '')
+            if (el.id === 'root') return true
+            if (!text && cls.includes('pointer-events-none')) return false
+            return true
+          })
+          const last = bodyKids[bodyKids.length - 1]
+          const lastIsRoot = last?.id === 'root'
+
+          // Brand wordmark "Luma Welfare" as direct brand line inside footer (once)
+          const footerBrand = footer.querySelectorAll('*')
+          let footerNameHits = 0
+          footerBrand.forEach((el) => {
+            if (el.childElementCount === 0 && (el.textContent || '').trim() === 'Luma Welfare') {
+              footerNameHits += 1
+            }
+          })
+
+          // Nothing with Community Welfare after footer in document order
+          const afterFooter: string[] = []
+          const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT)
+          let passed = false
+          let node = walk.currentNode as Element | null
+          while (node) {
+            if (node === footer) {
+              passed = true
+            } else if (passed && node !== footer && !footer.contains(node)) {
+              const t = (node.textContent || '').trim()
+              if (t === 'Community Welfare' || t === 'COMMUNITY WELFARE') {
+                // only count leaf-ish
+                if (node.childElementCount === 0) afterFooter.push(t)
+              }
+              if (
+                node.classList?.contains('app-boot-static__wordmark') ||
+                node.classList?.contains('app-boot-static__tag')
+              ) {
+                afterFooter.push(node.className)
+              }
+            }
+            node = walk.nextNode() as Element | null
+          }
+
+          return {
+            ok: true as const,
+            orphans,
+            lastIsRoot,
+            footerNameHits,
+            afterFooter,
+          }
+        })
+
+        expect(result.ok).toBe(true)
+        if (!result.ok) return
+        expect(result.orphans, 'no orphan boot nodes under body').toEqual([])
+        expect(result.afterFooter, 'no Community Welfare / boot brand after footer').toEqual([])
+        expect(result.lastIsRoot, 'footer lives inside #root which is last body child').toBe(true)
+        expect(result.footerNameHits).toBeGreaterThanOrEqual(1)
+        expect(result.footerNameHits).toBeLessThanOrEqual(2)
+      })
+    }
+  }
+})
+
+// ============================================================================
 // PERFORMANCE — SPA LOADING
 // ============================================================================
 

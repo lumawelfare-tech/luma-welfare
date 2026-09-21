@@ -3,6 +3,7 @@ import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSession
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
 import { prepareMemberListRow } from '../shared/pii.ts'
+import { parseImportMemberRow, ValidationError } from '../shared/validate.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -359,15 +360,21 @@ Deno.serve(async (req) => {
       const results: Array<{ row: number; email: string; status: 'success' | 'error'; message: string; member_id?: string }> = []
 
       for (let i = 0; i < importMembers.length; i++) {
-        const row = importMembers[i]
         const rowNum = i + 2
-        const email = (row.email ?? '').trim().toLowerCase()
-        const fullName = (row.full_name ?? row.fullName ?? '').trim()
-        const phone = (row.phone ?? '').trim()
-        const idNumber = (row.id_number ?? row.idNumber ?? '').trim()
+        let email = ''
+        let fullName = ''
+        let phone = ''
+        let idNumber: string | null = null
 
-        if (!email || !fullName || !phone) {
-          results.push({ row: rowNum, email, status: 'error', message: 'Missing required fields (email, full_name, phone).' })
+        try {
+          const parsed = parseImportMemberRow(importMembers[i], `Row ${rowNum}`)
+          email = parsed.email
+          fullName = parsed.fullName
+          phone = parsed.phone
+          idNumber = parsed.idNumber
+        } catch (e) {
+          const msg = e instanceof ValidationError ? e.message : 'Invalid row.'
+          results.push({ row: rowNum, email, status: 'error', message: msg })
           continue
         }
 
@@ -382,18 +389,34 @@ Deno.serve(async (req) => {
           continue
         }
 
-        const tempPassword = `Luma${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+        const { data: phoneClash } = await adminClient
+          .from('members')
+          .select('id')
+          .eq('phone', phone)
+          .maybeSingle()
+
+        if (phoneClash) {
+          results.push({ row: rowNum, email, status: 'error', message: 'Phone number is already registered.' })
+          continue
+        }
+
+        const tempPassword = `Luma${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}!Aa1`
 
         try {
           const { data: authUser, error: authErr } = await adminClient.auth.admin.createUser({
             email,
             password: tempPassword,
-            email_confirm: true,
+            email_confirm: false,
             user_metadata: { full_name: fullName },
           })
 
           if (authErr || !authUser?.user) {
-            results.push({ row: rowNum, email, status: 'error', message: authErr?.message ?? 'Failed to create auth user.' })
+            results.push({
+              row: rowNum,
+              email,
+              status: 'error',
+              message: 'Could not create login account for this email.',
+            })
             continue
           }
 
@@ -404,8 +427,8 @@ Deno.serve(async (req) => {
               email,
               full_name: fullName,
               phone,
-              id_number: idNumber || null,
-              status: 'active',
+              id_number: idNumber,
+              status: 'pending_approval',
               joined_at: new Date().toISOString(),
             })
 
@@ -417,7 +440,7 @@ Deno.serve(async (req) => {
                 row: rowNum,
                 email,
                 status: 'error',
-                message: 'That ID number or email is already registered.',
+                message: 'That ID number, phone, or email is already registered.',
               })
             } else {
               results.push({ row: rowNum, email, status: 'error', message: 'Could not create membership.' })
@@ -429,9 +452,15 @@ Deno.serve(async (req) => {
             .from('registration_fees')
             .insert({ member_id: authUser.user.id, fee_type: 'registration', amount: 300, currency: 'KES', status: 'unpaid' })
 
-          results.push({ row: rowNum, email, status: 'success', message: 'Member created.', member_id: authUser.user.id })
-        } catch (err) {
-          results.push({ row: rowNum, email, status: 'error', message: err instanceof Error ? err.message : 'Unknown error.' })
+          results.push({
+            row: rowNum,
+            email,
+            status: 'success',
+            message: 'Member created as pending (email verification required).',
+            member_id: authUser.user.id,
+          })
+        } catch {
+          results.push({ row: rowNum, email, status: 'error', message: 'Could not import this row.' })
         }
       }
 

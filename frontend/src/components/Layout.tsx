@@ -64,7 +64,7 @@ export function Layout() {
   const menuTransition = reduceMotion ? lumaInstant : lumaEase.menuSpring
 
   return (
-    <div className="flex min-h-dvh w-full max-w-[100vw] flex-col overflow-x-clip">
+    <div className="flex min-h-dvh w-full max-w-[100vw] flex-1 flex-col overflow-x-clip">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:rounded-lg focus:bg-luma-700 focus:px-4 focus:py-2 focus:text-sm focus:text-white focus:shadow-lg">
         Skip to main content
       </a>
