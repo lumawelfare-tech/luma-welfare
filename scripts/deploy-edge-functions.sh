@@ -108,6 +108,7 @@ ALL_FUNCTIONS=(
   admin-reconciliation
   admin-registration-fee
   admin-reports
+  admin-reveal-member-id
   admin-scheduled-reports
   admin-settings
   admin-subscriptions
