@@ -1,17 +1,28 @@
-# Security verification notes (Phase 2)
+# Security verification notes
 
-Last updated: 2026-09-21
+Last updated: 2026-09-21 (Phase 5 testing quality)
 
 ## Automated coverage
 
-| Suite | Command | Requires |
-|-------|---------|----------|
-| Static contracts | `npm test` (phase2-security-verification + validate) | none |
-| Live RLS isolation | `npm run test:rls` | `SUPABASE_URL` + anon + service_role |
-| Client bundle scan | `npm run build && npm run scan:bundle` | build output |
-| SQL inventory helpers | `scripts/verify-rls-inventory.sql`, `scripts/verify-security-lockdown.sql` | SQL editor / `psql` |
+| Suite | Command | Requires | CI |
+|-------|---------|----------|-----|
+| Static contracts | `npm test` (validate, auth-validate, edge-auth-contracts, rate-limit-core, …) | none | `🧪 Tests` |
+| Qualification engine | `npm run test:qualify` | none | `🧪 Tests` |
+| Live RLS isolation | `npm run test:rls` | `SUPABASE_URL` + anon + service_role | `🧪 Tests` (self-skips without secrets; **fails the job** when secrets set and suite fails) |
+| Vitest coverage | `npm run test:coverage -w frontend` | none | Informational artifact |
+| Client bundle scan | `npm run build && npm run scan:bundle` | build output | `🏗️ Build` |
+| Playwright E2E | `npx playwright test` | `BASE_URL` + optional `E2E_*` / Supabase secrets | `🎭 E2E Tests` (PRs + `main`) |
+| SQL inventory helpers | `scripts/verify-rls-inventory.sql` | SQL editor / `psql` | Manual |
 
-Docker / `supabase start` is **not** available on the current Windows agent — live RLS must be run against a local Docker host or a preview project.
+Branch protection checklist: `docs/BRANCH_PROTECTION.md`.
+
+## RLS live suite — tables & edge coverage
+
+| Surface | Anonymous | Member A vs B | Member vs admin tables |
+|---------|-----------|---------------|------------------------|
+| `members`, `claims`, `contributions`, `subscriptions`, `family_members`, `notifications`, `registration_fees`, `data_deletion_requests`, `member_legal_acceptances`, `financial_ledger` | no read | B cannot read A; A reads own | — |
+| `admins`, `audit_logs` | no read | members get empty | denied to members |
+| Edge `admin-claims` | — | member JWT → 401/403 | — |
 
 ## Intentional public reads (`USING (true)` / public content)
 
@@ -36,4 +47,4 @@ Docker / `supabase start` is **not** available on the current Windows agent — 
 
 ## Manual actions
 
-See Phase 2 summary checklist: apply migration `20260921140000_phase2_security_verification.sql`, run live RLS suite, rotate any keys that ever appeared in client logs.
+Configure branch protection + CI secrets per `docs/BRANCH_PROTECTION.md`. Run live RLS against staging/preview before go-live.

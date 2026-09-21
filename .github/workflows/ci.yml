@@ -195,6 +195,20 @@ jobs:
         working-directory: frontend
         run: npm run test -- --reporter=verbose
 
+      - name: Unit test coverage (informational)
+        working-directory: frontend
+        continue-on-error: true
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: vitest-coverage
+          path: frontend/coverage/
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Run qualification engine tests
         run: npm run test:qualify
         env:
@@ -202,33 +216,29 @@ jobs:
           # (Previous failures: runner local TZ shifted eligibleFrom by one calendar day.)
           TZ: UTC
 
-      - name: Run live RLS isolation (optional)
+      - name: Run live RLS isolation
         run: npm run test:rls
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        # Suite self-skips when secrets are empty; never fail the job for missing Docker/secrets.
-        continue-on-error: true
+        # Suite self-skips when secrets are empty. When secrets ARE set, failures block the job.
 
-      - name: Run edge function integration tests
+      - name: Edge auth contract note
         run: |
-          echo "=== Edge Function Integration Tests ==="
-          echo "These tests verify live Edge Functions for auth/CORS/public endpoints."
-          echo "Skipping in CI — requires live Supabase project."
-          echo ""
-          echo "To run locally:"
-          echo "  npx vitest run scripts/__tests__/edge-functions.test.ts"
+          echo "=== Edge Function auth ==="
+          echo "Unauthenticated auth checks run in Playwright e2e/security-api.spec.ts"
+          echo "and live RLS (member JWT → admin-claims 401/403)."
+          echo "Offline parsers: frontend vitest (validate / auth-validate)."
           echo ""
 
   # ============================================================================
-  # BUILD — does not block on test failures (still requires typecheck + lint)
+  # BUILD — requires typecheck, lint, and tests to succeed
   # ============================================================================
   build:
     name: "🏗️ Build"
     runs-on: ubuntu-latest
     needs: [typecheck, lint, test]
-    if: always() && needs.typecheck.result == 'success' && needs.lint.result == 'success'
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -410,7 +420,7 @@ jobs:
   security-summary:
     name: "📊 Security Summary"
     runs-on: ubuntu-latest
-    needs: [security-audit, typecheck, lint, test, build]
+    needs: [security-audit, typecheck, lint, test, build, e2e, edge-function-check]
     if: always()
     steps:
       - name: Check all jobs
@@ -420,6 +430,8 @@ jobs:
           LINT: ${{ needs.lint.result }}
           TESTS: ${{ needs.test.result }}
           BUILD: ${{ needs.build.result }}
+          E2E: ${{ needs.e2e.result }}
+          EDGE_CHECK: ${{ needs.edge-function-check.result }}
         run: |
           echo "============================================="
           echo "  CI PIPELINE SUMMARY"
@@ -432,12 +444,16 @@ jobs:
           LINT="${LINT:-missing}"
           TESTS="${TESTS:-missing}"
           BUILD="${BUILD:-missing}"
+          E2E="${E2E:-missing}"
+          EDGE_CHECK="${EDGE_CHECK:-missing}"
 
           echo "Security Audit:    $SECURITY_AUDIT"
           echo "Typecheck:         $TYPECHECK"
           echo "Lint:              $LINT"
           echo "Tests:             $TESTS"
           echo "Build:             $BUILD"
+          echo "E2E:               $E2E"
+          echo "Edge Check:        $EDGE_CHECK"
           echo ""
 
           FAILED=0
@@ -458,9 +474,11 @@ jobs:
                 FAILED=1
                 ;;
               skipped)
-                # Build is allowed to skip only when typecheck/lint already failed.
-                if [ "$name" = "Build" ] && { [ "$TYPECHECK" != "success" ] || [ "$LINT" != "success" ]; }; then
-                  echo "⚠️  $name skipped (typecheck/lint did not succeed)"
+                # E2E / Edge check skip on develop-only pushes (not PR); Build skips only if deps failed.
+                if [ "$name" = "E2E" ] || [ "$name" = "Edge Check" ]; then
+                  echo "⚠️  $name skipped (expected on some branch push events — required on PRs and main)"
+                elif [ "$name" = "Build" ] && { [ "$TYPECHECK" != "success" ] || [ "$LINT" != "success" ] || [ "$TESTS" != "success" ]; }; then
+                  echo "⚠️  $name skipped (upstream typecheck/lint/tests did not succeed)"
                 else
                   echo "❌ $name skipped unexpectedly — deployment blocked"
                   FAILED=1
@@ -478,6 +496,8 @@ jobs:
           check_required "Lint" "$LINT"
           check_required "Tests" "$TESTS"
           check_required "Build" "$BUILD"
+          check_required "E2E" "$E2E"
+          check_required "Edge Check" "$EDGE_CHECK"
           echo ""
 
           if [ "$FAILED" -ne 0 ]; then

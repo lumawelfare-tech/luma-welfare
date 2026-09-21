@@ -65,9 +65,8 @@ test.describe('Packages Page', () => {
 
     await expect(page).toHaveTitle(/Luma Welfare/)
 
-    // Wait for content to load — data pages need more time
-    await page.waitForSelector('#root, #app, main', { timeout: 20000 })
-    await page.waitForTimeout(2000) // Allow API data to load
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 20_000 })
     const bodyText = await page.locator('body').textContent()
     expect(bodyText?.trim().length).toBeGreaterThan(20)
   })
@@ -83,7 +82,8 @@ test.describe('News Page', () => {
 
     await expect(page).toHaveTitle(/Luma Welfare/)
 
-    await page.waitForSelector('#root, #app, main', { timeout: 15000 })
+    await page.waitForSelector('main', { timeout: 15_000 })
+    await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 15_000 })
   })
 })
 
@@ -97,10 +97,9 @@ test.describe('Gallery Page', () => {
 
     await expect(page).toHaveTitle(/Luma Welfare/)
 
-    await page.waitForSelector('#root, #app, main', { timeout: 20000 })
-    await page.waitForTimeout(2000) // Allow API data to load
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 20_000 })
 
-    // Should have some content (empty state or gallery items)
     const bodyText = await page.locator('body').textContent()
     expect(bodyText?.trim().length).toBeGreaterThan(20)
   })
@@ -116,10 +115,9 @@ test.describe('Media Page', () => {
 
     await expect(page).toHaveTitle(/Luma Welfare/)
 
-    await page.waitForSelector('#root, #app, main', { timeout: 20000 })
-    await page.waitForTimeout(2000) // Allow API data to load
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 20_000 })
 
-    // Should have filter tabs or media content
     const bodyText = await page.locator('body').textContent()
     expect(bodyText?.trim().length).toBeGreaterThan(20)
   })
@@ -127,13 +125,13 @@ test.describe('Media Page', () => {
   test('has media type filter tabs', async ({ page }) => {
     await page.goto(`${BASE}/media`)
 
-    await page.waitForSelector('#root, #app, main', { timeout: 20000 })
-    await page.waitForTimeout(2000) // Allow API data to load
+    await page.waitForSelector('main', { timeout: 20_000 })
+    await expect(
+      page.locator('button:has-text("All"), button:has-text("Photo"), button:has-text("Video")').first(),
+    ).toBeVisible({ timeout: 20_000 })
 
-    // Look for filter buttons/tabs
     const filterButtons = page.locator('button:has-text("All"), button:has-text("Photo"), button:has-text("Video"), button:has-text("Audio"), button:has-text("Document")')
     const count = await filterButtons.count()
-    // Should have at least 3 filter options
     expect(count).toBeGreaterThanOrEqual(3)
   })
 })

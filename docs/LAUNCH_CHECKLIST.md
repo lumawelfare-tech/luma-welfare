@@ -4,10 +4,12 @@ Use before real members onboard. **Do not enable M-Pesa** (`PAYMENTS_ENABLED` mu
 
 ## Pre-flight (repo / CI)
 
-- [ ] `main` green: lint, typecheck, unit tests, build, security audit
+- [ ] `main` green: lint, typecheck, unit tests, build, security audit, E2E
+- [ ] Branch protection configured per `docs/BRANCH_PROTECTION.md`
 - [ ] Phase 2 migration applied (`FORCE RLS`, private `exports`)
-- [ ] Phase 3 migration applied (consent columns + `data_deletion_requests`)
+- [ ] Phase 3 migration applied (consent columns + `data_deletion_requests` + legal versions)
 - [ ] `npm run scan:bundle` clean after production build
+- [ ] Live RLS suite green with repo `SUPABASE_*` secrets (`npm run test:rls`)
 
 ## Supabase
 

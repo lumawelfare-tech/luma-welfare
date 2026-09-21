@@ -30,13 +30,16 @@ test.describe('Member flows', () => {
     const url = page.url()
     expect(url.includes('/admin/dashboard')).toBeFalsy()
 
-    // API: own claims list is authorized
+    // API: own claims list is authorized; admin edge is denied
     const session = await signInApi(request, E2E_MEMBER.email, E2E_MEMBER.password)
     const claims = await edgeJson<{ claims?: unknown[]; message?: string }>(
       request, 'GET', 'member-claims', session.accessToken,
     )
     expect(claims.status).toBe(200)
     expect(Array.isArray(claims.body.claims)).toBeTruthy()
+
+    const adminDenied = await edgeJson(request, 'GET', 'admin-members', session.accessToken)
+    expect([401, 403]).toContain(adminDenied.status)
   })
 
   test('can open claims page and submit a draft when eligible', async ({ page, request }) => {
