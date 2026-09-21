@@ -12,6 +12,7 @@ const functionsDir = join(root, 'supabase/functions')
 const ADMIN_FNS = [
   'admin-dashboard',
   'admin-members',
+  'admin-delete-member',
   'admin-reveal-member-id',
   'admin-claims',
   'admin-contributions',
