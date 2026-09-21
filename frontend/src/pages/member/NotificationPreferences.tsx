@@ -253,7 +253,7 @@ export function NotificationPreferences() {
                 <button
                   onClick={() => toggleChannel(ch.key)}
                   disabled={isRequired || isSavingThis || (ch.key === 'push_enabled' && !pushSupported)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-luma-500 focus:ring-offset-2 disabled:cursor-not-allowed ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none focus:outline-none focus:ring-2 focus:ring-luma-500 focus:ring-offset-2 disabled:cursor-not-allowed ${
                     isEnabled ? 'bg-luma-600' : 'bg-gray-200'
                   } ${isRequired ? 'opacity-70' : ''}`}
                   role="switch"
@@ -261,7 +261,7 @@ export function NotificationPreferences() {
                   aria-label={`${ch.label} notifications ${isEnabled ? 'enabled' : 'disabled'}`}
                 >
                   <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none ${
                       isEnabled ? 'translate-x-5' : 'translate-x-0'
                     }`}
                   />

@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext'
 import { NotificationBell } from './NotificationBell'
 import { useHead } from '../lib/seo'
 import { useFocusTrap } from '../hooks/useFocusTrap'
-import { lumaDistance, lumaEase, lumaInstant, lumaModal } from '../lib/lumaMotion'
+import { PageTransition } from './PageTransition'
+import { lumaDistance, lumaEase, lumaInstant, lumaMenuItem, lumaModal } from '../lib/lumaMotion'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: (
@@ -193,16 +194,22 @@ export function MemberLayout() {
                 </button>
               </div>
               <nav aria-label="Member sidebar" className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
-                {navItems.map((item) => (
-                  <NavLink
+                {navItems.map((item, i) => (
+                  <motion.div
                     key={item.to}
-                    to={item.to}
-                    onClick={() => setMobileOpen(false)}
-                    className={({ isActive }) => navClass(isActive)}
+                    initial={reduceMotion ? false : lumaMenuItem.initial}
+                    animate={lumaMenuItem.animate}
+                    transition={lumaMenuItem.transition(Boolean(reduceMotion), i)}
                   >
-                    {item.icon}
-                    <span className="truncate">{item.label}</span>
-                  </NavLink>
+                    <NavLink
+                      to={item.to}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) => navClass(isActive)}
+                    >
+                      {item.icon}
+                      <span className="truncate">{item.label}</span>
+                    </NavLink>
+                  </motion.div>
                 ))}
               </nav>
               <div className="border-t border-white/50 px-4 py-4 pb-safe">
@@ -221,7 +228,9 @@ export function MemberLayout() {
 
       <main id="member-main" className="min-w-0 flex-1 lg:pl-64" role="main">
         <div className="pt-[calc(3.5rem+env(safe-area-inset-top,0px))] lg:pt-0">
-          <Outlet />
+          <PageTransition>
+            <Outlet />
+          </PageTransition>
         </div>
       </main>
     </div>

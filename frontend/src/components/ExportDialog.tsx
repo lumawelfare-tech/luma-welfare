@@ -302,7 +302,7 @@ export function ExportDialog({
                       </div>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
                         <div
-                          className="h-full rounded-full bg-luma-600 transition-all duration-300"
+                          className="h-full rounded-full bg-luma-600 transition-[width] duration-[var(--motion-normal)] ease-[var(--luma-ease-out)] motion-reduce:transition-none"
                           style={{ width: `${progressPercent}%` }}
                         />
                       </div>

@@ -233,7 +233,7 @@ export function Media() {
                 <div className="relative aspect-square overflow-hidden bg-luma-50/40">
                   {item.media_type === 'image' ? (
                     <img src={item.thumbnail_url || item.file_url} alt={item.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      className="h-full w-full object-cover transition-transform duration-[var(--motion-normal)] ease-[var(--luma-ease-out)] motion-reduce:transition-none group-hover:scale-[1.03]" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
                       <svg className="h-12 w-12 text-luma-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">

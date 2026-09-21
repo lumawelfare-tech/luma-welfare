@@ -69,13 +69,15 @@ export const lumaDurationMs = {
 
 /** Movement distances in px (transform only). */
 export const lumaDistance = {
+  /** Micro lift / nudge */
+  microY: 2,
   enterY: 16,
   exitY: 8,
   revealY: 24,
   pageEnterY: 8,
   pageExitY: 4,
-  modalY: 16,
-  hoverY: -4,
+  modalY: 8,
+  hoverY: -3,
   toastX: 40,
   toastExitX: 24,
   menuItemX: -8,
@@ -83,15 +85,21 @@ export const lumaDistance = {
   drawerX: -256,
   /** Member portal drawer is 18rem wide */
   drawerXWide: -288,
+  /** Image reveal starts slightly scaled */
+  imageScaleFrom: 1.03,
 } as const
 
-/** Scale feedback for press / soft press / CTA hover. */
+/** Scale feedback for press / soft press / CTA hover / modal. */
 export const lumaScale = {
   press: 0.98,
   pressSoft: 0.985,
   pressIcon: 0.92,
   hoverCta: 1.02,
   hoverCtaStrong: 1.03,
+  /** Card / media hover zoom (keep ≤ 1.05) */
+  hoverImage: 1.03,
+  /** Modal enter from */
+  modalFrom: 0.97,
 } as const
 
 /**
@@ -110,9 +118,9 @@ export const lumaEase = {
   cssOut: 'cubic-bezier(0.22, 1, 0.36, 1)',
   linear: 'linear' as const,
   inOut: 'easeInOut' as const,
-  /** Shared drawer / sheet spring — keep identical across admin/member/public */
-  drawerSpring: { type: 'spring' as const, stiffness: 380, damping: 34 },
-  menuSpring: { type: 'spring' as const, stiffness: 380, damping: 32 },
+  /** Shared drawer / sheet spring — damped for a stable, non-bouncy feel */
+  drawerSpring: { type: 'spring' as const, stiffness: 380, damping: 38 },
+  menuSpring: { type: 'spring' as const, stiffness: 380, damping: 36 },
 }
 
 /** Instant transition when reduced motion is preferred. */
@@ -184,10 +192,12 @@ export const lumaModal = {
     transition: (reduce = false): Transition => lumaTransition(lumaDuration.micro, reduce),
   },
   panel: {
-    initial: { opacity: 0, y: lumaDistance.modalY, scale: 0.98 },
+    initial: { opacity: 0, y: lumaDistance.modalY, scale: lumaScale.modalFrom },
     animate: { opacity: 1, y: 0, scale: 1 },
-    exit: { opacity: 0, y: lumaDistance.exitY, scale: 0.98 },
-    transition: (reduce = false): Transition => lumaTransition(lumaDuration.normal, reduce),
+    exit: { opacity: 0, y: lumaDistance.exitY, scale: lumaScale.modalFrom },
+    /** Slightly faster close than open */
+    transition: (reduce = false, closing = false): Transition =>
+      lumaTransition(closing ? lumaDuration.fast : lumaDuration.normal, reduce),
   },
 }
 
@@ -197,6 +207,21 @@ export const lumaReveal = {
   viewport: { once: true as const, margin: '-48px 0px' },
   transition: (reduce = false, delay = 0): Transition =>
     lumaTransition(lumaDuration.section, reduce, { delay }),
+}
+
+/** Subtle image zoom-out reveal (overflow-hidden parent). */
+export const lumaImage = {
+  initial: { opacity: 0, scale: lumaDistance.imageScaleFrom },
+  whileInView: { opacity: 1, scale: 1 },
+  viewport: { once: true as const, margin: '-32px 0px' },
+  transition: (reduce = false): Transition => lumaTransition(lumaDuration.hero, reduce),
+}
+
+export const lumaFade = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
+  transition: (reduce = false): Transition => lumaTransition(lumaDuration.fast, reduce),
 }
 
 export const lumaToast = {
@@ -266,10 +291,13 @@ export const lumaMotion = {
   page: lumaPage,
   modal: lumaModal,
   reveal: lumaReveal,
+  image: lumaImage,
+  fade: lumaFade,
   toast: lumaToast,
   dropdown: lumaDropdown,
   drawer: lumaDrawer,
   menuItem: lumaMenuItem,
+  listItemVariants: lumaListItemVariants,
   transition: lumaTransition,
   staggerDelay: lumaStaggerDelay,
   instant: lumaInstant,

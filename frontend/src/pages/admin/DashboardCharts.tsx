@@ -53,7 +53,7 @@ const MembershipFunnel = memo(function MembershipFunnel({ data }: { data: Dashbo
             </div>
             <div className="mt-1 h-6 overflow-hidden rounded-lg bg-gray-100">
               <div
-                className="h-full rounded-lg transition-all duration-500 flex items-center pl-2"
+                className="h-full rounded-lg transition-[width] duration-[var(--motion-data)] ease-[var(--luma-ease-out)] motion-reduce:transition-none flex items-center pl-2"
                 style={{ width: `${Math.max(widthPct, 2)}%`, backgroundColor: FUNNEL_COLORS[i % FUNNEL_COLORS.length] }}
               >
                 {widthPct > 20 && (

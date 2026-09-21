@@ -1,5 +1,5 @@
 export function SkeletonRow({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-luma-100/80 ${className}`} />
+  return <div className={`luma-skeleton rounded ${className}`} aria-hidden="true" />
 }
 
 export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {

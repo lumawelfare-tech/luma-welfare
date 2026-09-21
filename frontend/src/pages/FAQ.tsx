@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useHead } from '../lib/seo'
+import { MotionSection } from '../components/MotionSection'
 
 type FAQItem = { q: string; a: string }
 
@@ -208,7 +209,7 @@ function FaqItem({ item, isOpen, onToggle, id }: { item: FAQItem; isOpen: boolea
         id={id}
         role="region"
         aria-labelledby={`btn-${id}`}
-        className={`overflow-hidden transition-all duration-200 ${isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
+        className={`overflow-hidden transition-[max-height,opacity] duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none ${isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
       >
         <p className="border-t border-white/50 px-5 py-4 text-sm leading-relaxed text-gray-600">{item.a}</p>
       </div>
@@ -282,7 +283,7 @@ export function FAQ() {
         </div>
       </section>
 
-      <div className="container-luma py-12">
+      <MotionSection as="div" className="container-luma py-12">
         <div className="mb-8 flex flex-wrap gap-2">
           <button
             type="button"
@@ -347,7 +348,7 @@ export function FAQ() {
             </Link>
           </div>
         </div>
-      </div>
+      </MotionSection>
     </div>
   )
 }

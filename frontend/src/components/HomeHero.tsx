@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Icon } from './Icon'
 import { lumaHero, lumaDuration, lumaTransition, lumaDistance } from '../lib/lumaMotion'
+import { MotionImage } from './MotionSection'
 
 const HERO_COPY =
   'Affordable welfare packages for key life events — hospital, education, business, building, and more. Track contributions and eligibility in one place.'
@@ -73,18 +74,20 @@ export function HomeHero() {
           })}
         >
           <div className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-2xl bg-luma-50 sm:max-w-lg lg:max-w-none">
-            <picture>
-              <source srcSet="/brand/hero-family.webp" type="image/webp" />
-              <img
-                src="/brand/hero-family.jpeg"
-                alt="A smiling Kenyan family — the community Luma Welfare supports"
-                width={533}
-                height={405}
-                decoding="async"
-                fetchPriority="high"
-                className="absolute inset-0 h-full w-full object-cover object-[center_25%]"
-              />
-            </picture>
+            <MotionImage className="absolute inset-0 h-full w-full">
+              <picture>
+                <source srcSet="/brand/hero-family.webp" type="image/webp" />
+                <img
+                  src="/brand/hero-family.jpeg"
+                  alt="A smiling Kenyan family — the community Luma Welfare supports"
+                  width={533}
+                  height={405}
+                  decoding="async"
+                  fetchPriority="high"
+                  className="h-full w-full object-cover object-[center_25%]"
+                />
+              </picture>
+            </MotionImage>
           </div>
         </motion.div>
       </div>

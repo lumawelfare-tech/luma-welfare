@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useHead } from '../lib/seo'
 import { PageHero } from '../components/PageHero'
+import { MotionSection } from '../components/MotionSection'
 import { LegalDraftBanner, LegalContactBlock } from '../components/LegalDraftBanner'
 import { legalConfig, displayLegalValue } from '../config/legal'
 
@@ -45,7 +46,7 @@ export function Privacy() {
         meta={meta}
       />
 
-      <div className="container-luma py-14">
+      <MotionSection as="div" className="container-luma py-14">
         <div className="glass-card mx-auto max-w-3xl p-8 sm:p-10">
           <LegalDraftBanner documentLabel="Privacy Policy" />
 
@@ -177,7 +178,7 @@ export function Privacy() {
             </div>
           </div>
         </div>
-      </div>
+      </MotionSection>
     </div>
   )
 }

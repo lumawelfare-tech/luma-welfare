@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react'
-import { MotionSection } from './MotionSection'
+import { motion, useReducedMotion } from 'framer-motion'
+import { lumaDuration, lumaHero, lumaStagger, lumaTransition } from '../lib/lumaMotion'
 
 type PageHeroProps = {
   eyebrow: string
@@ -10,17 +11,59 @@ type PageHeroProps = {
 
 /** Shared green page hero for public marketing/legal pages. */
 export function PageHero({ eyebrow, title, description, meta }: PageHeroProps) {
+  const reduceMotion = useReducedMotion()
+  const t = (delay: number) =>
+    lumaTransition(lumaDuration.hero, Boolean(reduceMotion), {
+      delay: reduceMotion ? 0 : delay,
+    })
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-luma-800 to-luma-900 py-16 lg:py-20">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.08),_transparent_50%)]" />
       <div className="container-luma relative">
-        <span className="text-sm font-semibold uppercase tracking-wider text-luma-200">{eyebrow}</span>
-        <h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">{title}</h1>
+        <motion.span
+          className="block text-sm font-semibold uppercase tracking-wider text-luma-200"
+          initial={reduceMotion ? false : lumaHero.initial}
+          animate={lumaHero.animate}
+          transition={t(0)}
+        >
+          {eyebrow}
+        </motion.span>
+        <motion.h1
+          className="mt-2 text-4xl font-bold text-white sm:text-5xl"
+          initial={reduceMotion ? false : lumaHero.initial}
+          animate={lumaHero.animate}
+          transition={t(lumaStagger.step)}
+        >
+          {title}
+        </motion.h1>
         {description && (
-          <p className="mt-4 max-w-2xl text-lg text-white/85">{description}</p>
+          <motion.p
+            className="mt-4 max-w-2xl text-lg text-white/85"
+            initial={reduceMotion ? false : lumaHero.initial}
+            animate={lumaHero.animate}
+            transition={t(lumaStagger.step * 2)}
+          >
+            {description}
+          </motion.p>
         )}
-        <div className="mt-3 h-1 w-12 rounded-full bg-luma-400" />
-        {meta && <div className="mt-4 text-sm text-white/60">{meta}</div>}
+        <motion.div
+          className="mt-3 h-1 w-12 rounded-full bg-luma-400"
+          initial={reduceMotion ? false : { opacity: 0, scaleX: 0.4 }}
+          animate={{ opacity: 1, scaleX: 1 }}
+          transition={t(lumaStagger.step * 3)}
+          style={{ transformOrigin: 'left' }}
+        />
+        {meta && (
+          <motion.div
+            className="mt-4 text-sm text-white/60"
+            initial={reduceMotion ? false : lumaHero.initial}
+            animate={lumaHero.animate}
+            transition={t(lumaStagger.step * 4)}
+          >
+            {meta}
+          </motion.div>
+        )}
       </div>
     </section>
   )
@@ -28,11 +71,18 @@ export function PageHero({ eyebrow, title, description, meta }: PageHeroProps) {
 
 /** Glass panel wrapping auth forms (login / register / password). */
 export function AuthCard({ children }: { children: ReactNode }) {
+  const reduceMotion = useReducedMotion()
+
   return (
     <div className="flex min-h-[60vh] items-center justify-center py-16">
-      <MotionSection as="div" className="w-full max-w-md px-4">
+      <motion.div
+        className="w-full max-w-md px-4"
+        initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={lumaTransition(lumaDuration.section, Boolean(reduceMotion))}
+      >
         <div className="glass-modal p-8">{children}</div>
-      </MotionSection>
+      </motion.div>
     </div>
   )
 }

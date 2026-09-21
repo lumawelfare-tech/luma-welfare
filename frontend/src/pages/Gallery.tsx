@@ -81,7 +81,7 @@ export function Gallery() {
                     <img
                       src={g.image_url}
                       alt={g.title ?? 'Luma Welfare event'}
-                      className="h-56 w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      className="h-56 w-full object-cover transition-transform duration-[var(--motion-normal)] ease-[var(--luma-ease-out)] motion-reduce:transition-none group-hover:scale-[1.03]"
                     />
                   </div>
                   <figcaption className="px-5 py-4">

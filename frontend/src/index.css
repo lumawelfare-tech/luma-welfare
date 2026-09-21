@@ -95,6 +95,8 @@ body {
 }
 
 #root {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   max-width: 100%;
   overflow-x: clip;
@@ -232,7 +234,9 @@ body {
 
 /* Smooth transitions for interactive elements */
 a, button {
-  @apply transition-colors duration-200;
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--luma-ease-out);
 }
 
 /* Design-system motion helpers (150–400ms; honor reduced-motion block below) */
@@ -244,6 +248,24 @@ a, button {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Soft skeleton shimmer — not aggressive pulse */
+.luma-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(209, 237, 224, 0.55) 0%,
+    rgba(232, 245, 238, 0.95) 50%,
+    rgba(209, 237, 224, 0.55) 100%
+  );
+  background-size: 200% 100%;
+  animation: luma-skeleton-shimmer var(--motion-data) ease-in-out infinite;
+}
+
+@keyframes luma-skeleton-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
 
 /* Button micro-interactions — hover/active/focus/disabled */
 .luma-btn {
@@ -362,6 +384,11 @@ a, button {
   .slide-in-from-bottom,
   .luma-enter {
     animation: none !important;
+  }
+
+  .luma-skeleton {
+    animation: none !important;
+    background: rgba(209, 237, 224, 0.7);
   }
 
   .luma-btn:hover:not(:disabled),

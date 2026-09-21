@@ -22,10 +22,10 @@ const SUPPORT_LINKS = [
 ] as const
 
 const linkClass =
-  'inline-flex min-h-11 items-center text-sm text-luma-200 transition-colors duration-200 hover:text-white hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 rounded-sm motion-reduce:transition-none'
+  'inline-flex min-h-11 items-center text-sm text-luma-200 transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] hover:text-white hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 rounded-sm motion-reduce:transition-none'
 
 const socialBtnClass =
-  'inline-flex h-11 w-11 items-center justify-center rounded-xl text-luma-200 transition-colors duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 motion-reduce:transition-none'
+  'inline-flex h-11 w-11 items-center justify-center rounded-xl text-luma-200 transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 motion-reduce:transition-none'
 
 function SocialIcon({ name }: { name: SiteSocialKey }) {
   const common = 'h-5 w-5'
@@ -123,7 +123,7 @@ export function SiteFooter() {
           </p>
           <Link
             to="/register"
-            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-luma-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-luma-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 motion-reduce:transition-none"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-luma-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] hover:bg-luma-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 motion-reduce:transition-none"
           >
             Join Now
           </Link>
@@ -241,7 +241,7 @@ export function SiteFooter() {
           <button
             type="button"
             onClick={scrollWindowToTop}
-            className="inline-flex min-h-11 items-center justify-center self-start rounded-lg border border-white/15 px-3 text-xs font-medium text-luma-200 transition-colors duration-200 hover:border-white/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 motion-reduce:transition-none sm:self-auto"
+            className="inline-flex min-h-11 items-center justify-center self-start rounded-lg border border-white/15 px-3 text-xs font-medium text-luma-200 transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] hover:border-white/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 motion-reduce:transition-none sm:self-auto"
           >
             Back to top
           </button>
