@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
       requirePermission(session, 'members', 'read')
       let query = adminClient
         .from('registration_fees')
-        .select('id, member_id, amount, currency, status, payment_method, mpesa_receipt, transaction_reference, paid_at, created_at, members(full_name, phone, email, membership_number)')
+        .select('id, member_id, amount, currency, status, payment_method, mpesa_receipt, transaction_reference, paid_at, created_at, members(full_name, phone, email, membership_number, id_number)')
         .eq('fee_type', 'registration')
         .order('created_at', { ascending: false })
 
@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
       requirePermission(session, 'contributions', 'read')
       let query = adminClient
         .from('contributions')
-        .select('id, period, amount, status, notes, created_at, member_id, members(full_name, phone, membership_number), packages(code, name), payments(mpesa_receipt, channel)')
+        .select('id, period, amount, status, notes, created_at, member_id, members(full_name, phone, membership_number, id_number), packages(code, name), payments(mpesa_receipt, channel)')
         .order('created_at', { ascending: false })
 
       if (status) query = query.eq('status', status)
@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
       requirePermission(session, 'members', 'read')
       let query = adminClient
         .from('subscriptions')
-        .select('id, status, started_at, next_due_date, cancelled_at, created_at, member_id, members(full_name, phone, email, membership_number), packages(code, name), package_tiers(name, amount)')
+        .select('id, status, started_at, next_due_date, cancelled_at, created_at, member_id, members(full_name, phone, email, membership_number, id_number), packages(code, name), package_tiers(name, amount)')
         .order('created_at', { ascending: false })
 
       if (status) query = query.eq('status', status)
@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
       requirePermission(session, 'claims', 'read')
       let query = adminClient
         .from('claims')
-        .select('id, claim_number, claim_type, amount_requested, approved_amount, status, created_at, submitted_at, decided_at, member_id, members(full_name, phone, email), packages(code, name)')
+        .select('id, claim_number, claim_type, amount_requested, approved_amount, status, created_at, submitted_at, decided_at, member_id, members(full_name, phone, email, id_number), packages(code, name)')
         .order('created_at', { ascending: false })
 
       if (status) query = query.eq('status', status)
@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
       requirePermission(session, 'members', 'read')
       let query = adminClient
         .from('members')
-        .select('id, membership_number, full_name, phone, email, status, joined_at, created_at')
+        .select('id, membership_number, full_name, phone, email, id_number, status, joined_at, created_at')
         .order('created_at', { ascending: false })
 
       if (status) query = query.eq('status', status)
@@ -219,8 +219,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Financial Summary
-    if (action === 'financial-summary') {
+    // Financial Summary (also accepts type=financial from the admin UI)
+    if (action === 'financial-summary' || action === 'financial') {
       requirePermission(session, 'members', 'read')
 
       const [regFeeResult, contribResult, claimResult] = await Promise.all([
@@ -232,19 +232,43 @@ Deno.serve(async (req) => {
       const contribStats = contribResult.data  
       const claimStats = claimResult.data
 
+      const summary = {
+        registration_fees_collected: Number(regFeeStats?.[0]?.paid_amount ?? 0),
+        total_contributions: Number(contribStats?.[0]?.verified_amount ?? 0),
+        total_claims_approved: Number(claimStats?.[0]?.approved_amount ?? 0) + Number(claimStats?.[0]?.paid_amount ?? 0),
+        total_claims_requested: Number(claimStats?.[0]?.requested_amount ?? 0),
+        registration_fees_count: Number(regFeeStats?.[0]?.paid_count ?? 0),
+        contributions_count: Number(contribStats?.[0]?.verified_count ?? 0),
+        claims_approved_count: Number(claimStats?.[0]?.approved_count ?? 0) + Number(claimStats?.[0]?.paid_count ?? 0),
+      }
+
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'report_generated', resource: 'report', meta: { type: 'financial-summary', format: 'json' } })
 
       return new Response(JSON.stringify({
         report: 'Financial Summary',
-        summary: {
-          registration_fees_collected: Number(regFeeStats?.[0]?.paid_amount ?? 0),
-          total_contributions: Number(contribStats?.[0]?.verified_amount ?? 0),
-          total_claims_approved: Number(claimStats?.[0]?.approved_amount ?? 0) + Number(claimStats?.[0]?.paid_amount ?? 0),
-          total_claims_requested: Number(claimStats?.[0]?.requested_amount ?? 0),
-          registration_fees_count: Number(regFeeStats?.[0]?.paid_count ?? 0),
-          contributions_count: Number(contribStats?.[0]?.verified_count ?? 0),
-          claims_approved_count: Number(claimStats?.[0]?.approved_count ?? 0) + Number(claimStats?.[0]?.paid_count ?? 0),
-        },
+        summary,
+        data: [
+          {
+            category: 'Registration Fees Collected',
+            amount: summary.registration_fees_collected,
+            count: summary.registration_fees_count,
+          },
+          {
+            category: 'Verified Contributions',
+            amount: summary.total_contributions,
+            count: summary.contributions_count,
+          },
+          {
+            category: 'Claims Approved',
+            amount: summary.total_claims_approved,
+            count: summary.claims_approved_count,
+          },
+          {
+            category: 'Claims Requested',
+            amount: summary.total_claims_requested,
+            count: null,
+          },
+        ],
         generated_at: new Date().toISOString(),
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

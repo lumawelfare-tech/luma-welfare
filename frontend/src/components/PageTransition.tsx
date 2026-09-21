@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useLocation } from 'react-router-dom'
+import { lumaPage } from '../lib/lumaMotion'
 
 type PageTransitionProps = {
   children: ReactNode
@@ -8,7 +9,7 @@ type PageTransitionProps = {
 
 /**
  * Short fade + slight rise between public routes.
- * Instant when prefers-reduced-motion is set.
+ * Uses Luma Motion System page tokens. Instant when prefers-reduced-motion.
  */
 export function PageTransition({ children }: PageTransitionProps) {
   const location = useLocation()
@@ -22,10 +23,10 @@ export function PageTransition({ children }: PageTransitionProps) {
     <AnimatePresence mode="wait">
       <motion.div
         key={location.pathname}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -4 }}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        initial={lumaPage.initial}
+        animate={lumaPage.animate}
+        exit={lumaPage.exit}
+        transition={lumaPage.transition(false)}
       >
         {children}
       </motion.div>

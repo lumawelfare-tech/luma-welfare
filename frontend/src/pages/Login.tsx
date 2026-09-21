@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { api, ApiError } from '../lib/api'
 import { useHead } from '../lib/seo'
 import { AuthCard, fieldClass, alertErrorClass, alertSuccessClass, alertWarnClass } from '../components/PageHero'
+import { lumaPress } from '../lib/lumaMotion'
 
 export function Login() {
   useHead('Login', undefined, { noindex: true })
@@ -155,7 +156,7 @@ export function Login() {
                 type="button"
                 onClick={handleVerify2FA}
                 disabled={verifying2fa || totpCode.length !== 6}
-                whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+                whileTap={lumaPress.default(Boolean(reduceMotion))}
                 className="w-full rounded-xl bg-luma-700 py-3 text-sm font-bold text-white hover:bg-luma-800 disabled:opacity-60 transition-all shadow-sm"
               >
                 {verifying2fa ? 'Verifying…' : 'Verify'}
@@ -242,7 +243,7 @@ export function Login() {
                   type="submit"
                   data-testid="login-submit"
                   disabled={busy || googleBusy}
-                  whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+                  whileTap={lumaPress.default(Boolean(reduceMotion))}
                   className="w-full rounded-xl bg-luma-700 py-3 text-sm font-bold text-white hover:bg-luma-800 disabled:opacity-60 transition-all shadow-sm"
                 >
                   {busy ? 'Signing in…' : 'Sign In'}
@@ -259,7 +260,7 @@ export function Login() {
                 type="button"
                 onClick={handleGoogle}
                 disabled={busy || googleBusy}
-                whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+                whileTap={lumaPress.default(Boolean(reduceMotion))}
                 className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/60 bg-white/60 py-3 text-sm font-medium text-gray-800 hover:bg-white/90 disabled:opacity-60 transition-all shadow-sm"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24">

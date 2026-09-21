@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { lumaToast } from '../lib/lumaMotion'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info' | 'pending'
 
@@ -107,10 +108,10 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
   return (
     <motion.div
       layout
-      initial={reduceMotion ? false : { opacity: 0, x: 40, y: 8 }}
-      animate={{ opacity: 1, x: 0, y: 0 }}
-      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 24, transition: { duration: 0.18 } }}
-      transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      initial={reduceMotion ? false : lumaToast.initial}
+      animate={lumaToast.animate}
+      exit={lumaToast.exit(Boolean(reduceMotion))}
+      transition={lumaToast.transition(Boolean(reduceMotion))}
       className={`pointer-events-auto flex items-start gap-3 rounded-xl border ${styles.bg} ${styles.border} px-4 py-3 shadow-lg`}
       role="alert"
     >

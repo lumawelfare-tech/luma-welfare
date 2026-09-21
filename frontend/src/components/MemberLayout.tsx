@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { NotificationBell } from './NotificationBell'
 import { useHead } from '../lib/seo'
 import { useFocusTrap } from '../hooks/useFocusTrap'
+import { lumaDistance, lumaEase, lumaInstant, lumaModal } from '../lib/lumaMotion'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: (
@@ -164,9 +165,10 @@ export function MemberLayout() {
           <div className="lg:hidden fixed inset-0 z-50 flex" id="member-mobile-nav">
             <motion.div
               className="fixed inset-0 bg-black/35 backdrop-blur-[2px]"
-              initial={reduceMotion ? false : { opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={reduceMotion ? false : lumaModal.backdrop.initial}
+              animate={lumaModal.backdrop.animate}
+              exit={lumaModal.backdrop.exit}
+              transition={lumaModal.backdrop.transition(Boolean(reduceMotion))}
               onClick={() => setMobileOpen(false)}
               aria-hidden="true"
             />
@@ -176,10 +178,10 @@ export function MemberLayout() {
               aria-modal="true"
               aria-label="Member navigation"
               className="glass-sidebar relative flex w-[min(18rem,100vw)] max-w-full flex-col shadow-xl"
-              initial={reduceMotion ? false : { x: -288 }}
+              initial={reduceMotion ? false : { x: lumaDistance.drawerXWide }}
               animate={{ x: 0 }}
-              exit={reduceMotion ? undefined : { x: -288 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+              exit={reduceMotion ? undefined : { x: lumaDistance.drawerXWide }}
+              transition={reduceMotion ? lumaInstant : lumaEase.drawerSpring}
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/50 pt-safe">
                 <div className="flex min-w-0 items-center gap-2">

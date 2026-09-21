@@ -1,11 +1,10 @@
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Icon } from './Icon'
+import { lumaHero, lumaDuration, lumaTransition, lumaDistance } from '../lib/lumaMotion'
 
 const HERO_COPY =
   'Affordable welfare packages for key life events — hospital, education, business, building, and more. Track contributions and eligibility in one place.'
-
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
 /**
  * Public homepage hero: brand-forward headline, one supporting line,
@@ -27,9 +26,9 @@ export function HomeHero() {
       <div className="container-luma relative grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-2 lg:gap-12 lg:py-20">
         <motion.div
           className="relative z-10 min-w-0 max-w-xl"
-          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: EASE }}
+          initial={reduceMotion ? false : lumaHero.initial}
+          animate={lumaHero.animate}
+          transition={lumaHero.transition(Boolean(reduceMotion))}
         >
           <p className="text-sm font-semibold uppercase tracking-[0.14em] text-luma-700">
             Luma Welfare
@@ -67,9 +66,11 @@ export function HomeHero() {
 
         <motion.div
           className="relative z-10 mx-auto w-full max-w-lg lg:max-w-none"
-          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+          initial={reduceMotion ? false : { opacity: 0, y: lumaDistance.enterY + 4 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: EASE, delay: 0.08 }}
+          transition={lumaTransition(lumaDuration.hero, Boolean(reduceMotion), {
+            delay: reduceMotion ? 0 : 0.06,
+          })}
         >
           <div className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-2xl bg-luma-50 sm:max-w-lg lg:max-w-none">
             <picture>

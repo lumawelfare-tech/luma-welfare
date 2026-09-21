@@ -70,7 +70,7 @@ export function ProgressBar({
         aria-label={ariaLabel ?? label ?? 'Progress'}
       >
         <div
-          className="h-full rounded-full bg-luma-600 transition-[width] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          className="h-full rounded-full bg-luma-600 transition-[width] duration-[var(--motion-data)] ease-[var(--luma-ease-out)] motion-reduce:transition-none"
           style={{ width: `${widthPct}%` }}
         />
       </div>

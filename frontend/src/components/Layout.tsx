@@ -6,6 +6,7 @@ import { scrollWindowToTop } from './ScrollToTop'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { SiteFooter } from './SiteFooter'
 import { PageTransition } from './PageTransition'
+import { lumaEase, lumaHover, lumaInstant, lumaMenuItem, lumaPress } from '../lib/lumaMotion'
 
 const navLinks = [
   { to: '/', label: 'Home' },
@@ -60,9 +61,7 @@ export function Layout() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const menuTransition = reduceMotion
-    ? { duration: 0 }
-    : { type: 'spring' as const, stiffness: 380, damping: 32 }
+  const menuTransition = reduceMotion ? lumaInstant : lumaEase.menuSpring
 
   return (
     <div className="flex min-h-dvh w-full max-w-[100vw] flex-col overflow-x-clip">
@@ -72,12 +71,12 @@ export function Layout() {
 
       {/* Main navigation */}
       <header
-        className={`glass-header sticky top-0 z-40 pt-safe transition-[box-shadow,background-color] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`glass-header sticky top-0 z-40 pt-safe transition-[box-shadow,background-color] duration-[var(--motion-normal)] ease-[var(--luma-ease-out)] ${
           scrolled ? 'glass-header-scrolled' : ''
         }`}
       >
         <div
-          className={`container-luma flex min-w-0 items-center justify-between gap-2 sm:gap-4 transition-[height] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          className={`container-luma flex min-w-0 items-center justify-between gap-2 sm:gap-4 transition-[height] duration-[var(--motion-normal)] ease-[var(--luma-ease-out)] ${
             scrolled ? 'h-14' : 'h-16'
           }`}
         >
@@ -157,15 +156,15 @@ export function Layout() {
                 <motion.button
                   type="button"
                   onClick={logout}
-                  whileHover={reduceMotion ? undefined : { scale: 1.02 }}
-                  whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+                  whileHover={lumaHover.cta(Boolean(reduceMotion))}
+                  whileTap={lumaPress.default(Boolean(reduceMotion))}
                   className="rounded-lg border border-white/60 bg-white/50 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-white/80"
                 >
                   Sign out
                 </motion.button>
               </div>
             ) : (
-              <motion.div whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
+              <motion.div whileHover={lumaHover.ctaStrong(Boolean(reduceMotion))} whileTap={lumaPress.default(Boolean(reduceMotion))}>
                 <Link
                   to="/register"
                   className="inline-block rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-luma-700/30 hover:bg-luma-800"
@@ -182,7 +181,7 @@ export function Layout() {
               aria-label="Toggle menu"
               aria-expanded={open}
               aria-controls="mobile-nav"
-              whileTap={reduceMotion ? undefined : { scale: 0.92 }}
+              whileTap={lumaPress.icon(Boolean(reduceMotion))}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
@@ -210,9 +209,9 @@ export function Layout() {
                   {navLinks.map((l, i) => (
                     <motion.div
                       key={l.label}
-                      initial={reduceMotion ? false : { opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={reduceMotion ? { duration: 0 } : { delay: 0.03 * i, duration: 0.2 }}
+                      initial={reduceMotion ? false : lumaMenuItem.initial}
+                      animate={lumaMenuItem.animate}
+                      transition={lumaMenuItem.transition(Boolean(reduceMotion), i)}
                     >
                       <NavLink
                         to={l.to}

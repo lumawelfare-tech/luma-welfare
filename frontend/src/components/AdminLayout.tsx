@@ -6,6 +6,7 @@ import { useHead } from '../lib/seo'
 import { AdminNotificationBell } from './AdminNotificationBell'
 import { ShortcutHelp } from './ShortcutHelp'
 import { useFocusTrap } from '../hooks/useFocusTrap'
+import { lumaDrawer, lumaDropdown, lumaModal } from '../lib/lumaMotion'
 
 const navSections = [
   {
@@ -131,9 +132,10 @@ export function AdminLayout() {
           <div className="fixed inset-0 z-40 lg:hidden">
             <motion.div
               className="fixed inset-0 bg-black/40 backdrop-blur-[2px]"
-              initial={reduceMotion ? false : { opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={reduceMotion ? false : lumaModal.backdrop.initial}
+              animate={lumaModal.backdrop.animate}
+              exit={lumaModal.backdrop.exit}
+              transition={lumaModal.backdrop.transition(Boolean(reduceMotion))}
               onClick={closeSidebar}
               aria-hidden="true"
             />
@@ -143,10 +145,10 @@ export function AdminLayout() {
               aria-modal="true"
               aria-label="Admin navigation"
               className="fixed inset-y-0 left-0 z-50 w-[min(16rem,100vw)] max-w-full shadow-xl"
-              initial={reduceMotion ? false : { x: -256 }}
-              animate={{ x: 0 }}
-              exit={reduceMotion ? undefined : { x: -256 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+              initial={reduceMotion ? false : lumaDrawer.initial}
+              animate={lumaDrawer.animate}
+              exit={reduceMotion ? undefined : lumaDrawer.exit}
+              transition={lumaDrawer.transition(Boolean(reduceMotion))}
             >
               <SidebarContent onClose={closeSidebar} />
             </motion.div>
@@ -202,10 +204,10 @@ export function AdminLayout() {
                   <motion.div
                     className="glass-modal absolute right-0 top-full z-50 mt-1 w-56 py-1"
                     role="menu"
-                    initial={reduceMotion ? false : { opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
-                    transition={{ duration: 0.15 }}
+                    initial={reduceMotion ? false : lumaDropdown.initial}
+                    animate={lumaDropdown.animate}
+                    exit={reduceMotion ? undefined : lumaDropdown.exit}
+                    transition={lumaDropdown.transition(Boolean(reduceMotion))}
                   >
                     <div className="border-b border-white/50 px-4 py-3">
                       <div className="text-sm font-medium text-gray-900">{member?.full_name ?? 'Administrator'}</div>

@@ -7,6 +7,7 @@ import { useHead } from '../lib/seo'
 import { fieldClass, alertErrorClass } from '../components/PageHero'
 import { MotionSection } from '../components/MotionSection'
 import { legalConfig } from '../config/legal'
+import { lumaPress } from '../lib/lumaMotion'
 
 export function Register() {
   useHead('Register', undefined, { noindex: true })
@@ -262,7 +263,7 @@ export function Register() {
             <motion.button
               type="submit"
               disabled={busy}
-              whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+              whileTap={lumaPress.default(Boolean(reduceMotion))}
               className="w-full rounded-xl bg-luma-700 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-luma-800 disabled:opacity-60"
             >
               {busy ? 'Creating account…' : 'Create Account'}

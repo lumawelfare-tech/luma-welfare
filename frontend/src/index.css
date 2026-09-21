@@ -34,15 +34,23 @@
   --radius-control: 0.75rem;
   --shadow-card: 0 8px 28px rgba(2, 46, 19, 0.08);
 
-  --motion-fast: 150ms;
-  --motion-base: 250ms;
-  --motion-slow: 400ms;
-
-  /* Shared UX motion tokens (Increment 1) */
-  --luma-motion-micro: 180ms;
-  --luma-motion-ui: 280ms;
-  --luma-motion-reveal: 450ms;
+  /* Luma Motion System — keep in sync with frontend/src/lib/lumaMotion.ts */
+  --motion-micro: 150ms;
+  --motion-fast: 200ms;
+  --motion-normal: 300ms;
+  --motion-section: 450ms;
+  --motion-hero: 600ms;
+  --motion-data: 1000ms;
   --luma-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Aliases for existing utility classes */
+  --luma-motion-micro: var(--motion-micro);
+  --luma-motion-fast: var(--motion-fast);
+  --luma-motion-ui: var(--motion-normal);
+  --luma-motion-hover: var(--motion-fast);
+  --luma-motion-reveal: var(--motion-section);
+  --motion-base: var(--motion-normal);
+  --motion-slow: var(--motion-section);
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 
@@ -229,7 +237,7 @@ a, button {
 
 /* Design-system motion helpers (150–400ms; honor reduced-motion block below) */
 .luma-enter {
-  animation: luma-fade-up var(--luma-motion-ui) var(--luma-ease-out) both;
+  animation: luma-fade-up var(--motion-normal) var(--luma-ease-out) both;
 }
 
 @keyframes luma-fade-up {
@@ -247,11 +255,11 @@ a, button {
   border-radius: 0.5rem;
   font-weight: 600;
   transition:
-    background-color var(--luma-motion-micro) var(--luma-ease-out),
-    color var(--luma-motion-micro) var(--luma-ease-out),
-    box-shadow var(--luma-motion-micro) var(--luma-ease-out),
-    transform var(--luma-motion-micro) var(--luma-ease-out),
-    opacity var(--luma-motion-micro) var(--luma-ease-out);
+    background-color var(--motion-micro) var(--luma-ease-out),
+    color var(--motion-micro) var(--luma-ease-out),
+    box-shadow var(--motion-micro) var(--luma-ease-out),
+    transform var(--motion-micro) var(--luma-ease-out),
+    opacity var(--motion-micro) var(--luma-ease-out);
 }
 
 .luma-btn:hover:not(:disabled) {
@@ -282,9 +290,9 @@ a, button {
 /* Interactive cards — lift + shadow; no essential info on hover only */
 .luma-card-interactive {
   transition:
-    transform var(--luma-motion-ui) var(--luma-ease-out),
-    box-shadow var(--luma-motion-ui) var(--luma-ease-out),
-    border-color var(--luma-motion-ui) var(--luma-ease-out);
+    transform var(--motion-fast) var(--luma-ease-out),
+    box-shadow var(--motion-fast) var(--luma-ease-out),
+    border-color var(--motion-fast) var(--luma-ease-out);
 }
 
 .luma-card-interactive:hover {
@@ -330,8 +338,8 @@ a, button {
 }
 
 .animate-in {
-  animation-duration: 300ms;
-  animation-timing-function: ease-out;
+  animation-duration: var(--motion-normal);
+  animation-timing-function: var(--luma-ease-out);
   animation-fill-mode: both;
 }
 

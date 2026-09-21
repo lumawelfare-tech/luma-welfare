@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Icon } from './Icon'
+import { lumaModal } from '../lib/lumaMotion'
 
 type ConfirmDialogProps = {
   open: boolean
@@ -77,19 +78,19 @@ export function ConfirmDialog({
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-title"
-          initial={reduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={reduceMotion ? undefined : { opacity: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.18 }}
+          initial={reduceMotion ? false : lumaModal.backdrop.initial}
+          animate={lumaModal.backdrop.animate}
+          exit={reduceMotion ? undefined : lumaModal.backdrop.exit}
+          transition={lumaModal.backdrop.transition(Boolean(reduceMotion))}
           onClick={onCancel}
         >
           <motion.div
             className="glass-modal w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
-            initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduceMotion ? undefined : { opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
+            initial={reduceMotion ? false : lumaModal.panel.initial}
+            animate={lumaModal.panel.animate}
+            exit={reduceMotion ? undefined : lumaModal.panel.exit}
+            transition={lumaModal.panel.transition(Boolean(reduceMotion))}
           >
             <div className="px-6 py-5">
               <div className="flex items-start gap-3">

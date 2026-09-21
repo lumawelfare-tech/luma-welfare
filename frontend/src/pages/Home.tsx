@@ -8,6 +8,7 @@ import { MotionSection, MotionCard } from '../components/MotionSection'
 import { SectionHeading } from '../components/SectionHeading'
 import { Icon } from '../components/Icon'
 import { useHead } from '../lib/seo'
+import { lumaHover, lumaPress } from '../lib/lumaMotion'
 
 const offerCodes = ['hospital', 'education', 'business', 'building', 'dowry', 'wedding']
 
@@ -123,7 +124,7 @@ function CtaButton({
         : 'border-2 border-white/30 text-white hover:bg-white/10'
 
   return (
-    <motion.div whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
+    <motion.div whileHover={lumaHover.ctaStrong(Boolean(reduceMotion))} whileTap={lumaPress.default(Boolean(reduceMotion))}>
       <Link to={to} className={`inline-block rounded-xl px-8 py-3.5 text-sm font-bold transition-all ${styles}`}>
         {children}
       </Link>

@@ -2,6 +2,7 @@ import { type JSX, useEffect, useRef, useState } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import { api } from '../lib/api'
 import { SkeletonRow } from './Skeleton'
+import { lumaDuration } from '../lib/lumaMotion'
 
 type Stats = {
   members?: number | null
@@ -42,7 +43,7 @@ function CountUpValue({
     if (!active) return
 
     let frame = 0
-    const duration = 900
+    const duration = lumaDuration.data * 1000
     const start = performance.now()
 
     const tick = (now: number) => {

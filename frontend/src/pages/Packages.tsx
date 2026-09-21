@@ -6,6 +6,7 @@ import { useHead } from '../lib/seo'
 import { MotionSection, MotionCard } from '../components/MotionSection'
 import { SkeletonPackageGrid } from '../components/Skeleton'
 import { EmptyState } from '../components/EmptyState'
+import { lumaDistance, lumaDuration, lumaStaggerDelay, lumaTransition } from '../lib/lumaMotion'
 
 type Tier = { id: string; package_id: string; name: string; amount: number }
 type RuleMap = Record<string, unknown>
@@ -119,9 +120,11 @@ export function PackagesPage() {
               <MotionCard key={p.id}>
                 <motion.div
                   className="glass-card flex h-full flex-col p-6"
-                  initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                  initial={reduceMotion ? false : { opacity: 0, y: lumaDistance.enterY }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.24), duration: 0.35 }}
+                  transition={lumaTransition(lumaDuration.normal, Boolean(reduceMotion), {
+                    delay: reduceMotion ? 0 : lumaStaggerDelay(i),
+                  })}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <h2 className="text-lg font-bold text-luma-900">{p.name}</h2>

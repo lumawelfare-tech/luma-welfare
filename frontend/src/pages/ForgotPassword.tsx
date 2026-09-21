@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { AuthCard, fieldClass, alertErrorClass } from '../components/PageHero'
 import { useHead } from '../lib/seo'
+import { lumaPress } from '../lib/lumaMotion'
 
 export function ForgotPassword() {
   useHead('Forgot Password', undefined, { noindex: true })
@@ -99,7 +100,7 @@ export function ForgotPassword() {
         <motion.button
           type="submit"
           disabled={busy}
-          whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+          whileTap={lumaPress.default(Boolean(reduceMotion))}
           className="w-full rounded-xl bg-luma-700 py-3 text-sm font-bold text-white hover:bg-luma-800 disabled:opacity-60 transition-all shadow-sm"
         >
           {busy ? 'Sending…' : 'Send Reset Link'}

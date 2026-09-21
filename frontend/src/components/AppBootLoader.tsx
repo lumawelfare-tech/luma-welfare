@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
+import { lumaDuration, lumaEase, lumaStagger } from '../lib/lumaMotion'
 
 type AppBootLoaderProps = {
   /** Short contextual line under the wordmark */
@@ -8,6 +9,9 @@ type AppBootLoaderProps = {
 /**
  * Full-screen branded loader for application bootstrap only
  * (auth/session hydration). Not for route-level Suspense.
+ *
+ * Continuous spinner/pulse is an intentional loading-state exception
+ * to the “no looping motion” rule; durations still come from lumaMotion.
  */
 export function AppBootLoader({
   message = 'Preparing your session…',
@@ -26,7 +30,6 @@ export function AppBootLoader({
       <span className="sr-only">Loading Luma Welfare. {message}</span>
 
       <div className="relative flex h-28 w-28 items-center justify-center sm:h-32 sm:w-32">
-        {/* Circular ring */}
         {reduceMotion ? (
           <div
             className="absolute inset-0 rounded-full border-[3px] border-luma-100 border-t-luma-600"
@@ -36,12 +39,11 @@ export function AppBootLoader({
           <motion.div
             className="absolute inset-0 rounded-full border-[3px] border-luma-100 border-t-luma-600"
             animate={{ rotate: 360 }}
-            transition={{ duration: 1.15, ease: 'linear', repeat: Infinity }}
+            transition={{ duration: lumaDuration.loader, ease: lumaEase.linear, repeat: Infinity }}
             aria-hidden="true"
           />
         )}
 
-        {/* Brand mark / center */}
         <motion.div
           className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl bg-luma-700 text-lg font-bold tracking-tight text-white shadow-sm shadow-luma-700/25 sm:h-16 sm:w-16 sm:text-xl"
           aria-hidden="true"
@@ -53,7 +55,7 @@ export function AppBootLoader({
           transition={
             reduceMotion
               ? undefined
-              : { duration: 2.2, ease: 'easeInOut', repeat: Infinity }
+              : { duration: lumaDuration.loaderPulse, ease: lumaEase.inOut, repeat: Infinity }
           }
         >
           LW
@@ -67,7 +69,6 @@ export function AppBootLoader({
         Community Welfare
       </p>
 
-      {/* Loading dots */}
       <div className="mt-6 flex items-center gap-1.5" aria-hidden="true">
         {reduceMotion ? (
           <div className="h-1.5 w-8 rounded-full bg-luma-300" />
@@ -78,10 +79,10 @@ export function AppBootLoader({
               className="h-1.5 w-1.5 rounded-full bg-luma-600"
               animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
               transition={{
-                duration: 0.9,
-                ease: 'easeInOut',
+                duration: lumaDuration.loaderDot,
+                ease: lumaEase.inOut,
                 repeat: Infinity,
-                delay: i * 0.18,
+                delay: i * lumaStagger.menu,
               }}
             />
           ))
