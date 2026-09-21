@@ -35,18 +35,38 @@ function ExportButtons({ onCSV, onPDF }: { onCSV: () => void; onPDF: () => void 
   )
 }
 
-function StatCard({ label, value, color, icon }: { label: string; value: number | string; color: string; icon: React.ReactNode }) {
-  return (
-    <div className={`glass-panel p-5 transition-all hover:shadow-md ${color}`}>
+function StatCard({
+  label,
+  value,
+  color,
+  icon,
+  to,
+}: {
+  label: string
+  value: number | string
+  color: string
+  icon: React.ReactNode
+  to?: string
+}) {
+  const inner = (
+    <div className={`glass-panel p-5 transition-all hover:shadow-md ${color} ${to ? 'cursor-pointer focus-within:ring-2 focus-within:ring-luma-500' : ''}`}>
       <div className="flex items-start justify-between">
         <div>
           <div className="text-3xl font-extrabold">{value}</div>
           <div className="mt-1 text-xs font-semibold uppercase tracking-wide opacity-75">{label}</div>
         </div>
-        <div className="opacity-40">{icon}</div>
+        <div className="opacity-40" aria-hidden="true">{icon}</div>
       </div>
     </div>
   )
+  if (to) {
+    return (
+      <Link to={to} className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-luma-500 focus-visible:ring-offset-2" aria-label={`View ${label}`}>
+        {inner}
+      </Link>
+    )
+  }
+  return inner
 }
 
 function formatKes(amount: number) {
@@ -308,48 +328,56 @@ export function AdminDashboard() {
       label: 'Total Members',
       value: data.members,
       color: 'bg-luma-50 text-luma-700',
+      to: '/admin/members',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>,
     },
     {
       label: 'Active Members',
       value: data.active_members ?? data.members,
       color: 'bg-emerald-50 text-emerald-700',
+      to: '/admin/members?status=active',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
     },
     {
       label: 'New Members',
       value: data.new_members_period ?? 0,
       color: 'bg-blue-50 text-blue-700',
+      to: '/admin/members',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" /></svg>,
     },
     {
       label: 'Active Subscriptions',
       value: data.subscriptions,
       color: 'bg-violet-50 text-violet-700',
+      to: '/admin/subscriptions?status=active',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>,
     },
     {
       label: 'Confirmed Revenue',
       value: formatKes(data.verified_contributions ?? totalVerified),
       color: 'bg-emerald-50 text-emerald-700',
+      to: '/admin/contributions?status=Verified',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
     },
     {
       label: 'Pending Claims',
       value: data.pending_claims,
       color: 'bg-amber-50 text-amber-700',
+      to: '/admin/claims?status=Submitted',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>,
     },
     {
       label: 'Approved Claims',
       value: data.approved_claims,
       color: 'bg-green-50 text-green-700',
+      to: '/admin/claims?status=Approved',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
     },
     {
       label: 'Paid Claims',
       value: data.paid_claims,
       color: 'bg-purple-50 text-purple-700',
+      to: '/admin/claims?status=Paid',
       icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>,
     },
   ]
@@ -411,7 +439,7 @@ export function AdminDashboard() {
       {/* Stats Grid */}
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {stats.map((s) => (
-          <StatCard key={s.label} label={s.label} value={s.value} color={s.color} icon={s.icon} />
+          <StatCard key={s.label} label={s.label} value={s.value} color={s.color} icon={s.icon} to={s.to} />
         ))}
       </div>
 

@@ -3,6 +3,10 @@ import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { ClaimTimeline } from '../../components/ClaimTimeline'
+import { PageHeader } from '../../components/PageHeader'
+import { StatusBadge } from '../../components/StatusBadge'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState } from '../../components/ErrorState'
 import { useHead } from '../../lib/seo'
 
 type Subscription = { id: string; status: string; packages: { code: string; name: string }[]; qualification?: { status: string } | null }
@@ -29,16 +33,6 @@ type ClaimDocument = {
   size_bytes: number | null
   uploaded_at: string
   created_at: string
-}
-
-const statusStyles: Record<string, string> = {
-  Draft: 'bg-gray-100 text-gray-600 border-gray-200',
-  Submitted: 'bg-blue-50 text-blue-700 border-blue-200',
-  'Under Review': 'bg-amber-50 text-amber-700 border-amber-200',
-  'Additional Information Required': 'bg-orange-50 text-orange-700 border-orange-200',
-  Approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Rejected: 'bg-red-50 text-red-700 border-red-200',
-  Paid: 'bg-purple-50 text-purple-700 border-purple-200',
 }
 
 const claimTypes = [
@@ -243,22 +237,22 @@ export function Claims() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Claims</h1>
-          <p className="mt-1 text-sm text-gray-500">Submit and track your welfare claims.</p>
-        </div>
-        {!showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            disabled={subscriptions.length === 0}
-            className="inline-flex items-center gap-2 rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-luma-800 disabled:opacity-50 transition-colors min-h-[44px]"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            New Claim
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Claims"
+        description="Submit and track your welfare claims through each review stage."
+        actions={
+          !showForm ? (
+            <button
+              onClick={() => setShowForm(true)}
+              disabled={subscriptions.length === 0}
+              className="inline-flex items-center gap-2 rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-luma-800 disabled:opacity-50 transition-colors min-h-[44px]"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              New Claim
+            </button>
+          ) : undefined
+        }
+      />
 
       {notice && (
         <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
@@ -267,12 +261,11 @@ export function Claims() {
         </div>
       )}
       {error && (
-        <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-center gap-2" role="alert">
-          <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-          <span className="flex-1">{error}</span>
-          <button onClick={() => { setError(null); setLoading(true); load() }} className="font-medium underline flex-shrink-0 min-h-[44px] px-2">
-            Retry
-          </button>
+        <div className="mt-4">
+          <ErrorState
+            message={error}
+            onRetry={() => { setError(null); setLoading(true); load() }}
+          />
         </div>
       )}
 
@@ -398,25 +391,17 @@ export function Claims() {
       )}
 
       {!loading && claims.length === 0 && (
-        <div className="mt-8 glass-panel p-12 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          </div>
-          <h2 className="mt-4 text-lg font-semibold text-gray-900">No claims yet</h2>
-          <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
-            When you need welfare support, you can file a claim from here. Your claim will be reviewed by an administrator.
-          </p>
-          {subscriptions.length > 0 ? (
-            <button
-              onClick={() => setShowForm(true)}
-              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-all min-h-[44px]"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-              File Your First Claim
-            </button>
-          ) : (
-            <p className="mt-4 text-xs text-gray-400">Join a package first to be eligible for claims.</p>
-          )}
+        <div className="mt-8">
+          <EmptyState
+            title="No claims yet"
+            message={
+              subscriptions.length > 0
+                ? 'When you need welfare support, you can file a claim from here. Your claim will be reviewed by an administrator.'
+                : 'Join a package first to be eligible for claims.'
+            }
+            icon="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            action={subscriptions.length > 0 ? { label: 'File Your First Claim', onClick: () => setShowForm(true) } : undefined}
+          />
         </div>
       )}
 
@@ -434,9 +419,7 @@ export function Claims() {
                     >
                       {cl.claim_number}
                     </button>
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusStyles[cl.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                      {cl.status}
-                    </span>
+                    <StatusBadge status={cl.status}>{cl.status}</StatusBadge>
                   </div>
                   <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
                     <span>{cl.packages?.name ?? 'Package'}</span>
@@ -446,9 +429,9 @@ export function Claims() {
                   {cl.description && (
                     <p className="mt-1.5 text-sm text-gray-500 line-clamp-2">{cl.description}</p>
                   )}
-                  {cl.admin_notes && (
-                    <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-                      <span className="font-medium">Admin:</span> {cl.admin_notes}
+                  {cl.admin_notes && (cl.status === 'Additional Information Required' || cl.status === 'Rejected' || cl.status === 'Approved') && (
+                    <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                      <span className="font-medium">Update from Luma:</span> {cl.admin_notes}
                     </div>
                   )}
 
@@ -482,9 +465,7 @@ export function Claims() {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{detail.claim_number}</h3>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusStyles[detail.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                      {detail.status}
-                    </span>
+                    <StatusBadge status={detail.status}>{detail.status}</StatusBadge>
                     <span className="text-xs text-gray-400">{detail.claim_type}</span>
                   </div>
                 </div>
@@ -539,10 +520,10 @@ export function Claims() {
                   <p className="mt-1 text-gray-700 whitespace-pre-wrap">{detail.description}</p>
                 </div>
               )}
-              {detail.admin_notes && (
+              {detail.admin_notes && (detail.status === 'Additional Information Required' || detail.status === 'Rejected' || detail.status === 'Approved') && (
                 <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-                  <span className="text-xs font-medium text-amber-700">Admin Notes</span>
-                  <p className="mt-0.5 text-sm text-amber-800 whitespace-pre-wrap">{detail.admin_notes}</p>
+                  <span className="text-xs font-medium text-amber-800">Update from Luma</span>
+                  <p className="mt-0.5 text-sm text-amber-900 whitespace-pre-wrap">{detail.admin_notes}</p>
                 </div>
               )}
 

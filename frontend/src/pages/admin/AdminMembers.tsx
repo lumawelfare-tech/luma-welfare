@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
@@ -6,6 +7,9 @@ import { DataTable, type Column } from '../../components/DataTable'
 import { maskPhone } from '../../lib/pii'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { FilterBar } from '../../components/FilterBar'
+import { SearchInput } from '../../components/SearchInput'
+import { StatusBadge } from '../../components/StatusBadge'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { exportMemberRecordsCSV, exportMemberRecordsExcel, exportMemberRecordsPDF, type MemberRecord } from '../../lib/exports'
 
@@ -19,12 +23,24 @@ type Member = {
   joined_at: string | null
 }
 
+const MEMBER_STATUS_FILTERS = [
+  { value: '', label: 'All' },
+  { value: 'pending_approval', label: 'Pending' },
+  { value: 'active', label: 'Active' },
+  { value: 'suspended', label: 'Suspended' },
+  { value: 'closed', label: 'Closed' },
+]
+
+const ALLOWED_MEMBER_STATUS = new Set<string>(MEMBER_STATUS_FILTERS.map((f) => f.value))
 
 export function AdminMembers() {
   useHead('Members', undefined, { noindex: true })
   const { addToast } = useToast()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const statusFromUrl = searchParams.get('status') ?? ''
+  const initialFilter = ALLOWED_MEMBER_STATUS.has(statusFromUrl) ? statusFromUrl : ''
   const [members, setMembers] = useState<Member[]>([])
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useState(initialFilter)
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebouncedValue(query, 300)
   const [loading, setLoading] = useState(true)
@@ -83,6 +99,22 @@ export function AdminMembers() {
 
   // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load(1) }, [load])
+
+  // Keep list filter aligned with ?status= deep links (e.g. from admin dashboard stats).
+  useEffect(() => {
+    const s = searchParams.get('status') ?? ''
+    const next = ALLOWED_MEMBER_STATUS.has(s) ? s : ''
+    setFilter((prev) => (prev === next ? prev : next))
+  }, [searchParams])
+
+  function applyFilter(value: string) {
+    setFilter(value)
+    setPage(1)
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set('status', value)
+    else next.delete('status')
+    setSearchParams(next, { replace: true })
+  }
 
   function normalizeMember(m: Member): MemberRecord {
     return {
@@ -260,16 +292,6 @@ export function AdminMembers() {
     }
   }
 
-  const statusColor = (s: string) => {
-    switch (s) {
-      case 'active': return 'bg-emerald-100 text-emerald-700'
-      case 'pending_approval': return 'bg-amber-100 text-amber-700'
-      case 'suspended': return 'bg-red-100 text-red-700'
-      case 'closed': return 'bg-gray-100 text-gray-500'
-      default: return 'bg-gray-100 text-gray-600'
-    }
-  }
-
   const columns: Column<Member>[] = [
     {
       key: 'full_name',
@@ -289,9 +311,7 @@ export function AdminMembers() {
       header: 'Status',
       sortable: true,
       render: (m) => (
-        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor(m.status)}`}>
-          {m.status.replace('_', ' ')}
-        </span>
+        <StatusBadge status={m.status}>{m.status.replace(/_/g, ' ')}</StatusBadge>
       ),
     },
     {
@@ -389,38 +409,21 @@ export function AdminMembers() {
       </div>
 
       {/* Filters */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <div className="flex gap-1 rounded-lg border border-gray-200 bg-white p-1">
-          {[
-            { value: '', label: 'All' },
-            { value: 'pending_approval', label: 'Pending' },
-            { value: 'active', label: 'Active' },
-            { value: 'suspended', label: 'Suspended' },
-            { value: 'closed', label: 'Closed' },
-          ].map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                filter === f.value ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1 min-w-[200px]">
-          <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            aria-label="Search members"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, phone, membership #..."
-            className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
-          />
-        </div>
+      <div className="mt-6">
+        <FilterBar
+          options={[...MEMBER_STATUS_FILTERS]}
+          value={filter}
+          onChange={applyFilter}
+          aria-label="Filter members by status"
+          search={
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Search name, phone, membership #..."
+              aria-label="Search members"
+            />
+          }
+        />
       </div>
 
       {error && (
@@ -458,9 +461,7 @@ export function AdminMembers() {
                       <div className="text-xs text-gray-500">{m.email ?? ''}</div>
                       {m.membership_number && <div className="text-xs text-gray-400">#{m.membership_number}</div>}
                     </div>
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor(m.status)}`}>
-                      {m.status.replace('_', ' ')}
-                    </span>
+                    <StatusBadge status={m.status}>{m.status.replace(/_/g, ' ')}</StatusBadge>
                   </div>
                   <div className="text-xs text-gray-500">{maskPhone(m.phone)}</div>
                   <div className="flex gap-2">

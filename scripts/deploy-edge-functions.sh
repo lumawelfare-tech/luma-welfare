@@ -74,6 +74,7 @@ NO_VERIFY_JWT_FUNCTIONS=(
   auth-verify-email
   auth-login
   public-data
+  contact
   payments-callback
   send-report-email
   admin-exports-worker
@@ -118,6 +119,7 @@ ALL_FUNCTIONS=(
   auth-oauth-provision
   auth-register
   auth-verify-email
+  contact
   health
   member-claims
   member-contributions

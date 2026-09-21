@@ -2,8 +2,11 @@ import { type JSX, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { StatBar } from '../components/StatBar'
+import { HomeHero } from '../components/HomeHero'
 import { OrganizationJsonLd } from '../components/OrganizationJsonLd'
 import { MotionSection, MotionCard } from '../components/MotionSection'
+import { SectionHeading } from '../components/SectionHeading'
+import { Icon } from '../components/Icon'
 import { useHead } from '../lib/seo'
 
 const offerCodes = ['hospital', 'education', 'business', 'building', 'dowry', 'wedding']
@@ -60,17 +63,17 @@ const offerIcons: Record<string, JSX.Element> = {
 }
 
 const whyChooseUs = [
-  { title: 'Transparent Operations', description: 'Every contribution, waiting period, and payout is tracked and visible to you. No hidden terms.', icon: '🔍' },
-  { title: 'M-Pesa Integration', description: 'Pay contributions directly via M-Pesa. Fast, secure, and familiar.', icon: '📱' },
-  { title: '12 Welfare Packages', description: 'Choose from hospital, education, business, building, bereavement, wedding, and more.', icon: '📦' },
-  { title: 'Community First', description: 'Members help each other. Your contributions directly support families in need.', icon: '🤝' },
+  { title: 'Transparent Operations', description: 'Every contribution, waiting period, and payout is tracked and visible to you. No hidden terms.', icon: 'eye' as const },
+  { title: 'M-Pesa Ready', description: 'Pay contributions directly via M-Pesa when payments are enabled. Fast, secure, and familiar.', icon: 'credit-card' as const },
+  { title: '12 Welfare Packages', description: 'Choose from hospital, education, business, building, bereavement, wedding, and more.', icon: 'folder' as const },
+  { title: 'Community First', description: 'Members help each other. Your contributions directly support families in need.', icon: 'users' as const },
 ]
 
 const trustFeatures = [
-  { title: 'Secure Payments', description: 'All transactions are processed through encrypted channels. Your money is handled with care.', icon: '🔒' },
-  { title: 'Audit Trail', description: 'Every financial transaction is recorded in an immutable ledger for complete accountability.', icon: '📋' },
-  { title: 'Data Protection', description: 'Your personal information is encrypted and never shared with third parties.', icon: '🛡️' },
-  { title: 'Verified Claims', description: 'Every claim is reviewed and verified before approval. Fair and consistent process.', icon: '✅' },
+  { title: 'Secure Payments', description: 'All transactions are processed through encrypted channels. Your money is handled with care.', icon: 'lock' as const },
+  { title: 'Audit Trail', description: 'Every financial transaction is recorded in an immutable ledger for complete accountability.', icon: 'document' as const },
+  { title: 'Data Protection', description: 'Your personal information is encrypted and never shared with third parties.', icon: 'shield' as const },
+  { title: 'Verified Claims', description: 'Every claim is reviewed and verified before approval. Fair and consistent process.', icon: 'check-circle' as const },
 ]
 
 const faqItems = [
@@ -133,91 +136,22 @@ export function Home() {
     'Luma Welfare — Community Welfare Platform in Kenya',
     'Luma Welfare is a community welfare organization in Kenya. Members contribute monthly to support each other through key life events.',
   )
-  const reduceMotion = useReducedMotion()
 
   return (
     <div>
       <OrganizationJsonLd />
-      {/* Hero — keep brand-first green plane */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-luma-800 via-luma-700 to-luma-900">
-        <div className="absolute -right-20 -top-20 h-96 w-96 rounded-full bg-luma-600/20" />
-        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-luma-500/10" />
-        <div className="container-luma relative grid items-center gap-10 py-16 lg:grid-cols-2 lg:py-24">
-          <motion.div
-            className="relative z-10"
-            initial={reduceMotion ? false : { opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.5 }}
-          >
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/15 px-4 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-              WELCOME TO LUMA WELFARE
-            </div>
-            <h1 className="text-3xl font-extrabold leading-[1.1] tracking-tight text-white min-[360px]:text-4xl sm:text-5xl lg:text-6xl">
-              TOGETHER WE
-              <br />
-              <span className="text-green-300">BUILD BETTER</span>
-              <br />
-              LIVES
-            </h1>
-            <p className="mt-6 max-w-lg text-lg leading-relaxed text-white/90">
-              Empowering families through affordable welfare packages that provide financial
-              support during key life events — hospital, education, business, building and more.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <CtaButton to="/register" variant="light">Join Luma — It&apos;s Free to Start</CtaButton>
-              <CtaButton to="/packages" variant="outline">View Packages</CtaButton>
-            </div>
-            <div className="mt-8 flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <svg className="h-5 w-5 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-sm font-medium text-white/90">Trusted by Kenyan families</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="h-5 w-5 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                </svg>
-                <span className="text-sm font-medium text-white/90">Secure &amp; Transparent</span>
-              </div>
-            </div>
-          </motion.div>
-          <div className="hidden justify-center lg:flex">
-            <div className="relative">
-              <img
-                src="/brand/luma-logo.jpeg"
-                alt="Luma Welfare — Community Welfare Organization"
-                width={320}
-                height={320}
-                decoding="async"
-                fetchPriority="high"
-                className="max-h-80 rounded-3xl object-contain shadow-2xl"
-              />
-              <div className="glass absolute -bottom-4 -left-4 rounded-2xl px-4 py-3">
-                <div className="text-2xl font-bold text-luma-700">12+</div>
-                <div className="text-xs font-medium text-gray-600">Welfare Packages</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HomeHero />
 
       <StatBar />
 
       {/* What We Offer */}
       <MotionSection className="py-16 lg:py-20">
         <div className="container-luma">
-          <div className="mb-10 flex items-end justify-between">
-            <div>
-              <span className="text-sm font-semibold uppercase tracking-wider text-luma-700">What We Offer</span>
-              <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Our Welfare Packages</h2>
-              <div className="mt-3 h-1 w-12 rounded-full bg-luma-500" />
-            </div>
-            <Link to="/packages" className="hidden rounded-lg border border-luma-200/80 bg-white/50 px-5 py-2.5 text-sm font-semibold text-luma-800 hover:bg-white/80 transition-all sm:block">
-              View All Packages →
-            </Link>
-          </div>
+          <SectionHeading
+            eyebrow="What We Offer"
+            title="Our Welfare Packages"
+            action={{ label: 'View All Packages →', to: '/packages' }}
+          />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {offerCodes.map((code) => (
               <MotionCard key={code}>
@@ -248,11 +182,11 @@ export function Home() {
       {/* How it Works */}
       <MotionSection className="py-16 lg:py-20">
         <div className="container-luma">
-          <div className="text-center">
-            <span className="text-sm font-semibold uppercase tracking-wider text-luma-700">How It Works</span>
-            <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Four Simple Steps</h2>
-            <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-luma-500" />
-          </div>
+          <SectionHeading
+            align="center"
+            eyebrow="How It Works"
+            title="Four Simple Steps"
+          />
           <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { step: '01', title: 'Register', text: 'Create your account with your name, email and phone number. It\'s free.' },
@@ -275,16 +209,18 @@ export function Home() {
       {/* Why Choose Luma */}
       <MotionSection className="py-16 lg:py-20">
         <div className="container-luma">
-          <div className="text-center">
-            <span className="text-sm font-semibold uppercase tracking-wider text-luma-700">Why Luma</span>
-            <h2 className="mt-2 text-3xl font-bold text-gray-900 sm:text-4xl">Why Choose Luma Welfare</h2>
-            <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-luma-500" />
-            <p className="mx-auto mt-4 max-w-2xl text-gray-600">We combine community values with modern technology to deliver welfare services you can trust.</p>
-          </div>
+          <SectionHeading
+            align="center"
+            eyebrow="Why Luma"
+            title="Why Choose Luma Welfare"
+            description="We combine community values with modern technology to deliver welfare services you can trust."
+          />
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {whyChooseUs.map((item) => (
               <MotionCard key={item.title} className="glass-card p-6">
-                <div className="mb-4 text-3xl" aria-hidden="true">{item.icon}</div>
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-luma-50 text-luma-700" aria-hidden="true">
+                  <Icon name={item.icon} className="h-5 w-5" />
+                </div>
                 <h3 className="text-lg font-bold text-gray-900">{item.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-gray-600">{item.description}</p>
               </MotionCard>
@@ -309,7 +245,9 @@ export function Home() {
             <div className="grid gap-4 sm:grid-cols-2">
               {trustFeatures.map((item) => (
                 <MotionCard key={item.title} className="glass-card p-5" hover={false}>
-                  <div className="mb-2 text-2xl" aria-hidden="true">{item.icon}</div>
+                  <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-luma-50 text-luma-700" aria-hidden="true">
+                    <Icon name={item.icon} className="h-4 w-4" />
+                  </div>
                   <h3 className="text-sm font-bold text-gray-900">{item.title}</h3>
                   <p className="mt-1 text-xs leading-relaxed text-gray-600">{item.description}</p>
                 </MotionCard>

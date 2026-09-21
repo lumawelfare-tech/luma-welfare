@@ -1,10 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { FilterBar } from '../../components/FilterBar'
+import { SearchInput } from '../../components/SearchInput'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { exportContributionRecordsCSV, exportContributionRecordsExcel, exportContributionRecordsPDF, type ContributionRecord } from '../../lib/exports'
 
@@ -65,12 +68,20 @@ const filterOptions = [
   { value: '', label: 'All' },
 ]
 
+const ALLOWED_CONTRIB_STATUS = new Set(filterOptions.map((f) => f.value))
+
+function resolveContribFilter(params: URLSearchParams): string {
+  if (!params.has('status')) return 'Pending'
+  const s = params.get('status') ?? ''
+  return ALLOWED_CONTRIB_STATUS.has(s) ? s : 'Pending'
+}
 
 export function AdminContributions() {
   useHead('Contributions', undefined, { noindex: true })
   const { addToast } = useToast()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<Contribution[]>([])
-  const [filter, setFilter] = useState('Pending')
+  const [filter, setFilter] = useState(() => resolveContribFilter(searchParams))
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebouncedValue(query, 300)
   const [dateFrom, setDateFrom] = useState('')
@@ -126,6 +137,20 @@ export function AdminContributions() {
 
   // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { load(1) }, [load])
+
+  useEffect(() => {
+    const next = resolveContribFilter(searchParams)
+    setFilter((prev) => (prev === next ? prev : next))
+  }, [searchParams])
+
+  function applyFilter(value: string) {
+    setFilter(value)
+    setPage(1)
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set('status', value)
+    else next.delete('status')
+    setSearchParams(next, { replace: true })
+  }
 
   // Load packages for filter dropdown
   useEffect(() => {
@@ -360,33 +385,20 @@ export function AdminContributions() {
 
       {/* Filters + Search */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-1 rounded-lg border border-gray-200 bg-white p-1">
-            {filterOptions.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setFilter(f.value)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  filter === f.value ? 'bg-luma-100 text-luma-700' : 'text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="relative flex-1 min-w-[200px]">
-            <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              aria-label="Search contributions"
+        <FilterBar
+          options={filterOptions}
+          value={filter}
+          onChange={applyFilter}
+          aria-label="Filter contributions by status"
+          search={
+            <SearchInput
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={setQuery}
               placeholder="Search member name, phone, period, receipt #..."
-              className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-luma-500 focus:ring-1 focus:ring-luma-500"
+              aria-label="Search contributions"
             />
-          </div>
-        </div>
+          }
+        />
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <label className="text-xs text-gray-500">From</label>

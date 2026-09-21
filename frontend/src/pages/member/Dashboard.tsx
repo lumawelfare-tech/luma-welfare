@@ -4,6 +4,9 @@ import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useHead } from '../../lib/seo'
 import { supabase } from '../../lib/supabase'
+import { PageHeader } from '../../components/PageHeader'
+import { StatusBadge } from '../../components/StatusBadge'
+import { ProgressBar } from '../../components/ProgressBar'
 import {
   initiateContributionPayment,
   mapPaymentUiStatus,
@@ -66,13 +69,6 @@ type RecentPayment = {
   mpesa_receipt: string | null
   created_at: string
   ui_status: PaymentUiStatus
-}
-
-const uiStatusStyle: Record<PaymentUiStatus, string> = {
-  pending: 'bg-amber-50 text-amber-700 border-amber-200',
-  success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  failed: 'bg-red-50 text-red-700 border-red-200',
-  expired: 'bg-gray-50 text-gray-600 border-gray-200',
 }
 
 const claimTypes = [
@@ -557,26 +553,22 @@ export function Dashboard() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
       {/* Welcome */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {memberName}
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Here's an overview of your Luma Welfare membership.
-          </p>
-        </div>
-        {activeCards.length > 0 && (
-          <button
-            type="button"
-            onClick={() => openContribPay()}
-            disabled={pendingBlocked}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-luma-800 disabled:opacity-50 min-h-[44px]"
-          >
-            {pendingBlocked ? 'Payment in progress…' : 'Pay now'}
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, ${memberName}`}
+        description="Here's an overview of your Luma Welfare membership."
+        actions={
+          activeCards.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => openContribPay()}
+              disabled={pendingBlocked}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-luma-800 disabled:opacity-50 min-h-[44px]"
+            >
+              {pendingBlocked ? 'Payment in progress…' : 'Pay now'}
+            </button>
+          ) : undefined
+        }
+      />
 
       {/* Summary cards */}
       {!loading && !error && summary && (
@@ -587,14 +579,10 @@ export function Dashboard() {
           </div>
           <div className="glass-panel p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">This month</p>
-            <p className={`mt-1 text-2xl font-bold capitalize ${
-              summary.month_status === 'paid' ? 'text-emerald-700'
-                : summary.month_status === 'overdue' ? 'text-red-700'
-                  : 'text-amber-700'
-            }`}>
-              {summary.month_status}
-            </p>
-            <p className="mt-0.5 text-xs text-gray-500">{summary.current_period}</p>
+            <div className="mt-2">
+              <StatusBadge status={summary.month_status}>{summary.month_status}</StatusBadge>
+            </div>
+            <p className="mt-1.5 text-xs text-gray-500">{summary.current_period}</p>
           </div>
           <div className="glass-panel p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Package</p>
@@ -653,9 +641,7 @@ export function Dashboard() {
                       <td className="px-4 py-2.5 font-medium text-gray-900">{money(p.amount)}</td>
                       <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{p.mpesa_receipt ?? '—'}</td>
                       <td className="px-4 py-2.5">
-                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${uiStatusStyle[ui]}`}>
-                          {ui}
-                        </span>
+                        <StatusBadge status={ui}>{ui}</StatusBadge>
                       </td>
                     </tr>
                   )
@@ -842,7 +828,7 @@ export function Dashboard() {
                   const sc = statusConfig(card)
                   const pct = progressPercent(card)
                   return (
-                    <div key={card.subscription_id} className="glass-panel p-5 transition-all hover:shadow-md">
+                    <div key={card.subscription_id} className="glass-panel p-5 transition-shadow hover:shadow-md">
                       {/* Header */}
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -850,10 +836,18 @@ export function Dashboard() {
                           {card.tier_name && (
                             <span className="text-xs text-gray-500">{card.tier_name}</span>
                           )}
+                          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                            {card.status}
+                          </p>
                         </div>
-                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${sc.color} ${sc.bg}`}>
+                        <StatusBadge tone={
+                          sc.label === 'Qualified' ? 'success'
+                            : sc.label === 'Cover at risk' || sc.label === 'Pending' ? 'warning'
+                              : sc.label === 'Cover lapsed' ? 'error'
+                                : 'info'
+                        }>
                           {sc.label}
-                        </span>
+                        </StatusBadge>
                       </div>
 
                       {/* Stats */}
@@ -875,18 +869,16 @@ export function Dashboard() {
                       {/* Progress bar */}
                       {card.waiting_period_months != null && card.waiting_period_months > 0 && (
                         <div className="mt-3">
-                          <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1">
-                            <span>{pct}% complete</span>
-                            {card.contributions.months_to_go != null && card.contributions.months_to_go > 0 && (
-                              <span>{card.contributions.months_to_go} month{card.contributions.months_to_go === 1 ? '' : 's'} to go</span>
-                            )}
-                          </div>
-                          <div className="h-2 w-full rounded-full bg-gray-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${pct}% complete`}>
-                            <div
-                              className={`h-2 rounded-full transition-all ${pct >= 100 ? 'bg-emerald-500' : 'bg-luma-500'}`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
+                          <ProgressBar
+                            value={card.contributions.paid}
+                            max={card.waiting_period_months}
+                            label={
+                              card.contributions.months_to_go != null && card.contributions.months_to_go > 0
+                                ? `${card.contributions.months_to_go} month${card.contributions.months_to_go === 1 ? '' : 's'} to go`
+                                : 'Contribution progress'
+                            }
+                            aria-label={`${pct}% of waiting period complete`}
+                          />
                         </div>
                       )}
 

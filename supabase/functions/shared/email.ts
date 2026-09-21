@@ -39,12 +39,14 @@ export interface EmailResult {
  * @param subject - Email subject line
  * @param html - HTML email body
  * @param attachments - Optional array of file attachments
+ * @param replyTo - Optional Reply-To address (e.g. contact-form sender)
  */
 export async function sendEmail(
   to: string,
   subject: string,
   html: string,
   attachments?: EmailAttachment[],
+  replyTo?: string,
 ): Promise<EmailResult> {
   const apiKey = Deno.env.get('RESEND_API_KEY')
   if (!apiKey) {
@@ -61,6 +63,9 @@ export async function sendEmail(
   if (!html || html.length > MAX_HTML) {
     return { success: false, error: 'Invalid HTML body' }
   }
+  if (replyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) {
+    return { success: false, error: 'Invalid reply-to email' }
+  }
 
   const testMode = (Deno.env.get('EMAIL_TEST_MODE') ?? '').toLowerCase() === 'true'
   const recipient = testMode ? TEST_RECIPIENT : to
@@ -71,6 +76,9 @@ export async function sendEmail(
       to: [recipient],
       subject,
       html,
+    }
+    if (replyTo) {
+      payload.reply_to = replyTo
     }
 
     // Add attachments if provided (Resend supports up to 10MB total)

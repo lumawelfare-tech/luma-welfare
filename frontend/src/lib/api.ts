@@ -323,6 +323,7 @@ function pathToFunctionName(path: string): string | null {
   if (cleanPath === 'news') return 'public-data'
   if (cleanPath === 'gallery') return 'public-data'
   if (cleanPath === 'media') return 'public-data'
+  if (cleanPath === 'contact') return 'contact'
 
   // Unknown path
   return null

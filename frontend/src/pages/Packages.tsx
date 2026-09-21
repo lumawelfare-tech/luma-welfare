@@ -74,8 +74,10 @@ export function PackagesPage() {
 
   return (
     <MotionSection className="container-luma py-14" as="div">
-      <h1 className="text-3xl font-bold text-luma-900 sm:text-4xl">Our packages</h1>
-      <p className="mt-3 max-w-2xl text-gray-600">
+      <p className="text-sm font-semibold uppercase tracking-wider text-luma-700">Welfare packages</p>
+      <h1 className="mt-2 text-3xl font-bold text-luma-900 sm:text-4xl">Choose protection that fits your family</h1>
+      <div className="mt-3 h-1 w-12 rounded-full bg-luma-500" />
+      <p className="mt-4 max-w-2xl text-gray-600">
         Twelve support packages, each with its own monthly contribution, coverage and waiting
         period. Members can hold more than one package at a time.
       </p>

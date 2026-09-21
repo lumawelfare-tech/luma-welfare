@@ -48,7 +48,7 @@ jobs:
             echo "Deploying: $FN"
             # Match scripts/deploy-edge-functions.sh JWT allowlist
             case "$FN" in
-              auth-register|auth-verify-email|auth-login|public-data|payments-callback|send-report-email|admin-exports-worker|health)
+              auth-register|auth-verify-email|auth-login|public-data|contact|payments-callback|send-report-email|admin-exports-worker|health)
                 supabase functions deploy "$FN" --project-ref mkbxigxmhqdhxmptanqr --no-verify-jwt
                 ;;
               *)

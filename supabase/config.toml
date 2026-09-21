@@ -63,6 +63,10 @@ verify_jwt = true
 [functions.public-data]
 verify_jwt = false
 
+# Public contact form — rate limited in-function
+[functions.contact]
+verify_jwt = false
+
 # Member functions — require user JWT
 [functions.member-dashboard]
 verify_jwt = true

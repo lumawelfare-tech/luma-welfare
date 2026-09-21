@@ -61,6 +61,9 @@ export const ENDPOINT_LIMITS: Record<string, { windowMs: number; max: number }> 
   'auth-verify-email': { windowMs: 60_000, max: 10 },
   'auth-verify-email-resend': { windowMs: 60_000, max: 5 },
 
+  // Public contact form
+  contact: { windowMs: 600_000, max: 5 },
+
   // Payments (kill-switch still applies separately)
   'payments-initiate': { windowMs: 60_000, max: 5 },
 

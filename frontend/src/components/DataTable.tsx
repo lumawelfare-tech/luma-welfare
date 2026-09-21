@@ -108,9 +108,9 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div className="rounded-xl border border-gray-200 bg-white">
       {/* Desktop Table */}
-      <div className="hidden md:block overflow-x-auto">
+      <div className="hidden md:block max-h-[70vh] overflow-auto">
         <table className="w-full min-w-[36rem] text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+          <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50/95 text-left text-xs uppercase tracking-wide text-gray-500 backdrop-blur-sm">
             <tr>
               {selectable && (
                 <th className="px-4 py-3 w-10">
@@ -128,6 +128,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   key={col.key}
                   className={`px-4 py-3 ${col.className ?? ''} ${col.sortable ? 'cursor-pointer select-none hover:text-gray-700' : ''}`}
                   onClick={() => col.sortable && toggleSort(col.key)}
+                  scope="col"
                 >
                   <span className="inline-flex items-center gap-1">
                     {col.header}

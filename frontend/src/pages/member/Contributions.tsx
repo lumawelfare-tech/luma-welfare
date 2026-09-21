@@ -3,6 +3,10 @@ import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { MobileCardTable } from '../../components/MobileCardTable'
+import { PageHeader } from '../../components/PageHeader'
+import { StatusBadge } from '../../components/StatusBadge'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState } from '../../components/ErrorState'
 import { useHead } from '../../lib/seo'
 
 type Subscription = { id: string; status: string; packages: { code: string; name: string }[]; package_tiers: { name: string; amount: number }[] }
@@ -14,14 +18,6 @@ type PaginatedResponse = {
   page: number
   per_page: number
   pages: number
-}
-
-const statusStyle: Record<string, string> = {
-  Paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Verified: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Pending: 'bg-amber-50 text-amber-700 border-amber-200',
-  Failed: 'bg-red-50 text-red-700 border-red-200',
-  Late: 'bg-amber-50 text-amber-700 border-amber-200',
 }
 
 const PER_PAGE = 20
@@ -177,21 +173,21 @@ export function Contributions() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contributions</h1>
-          <p className="mt-1 text-sm text-gray-500">Track your contribution history and record payments.</p>
-        </div>
-        {!showForm && subscriptions.length > 0 && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-luma-800 transition-colors min-h-[44px]"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            Record Payment
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Contributions"
+        description="Track your contribution history and record payments for verification."
+        actions={
+          !showForm && subscriptions.length > 0 ? (
+            <button
+              onClick={() => setShowForm(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-luma-800 transition-colors min-h-[44px]"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              Record Payment
+            </button>
+          ) : undefined
+        }
+      />
 
       {/* Summary stats */}
       {!loading && totalCount > 0 && (
@@ -220,10 +216,11 @@ export function Contributions() {
       )}
 
       {error && !loading && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2" role="alert">
-          <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-          <span className="flex-1">{error}</span>
-          <button onClick={() => { setError(null); loadPage(1, true) }} className="font-medium underline flex-shrink-0">Retry</button>
+        <div className="mt-6">
+          <ErrorState
+            message={error}
+            onRetry={() => { setError(null); loadPage(1, true) }}
+          />
         </div>
       )}
 
@@ -354,23 +351,13 @@ export function Contributions() {
       )}
 
       {!loading && !error && rows.length === 0 && (
-        <div className="mt-8 glass-panel p-12 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
-          </div>
-          <h2 className="mt-4 text-lg font-semibold text-gray-900">No contributions yet</h2>
-          <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
-            Your contribution history will appear here once you start contributing. You can record a payment manually or pay via M-Pesa.
-          </p>
-          {subscriptions.length > 0 && (
-            <button
-              onClick={() => setShowForm(true)}
-              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-all min-h-[44px]"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-              Record First Payment
-            </button>
-          )}
+        <div className="mt-8">
+          <EmptyState
+            title="No contributions yet"
+            message="Your contribution history will appear here once you start contributing."
+            icon="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"
+            action={subscriptions.length > 0 ? { label: 'Record First Payment', onClick: () => setShowForm(true) } : undefined}
+          />
         </div>
       )}
 
@@ -391,32 +378,24 @@ export function Contributions() {
           {/* Mobile: Card layout */}
           <div className="sm:hidden space-y-3">
             {rows.map((c) => (
-              <div key={c.id} className="glass-panel p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">{c.packages?.[0]?.name ?? '—'}</span>
-                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusStyle[c.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                        {c.status}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
-                      <span>Period: {c.period}</span>
-                    </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      {new Date(c.created_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+              <article key={c.id} className="glass-panel p-4">
+                <time className="text-xs font-medium text-gray-500" dateTime={c.created_at}>
+                  {new Date(c.created_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </time>
+                <div className="mt-1 font-semibold text-gray-900">{c.packages?.[0]?.name ?? 'Package'}</div>
+                <div className="mt-3 flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-bold text-gray-900">KES {c.amount.toLocaleString('en-KE')}</div>
+                    <div className="mt-1.5">
+                      <StatusBadge status={c.status}>{c.status}</StatusBadge>
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-lg font-bold text-gray-900">KSh {c.amount.toLocaleString('en-KE')}</div>
+                  <div className="text-right text-xs text-gray-500">
+                    <div>Period {c.period}</div>
+                    {c.notes && <div className="mt-1 font-mono text-gray-600">Ref: {c.notes}</div>}
                   </div>
                 </div>
-                {c.notes && (
-                  <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
-                    {c.notes}
-                  </div>
-                )}
-              </div>
+              </article>
             ))}
           </div>
 
@@ -445,16 +424,18 @@ export function Contributions() {
                 {
                   key: 'status',
                   header: 'Status',
-                  render: (c) => (
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusStyle[c.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                      {c.status}
-                    </span>
-                  ),
+                  render: (c) => <StatusBadge status={c.status}>{c.status}</StatusBadge>,
                 },
                 {
                   key: 'date',
                   header: 'Date',
-                  render: (c) => <span className="text-gray-500 text-xs">{new Date(c.created_at).toLocaleDateString()}</span>,
+                  render: (c) => <span className="text-gray-500 text-xs">{new Date(c.created_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}</span>,
+                },
+                {
+                  key: 'ref',
+                  header: 'Reference',
+                  render: (c) => <span className="font-mono text-xs text-gray-600">{c.notes ? c.notes : '—'}</span>,
+                  hideOnMobile: true,
                 },
               ]}
             />

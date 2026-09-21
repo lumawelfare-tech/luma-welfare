@@ -52,7 +52,7 @@ describe('Phase 1 — JWT deploy strategy is allowlisted', () => {
 
   it('CI single-function deploy uses the same allowlist', () => {
     const src = read('.github/workflows/deploy-functions.yml')
-    expect(src).toContain('auth-register|auth-verify-email|auth-login|public-data|payments-callback|send-report-email|admin-exports-worker|health')
+    expect(src).toContain('auth-register|auth-verify-email|auth-login|public-data|contact|payments-callback|send-report-email|admin-exports-worker|health')
     expect(src).not.toMatch(/supabase functions deploy \$\{?\{? inputs\.function_name \}?\}? --project-ref mkbxigxmhqdhxmptanqr --no-verify-jwt/)
   })
 })
