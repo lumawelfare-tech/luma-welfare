@@ -10,6 +10,15 @@ export function maskPhone(value: string | null | undefined): string {
   return `${'•'.repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`
 }
 
+/** List-style national ID mask: bullets + last 4 only (never full ID in list payloads). */
+export function maskIdNumberLast4(value: string | null | undefined): string {
+  if (!value) return '—'
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return '—'
+  if (digits.length < 4) return '••••'
+  return `••••${digits.slice(-4)}`
+}
+
 export function maskIdNumber(value: string | null | undefined): string {
   if (!value) return '—'
   const trimmed = value.trim()
@@ -28,14 +37,17 @@ export function maskEmail(value: string | null | undefined): string {
   return `${visible}${'•'.repeat(Math.max(1, local.length - visible.length))}@${domain}`
 }
 
-/** Mask phone/id on nested member objects used in admin list payloads. */
+/**
+ * Nested member blobs on contributions/subscriptions lists: mask phone + id.
+ * Admin members list uses prepareMemberListRow instead (full phone, masked id only).
+ */
 export function maskMemberListFields<T extends Record<string, unknown>>(row: T): T {
   const next = { ...row }
   if ('phone' in next && typeof next.phone === 'string') {
     next.phone = maskPhone(next.phone)
   }
   if ('id_number' in next && typeof next.id_number === 'string') {
-    next.id_number = maskIdNumber(next.id_number)
+    next.id_number = maskIdNumberLast4(next.id_number)
   }
   if ('alt_phone' in next && typeof next.alt_phone === 'string') {
     next.alt_phone = maskPhone(next.alt_phone)
@@ -44,4 +56,21 @@ export function maskMemberListFields<T extends Record<string, unknown>>(row: T):
     next.members = maskMemberListFields(next.members as Record<string, unknown>)
   }
   return next
+}
+
+/**
+ * Admin members list row: keep full phone for admin ops; never send full id_number.
+ */
+export function prepareMemberListRow(row: Record<string, unknown>): Record<string, unknown> {
+  const idRaw = typeof row.id_number === 'string' ? row.id_number.trim() : ''
+  const {
+    id_number: _omitId,
+    alt_phone: _omitAlt,
+    ...rest
+  } = row
+  return {
+    ...rest,
+    id_number_masked: maskIdNumberLast4(idRaw || null),
+    profile_incomplete: !idRaw,
+  }
 }

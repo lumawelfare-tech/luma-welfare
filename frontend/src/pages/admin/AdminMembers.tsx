@@ -4,7 +4,8 @@ import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
-import { maskPhone } from '../../lib/pii'
+import { displayEmail, formatKenyanPhone, toTelHref } from '../../lib/pii'
+import { IdRevealCell } from '../../components/IdRevealCell'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { FilterBar } from '../../components/FilterBar'
@@ -20,6 +21,8 @@ type Member = {
   full_name: string
   phone: string
   email: string | null
+  id_number_masked?: string | null
+  profile_incomplete?: boolean
   status: string
   joined_at: string | null
 }
@@ -300,14 +303,55 @@ export function AdminMembers() {
       header: 'Member',
       sortable: true,
       render: (m) => (
-        <button onClick={() => viewMember(m)} className="text-left hover:underline">
-          <div className="font-medium text-gray-900">{m.full_name}</div>
-          <div className="text-xs text-gray-500">{m.email ?? ''}</div>
+        <button type="button" onClick={() => viewMember(m)} className="min-h-[44px] text-left hover:underline">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-gray-900">{m.full_name}</span>
+            {m.profile_incomplete && (
+              <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200/80">
+                Incomplete profile
+              </span>
+            )}
+          </div>
           {m.membership_number && <div className="text-xs text-gray-400">#{m.membership_number}</div>}
         </button>
       ),
     },
-    { key: 'phone', header: 'Phone', sortable: true, render: (m) => maskPhone(m.phone) },
+    {
+      key: 'phone',
+      header: 'Phone',
+      sortable: true,
+      render: (m) => {
+        const label = formatKenyanPhone(m.phone)
+        const href = toTelHref(m.phone)
+        if (!href || label === '—') return <span className="text-gray-400">—</span>
+        return (
+          <a href={href} className="inline-flex min-h-[44px] items-center text-sm font-medium text-luma-700 hover:underline">
+            {label}
+          </a>
+        )
+      },
+    },
+    {
+      key: 'id_number_masked',
+      header: 'ID No.',
+      sortable: false,
+      render: (m) => (
+        <IdRevealCell memberId={m.id} masked={m.id_number_masked ?? '—'} />
+      ),
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      sortable: true,
+      render: (m) => {
+        const email = displayEmail(m.email)
+        return (
+          <span className={`text-sm ${email === '—' ? 'text-gray-400' : 'text-gray-700'}`}>
+            {email}
+          </span>
+        )
+      },
+    },
     {
       key: 'status',
       header: 'Status',
@@ -330,40 +374,45 @@ export function AdminMembers() {
       key: 'actions',
       header: 'Actions',
       className: 'text-right',
+      hideOnMobile: true,
       render: (m) => (
         <div className="flex items-center justify-end gap-1.5">
           {m.status === 'pending_approval' && (
             <button
+              type="button"
               disabled={busyId === m.id}
               onClick={() => setStatus(m.id, 'active')}
-              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               Approve
             </button>
           )}
           {m.status === 'active' && (
             <button
+              type="button"
               disabled={busyId === m.id}
               onClick={() => setStatus(m.id, 'suspended')}
-              className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              className="min-h-[44px] rounded-md border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               Suspend
             </button>
           )}
           {m.status === 'suspended' && (
             <button
+              type="button"
               disabled={busyId === m.id}
               onClick={() => setStatus(m.id, 'active')}
-              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               Reinstate
             </button>
           )}
           {m.status !== 'closed' && (
             <button
+              type="button"
               disabled={busyId === m.id}
               onClick={() => { setDeleteTarget(m); setConfirmText('') }}
-              className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+              className="min-h-[44px] rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
             >
               Delete
             </button>
@@ -422,7 +471,7 @@ export function AdminMembers() {
             <SearchInput
               value={query}
               onChange={setQuery}
-              placeholder="Search name, phone, membership #..."
+              placeholder="Search name, phone, ID, email, membership #..."
               aria-label="Search members"
             />
           }
@@ -489,53 +538,53 @@ export function AdminMembers() {
             emptyMessage="No members found."
             renderMobileCard={(row) => {
               const m = row as unknown as Member
+              const phoneLabel = formatKenyanPhone(m.phone)
+              const tel = toTelHref(m.phone)
+              const email = displayEmail(m.email)
               return (
-                <div className="space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div>
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <button type="button" onClick={() => viewMember(m)} className="min-h-[44px] text-left">
                       <div className="font-medium text-gray-900">{m.full_name}</div>
-                      <div className="text-xs text-gray-500">{m.email ?? ''}</div>
                       {m.membership_number && <div className="text-xs text-gray-400">#{m.membership_number}</div>}
-                    </div>
+                      {m.profile_incomplete && (
+                        <span className="mt-1 inline-block rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-800">
+                          Incomplete profile
+                        </span>
+                      )}
+                    </button>
                     <StatusBadge status={m.status}>{m.status.replace(/_/g, ' ')}</StatusBadge>
                   </div>
-                  <div className="text-xs text-gray-500">{maskPhone(m.phone)}</div>
-                  <div className="flex gap-2">
+                  <div className="grid gap-2 text-sm">
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Phone</div>
+                      {tel && phoneLabel !== '—' ? (
+                        <a href={tel} className="inline-flex min-h-[44px] items-center font-medium text-luma-700">{phoneLabel}</a>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">ID No.</div>
+                      <IdRevealCell memberId={m.id} masked={m.id_number_masked ?? '—'} />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Email</div>
+                      <div className={email === '—' ? 'text-gray-400' : 'text-gray-700'}>{email}</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
                     {m.status === 'pending_approval' && (
-                      <button
-                        disabled={busyId === m.id}
-                        onClick={() => setStatus(m.id, 'active')}
-                        className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        Approve
-                      </button>
+                      <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'active')} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Approve</button>
                     )}
                     {m.status === 'active' && (
-                      <button
-                        disabled={busyId === m.id}
-                        onClick={() => setStatus(m.id, 'suspended')}
-                        className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Suspend
-                      </button>
+                      <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'suspended')} className="min-h-[44px] rounded-md border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600">Suspend</button>
                     )}
                     {m.status === 'suspended' && (
-                      <button
-                        disabled={busyId === m.id}
-                        onClick={() => setStatus(m.id, 'active')}
-                        className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        Reinstate
-                      </button>
+                      <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'active')} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Reinstate</button>
                     )}
                     {m.status !== 'closed' && (
-                      <button
-                        disabled={busyId === m.id}
-                        onClick={() => { setDeleteTarget(m); setConfirmText('') }}
-                        className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
+                      <button type="button" disabled={busyId === m.id} onClick={() => { setDeleteTarget(m); setConfirmText('') }} className="min-h-[44px] rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-600">Delete</button>
                     )}
                   </div>
                 </div>

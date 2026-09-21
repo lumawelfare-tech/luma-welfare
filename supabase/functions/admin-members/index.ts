@@ -2,7 +2,7 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
-import { maskMemberListFields } from '../shared/pii.ts'
+import { prepareMemberListRow } from '../shared/pii.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
 
       const result = data?.[0] ?? { members: [], total: 0, page, per_page: perPage, pages: 1 }
       const maskedMembers = ((result.members ?? []) as Record<string, unknown>[]).map((m) =>
-        maskMemberListFields(m),
+        prepareMemberListRow(m),
       )
       return new Response(JSON.stringify({
         members: maskedMembers,
@@ -292,7 +292,9 @@ Deno.serve(async (req) => {
       if (error) throw new Error(error.message)
 
       const result = data?.[0] ?? { members: [] }
-      const members = result.members ?? []
+      const members = ((result.members ?? []) as Record<string, unknown>[]).map((m) =>
+        prepareMemberListRow(m),
+      )
 
       await logAudit(adminClient, {
         actor_id: session.id,
