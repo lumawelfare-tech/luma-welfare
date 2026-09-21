@@ -17,7 +17,7 @@
     "seo:prerender": "npx tsx ../scripts/prerender-public.ts"
   },
   "dependencies": {
-    "@sentry/react": "^10.71.0",
+    "@sentry/react": "^10.75.0",
     "@supabase/supabase-js": "^2.112.3",
     "@tailwindcss/vite": "^4.3.3",
     "framer-motion": "^13.4.0",
