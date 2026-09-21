@@ -262,7 +262,7 @@ export function FAQ() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.08),_transparent_50%)]" />
         <div className="container-luma relative">
           <span className="text-sm font-semibold uppercase tracking-wider text-luma-200">Support</span>
-          <h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">Frequently Asked Questions</h1>
+          <h1 className="mt-2 text-3xl font-bold text-white min-[360px]:text-4xl sm:text-5xl">Frequently Asked Questions</h1>
           <p className="mt-4 max-w-2xl text-lg text-white/85">
             Find answers to common questions about membership, packages, contributions, and claims.
           </p>

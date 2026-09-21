@@ -195,17 +195,17 @@ export function Contributions() {
 
       {/* Summary stats */}
       {!loading && totalCount > 0 && (
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-center">
-            <div className="text-lg font-bold text-gray-900">{totalCount.toLocaleString('en-KE')}</div>
+        <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="rounded-lg border border-gray-200 bg-white px-2 py-2.5 text-center sm:px-3">
+            <div className="text-base font-bold text-gray-900 sm:text-lg">{totalCount.toLocaleString('en-KE')}</div>
             <div className="text-[10px] font-medium uppercase text-gray-400">Total</div>
           </div>
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-center">
-            <div className="text-lg font-bold text-emerald-700">{paidCount.toLocaleString('en-KE')}</div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2.5 text-center sm:px-3">
+            <div className="text-base font-bold text-emerald-700 sm:text-lg">{paidCount.toLocaleString('en-KE')}</div>
             <div className="text-[10px] font-medium uppercase text-emerald-600">Paid</div>
           </div>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-center">
-            <div className="text-lg font-bold text-amber-700">{pendingCount.toLocaleString('en-KE')}</div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2.5 text-center sm:px-3">
+            <div className="text-base font-bold text-amber-700 sm:text-lg">{pendingCount.toLocaleString('en-KE')}</div>
             <div className="text-[10px] font-medium uppercase text-amber-600">Pending</div>
           </div>
         </div>
@@ -471,7 +471,7 @@ export function Contributions() {
                 <button
                   onClick={() => goToPage(page - 1)}
                   disabled={page <= 1 || pageLoading}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                   aria-label="Previous page"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
@@ -486,7 +486,7 @@ export function Contributions() {
                       key={p}
                       onClick={() => goToPage(Number(p))}
                       disabled={pageLoading}
-                      className={`rounded-lg px-3 py-2 text-xs font-medium transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center ${
+                      className={`rounded-lg px-3 py-2 text-xs font-medium transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
                         p === page
                           ? 'bg-luma-700 text-white'
                           : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
@@ -503,7 +503,7 @@ export function Contributions() {
                 <button
                   onClick={() => goToPage(page + 1)}
                   disabled={page >= totalPages || pageLoading}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                   aria-label="Next page"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>

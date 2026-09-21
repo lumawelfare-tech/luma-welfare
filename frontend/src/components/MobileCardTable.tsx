@@ -36,8 +36,8 @@ export function MobileCardTable<T>({ data, columns, keyFn, emptyMessage = 'No da
   return (
     <>
       {/* Desktop table — hidden on mobile */}
-      <div className="hidden md:block overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <table className="w-full min-w-[32rem] text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
               {columns.map(col => (

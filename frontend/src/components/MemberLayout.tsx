@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { NotificationBell } from './NotificationBell'
 import { useHead } from '../lib/seo'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: (
@@ -36,7 +37,7 @@ const navItems = [
 ]
 
 function navClass(isActive: boolean) {
-  return `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+  return `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
     isActive
       ? 'bg-luma-50/90 text-luma-800 shadow-sm'
       : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
@@ -49,6 +50,8 @@ export function MemberLayout() {
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const reduceMotion = useReducedMotion()
+  const mobileDrawerRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(mobileDrawerRef, mobileOpen)
   useHead('Member Portal', undefined, { noindex: true })
 
   function handleLogout() {
@@ -86,7 +89,7 @@ export function MemberLayout() {
         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-luma-700 font-bold text-white text-xs shadow-sm shadow-luma-700/25">
           LW
         </span>
-        <div>
+        <div className="min-w-0">
           <div className="text-sm font-bold text-gray-900">Luma Welfare</div>
           <div className="text-[10px] font-medium uppercase tracking-wider text-luma-700">Member Portal</div>
         </div>
@@ -96,12 +99,12 @@ export function MemberLayout() {
         {navItems.map((item) => (
           <NavLink key={item.to} to={item.to} className={({ isActive }) => navClass(isActive)}>
             {item.icon}
-            {item.label}
+            <span className="truncate">{item.label}</span>
           </NavLink>
         ))}
       </nav>
 
-      <div className="border-t border-white/50 px-4 py-4">
+      <div className="border-t border-white/50 px-4 py-4 pb-safe">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-luma-100 text-sm font-bold text-luma-800 overflow-hidden">
             {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
@@ -112,14 +115,14 @@ export function MemberLayout() {
           </div>
         </div>
         {isAdmin && (
-          <Link to="/admin" className="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-luma-800 hover:bg-luma-50/80 transition-colors">
+          <Link to="/admin" className="mt-3 flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-luma-800 hover:bg-luma-50/80 transition-colors">
             Admin Panel
           </Link>
         )}
         <button
           type="button"
           onClick={handleLogout}
-          className="mt-2 w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white/60 hover:text-gray-900 transition-colors"
+          className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white/60 hover:text-gray-900 transition-colors"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
           Sign Out
@@ -129,7 +132,7 @@ export function MemberLayout() {
   )
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-dvh max-w-[100vw] overflow-x-clip">
       <a href="#member-main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:rounded-lg focus:bg-luma-700 focus:px-4 focus:py-2 focus:text-sm focus:text-white focus:shadow-lg">
         Skip to main content
       </a>
@@ -138,14 +141,14 @@ export function MemberLayout() {
         {sidebarInner}
       </aside>
 
-      <div className="lg:hidden glass-header fixed top-0 inset-x-0 z-40">
-        <div className="flex items-center justify-between px-4 h-14">
-          <button type="button" onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-lg text-gray-700 hover:bg-white/60" aria-label="Open menu" aria-expanded={mobileOpen}>
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+      <div className="lg:hidden glass-header fixed top-0 inset-x-0 z-40 pt-safe">
+        <div className="flex min-w-0 items-center justify-between px-4 h-14">
+          <button type="button" onClick={() => setMobileOpen(true)} className="touch-target -ml-2 rounded-lg text-gray-700 hover:bg-white/60" aria-label="Open menu" aria-expanded={mobileOpen} aria-controls="member-mobile-nav">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
           </button>
-          <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-luma-700 font-bold text-white text-[10px]">LW</span>
-            <span className="text-sm font-bold text-gray-900">Luma Welfare</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex h-7 w-7 flex-none items-center justify-center rounded-md bg-luma-700 font-bold text-white text-[10px]">LW</span>
+            <span className="truncate text-sm font-bold text-gray-900">Luma Welfare</span>
           </div>
           <div className="flex items-center gap-1">
             <NotificationBell />
@@ -158,28 +161,33 @@ export function MemberLayout() {
 
       <AnimatePresence>
         {mobileOpen && (
-          <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="lg:hidden fixed inset-0 z-50 flex" id="member-mobile-nav">
             <motion.div
               className="fixed inset-0 bg-black/35 backdrop-blur-[2px]"
               initial={reduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
+              aria-hidden="true"
             />
             <motion.div
-              className="glass-sidebar relative flex w-72 flex-col shadow-xl"
+              ref={mobileDrawerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Member navigation"
+              className="glass-sidebar relative flex w-[min(18rem,100vw)] max-w-full flex-col shadow-xl"
               initial={reduceMotion ? false : { x: -288 }}
               animate={{ x: 0 }}
               exit={reduceMotion ? undefined : { x: -288 }}
               transition={{ type: 'spring', stiffness: 380, damping: 34 }}
             >
-              <div className="flex items-center justify-between px-5 py-4 border-b border-white/50">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-luma-700 font-bold text-white text-xs">LW</span>
-                  <div className="text-sm font-bold text-gray-900">Member Portal</div>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/50 pt-safe">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-luma-700 font-bold text-white text-xs">LW</span>
+                  <div className="truncate text-sm font-bold text-gray-900">Member Portal</div>
                 </div>
-                <button type="button" onClick={() => setMobileOpen(false)} className="p-1 rounded-lg text-gray-500 hover:bg-white/60" aria-label="Close menu">
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                <button type="button" onClick={() => setMobileOpen(false)} className="touch-target rounded-lg text-gray-500 hover:bg-white/60" aria-label="Close menu">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
               <nav aria-label="Member sidebar" className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
@@ -191,15 +199,15 @@ export function MemberLayout() {
                     className={({ isActive }) => navClass(isActive)}
                   >
                     {item.icon}
-                    {item.label}
+                    <span className="truncate">{item.label}</span>
                   </NavLink>
                 ))}
               </nav>
-              <div className="border-t border-white/50 px-4 py-4">
+              <div className="border-t border-white/50 px-4 py-4 pb-safe">
                 <button
                   type="button"
                   onClick={() => { setMobileOpen(false); handleLogout() }}
-                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-white/60"
+                  className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-white/60"
                 >
                   Sign Out
                 </button>
@@ -209,8 +217,8 @@ export function MemberLayout() {
         )}
       </AnimatePresence>
 
-      <main id="member-main" className="flex-1 lg:pl-64" role="main">
-        <div className="pt-14 lg:pt-0">
+      <main id="member-main" className="min-w-0 flex-1 lg:pl-64" role="main">
+        <div className="pt-[calc(3.5rem+env(safe-area-inset-top,0px))] lg:pt-0">
           <Outlet />
         </div>
       </main>

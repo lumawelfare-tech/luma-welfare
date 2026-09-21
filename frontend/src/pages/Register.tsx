@@ -91,9 +91,10 @@ export function Register() {
             onChange={(e) => set('fullName', e.target.value)}
             placeholder="Your full name"
             aria-invalid={!!fieldErrors.fullName}
+            aria-describedby={fieldErrors.fullName ? 'reg-name-error' : undefined}
             className={fieldClass}
           />
-          {fieldErrors.fullName && <p className="mt-1 text-xs text-red-700">{fieldErrors.fullName}</p>}
+          {fieldErrors.fullName && <p id="reg-name-error" className="mt-1 text-xs text-red-700" role="alert">{fieldErrors.fullName}</p>}
         </div>
         <div>
           <label htmlFor="reg-email" className="mb-1.5 block text-sm font-medium text-gray-700">Email</label>
@@ -106,9 +107,10 @@ export function Register() {
             onChange={(e) => set('email', e.target.value)}
             placeholder="you@example.com"
             aria-invalid={!!fieldErrors.email}
+            aria-describedby={fieldErrors.email ? 'reg-email-error' : undefined}
             className={fieldClass}
           />
-          {fieldErrors.email && <p className="mt-1 text-xs text-red-700">{fieldErrors.email}</p>}
+          {fieldErrors.email && <p id="reg-email-error" className="mt-1 text-xs text-red-700" role="alert">{fieldErrors.email}</p>}
         </div>
         <div>
           <label htmlFor="reg-phone" className="mb-1.5 block text-sm font-medium text-gray-700">
@@ -116,15 +118,18 @@ export function Register() {
           </label>
           <input
             id="reg-phone"
+            type="tel"
             required
             autoComplete="tel"
+            inputMode="tel"
             value={form.phone}
             onChange={(e) => set('phone', e.target.value)}
             placeholder="0712 345 678"
             aria-invalid={!!fieldErrors.phone}
+            aria-describedby={fieldErrors.phone ? 'reg-phone-error' : undefined}
             className={fieldClass}
           />
-          {fieldErrors.phone && <p className="mt-1 text-xs text-red-700">{fieldErrors.phone}</p>}
+          {fieldErrors.phone && <p id="reg-phone-error" className="mt-1 text-xs text-red-700" role="alert">{fieldErrors.phone}</p>}
         </div>
         <div>
           <label htmlFor="reg-id" className="mb-1.5 block text-sm font-medium text-gray-700">ID number (optional)</label>
@@ -148,10 +153,11 @@ export function Register() {
             onChange={(e) => set('password', e.target.value)}
             placeholder="Min. 8 characters"
             aria-invalid={!!fieldErrors.password}
+            aria-describedby={fieldErrors.password ? 'reg-password-error' : 'reg-password-hint'}
             className={fieldClass}
           />
-          <p className="mt-1 text-xs text-gray-500">At least 8 characters, with at least one letter and one number.</p>
-          {fieldErrors.password && <p className="mt-1 text-xs text-red-700">{fieldErrors.password}</p>}
+          <p id="reg-password-hint" className="mt-1 text-xs text-gray-500">At least 8 characters, with at least one letter and one number.</p>
+          {fieldErrors.password && <p id="reg-password-error" className="mt-1 text-xs text-red-700" role="alert">{fieldErrors.password}</p>}
         </div>
         <div>
           <label htmlFor="reg-confirm" className="mb-1.5 block text-sm font-medium text-gray-700">Confirm password</label>
@@ -164,9 +170,10 @@ export function Register() {
             onChange={(e) => set('confirm', e.target.value)}
             placeholder="Repeat your password"
             aria-invalid={!!fieldErrors.confirm}
+            aria-describedby={fieldErrors.confirm ? 'reg-confirm-error' : undefined}
             className={fieldClass}
           />
-          {fieldErrors.confirm && <p className="mt-1 text-xs text-red-700">{fieldErrors.confirm}</p>}
+          {fieldErrors.confirm && <p id="reg-confirm-error" className="mt-1 text-xs text-red-700" role="alert">{fieldErrors.confirm}</p>}
         </div>
 
         {error && (

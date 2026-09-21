@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { useHead } from '../lib/seo'
 import { AdminNotificationBell } from './AdminNotificationBell'
 import { ShortcutHelp } from './ShortcutHelp'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 const navSections = [
   {
@@ -51,17 +52,17 @@ function SidebarLink({ to, label, icon, onNavigate }: { to: string; label: strin
       to={to}
       onClick={onNavigate}
       className={({ isActive }) =>
-        `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+        `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
           isActive
             ? 'bg-luma-50/90 text-luma-800 shadow-sm'
             : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
         }`
       }
     >
-      <svg className="h-5 w-5 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+      <svg className="h-5 w-5 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
       </svg>
-      {label}
+      <span className="truncate">{label}</span>
     </NavLink>
   )
 }
@@ -72,6 +73,8 @@ export function AdminLayout() {
   const avatarUrl = member?.photo_url as string | undefined
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const mobileDrawerRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(mobileDrawerRef, sidebarOpen)
 
   useHead('Admin', undefined, { noindex: true })
 
@@ -116,7 +119,7 @@ export function AdminLayout() {
   const reduceMotion = useReducedMotion()
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-dvh max-w-[100vw] overflow-x-clip">
       <ShortcutHelp />
       <a href="#admin-main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:rounded-lg focus:bg-luma-700 focus:px-4 focus:py-2 focus:text-sm focus:text-white focus:shadow-lg">
         Skip to main content
@@ -131,9 +134,14 @@ export function AdminLayout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeSidebar}
+              aria-hidden="true"
             />
             <motion.div
-              className="fixed inset-y-0 left-0 z-50 w-64 shadow-xl"
+              ref={mobileDrawerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Admin navigation"
+              className="fixed inset-y-0 left-0 z-50 w-[min(16rem,100vw)] max-w-full shadow-xl"
               initial={reduceMotion ? false : { x: -256 }}
               animate={{ x: 0 }}
               exit={reduceMotion ? undefined : { x: -256 }}
@@ -149,22 +157,22 @@ export function AdminLayout() {
         <SidebarContent />
       </aside>
 
-      <div className="flex flex-1 flex-col lg:pl-64">
-        <header aria-label="Admin header" className="glass-header sticky top-0 z-30 flex h-16 items-center gap-4 px-4 lg:px-6">
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
+        <header aria-label="Admin header" className="glass-header sticky top-0 z-30 flex h-16 items-center gap-3 px-4 pt-safe lg:gap-4 lg:px-6">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-2 text-gray-600 hover:bg-white/60 lg:hidden"
+            className="touch-target rounded-lg text-gray-600 hover:bg-white/60 lg:hidden"
             aria-label="Open menu"
             aria-expanded={sidebarOpen}
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
 
-          <div className="flex-1">
-            <h1 className="text-lg font-semibold text-gray-900">{pageTitle}</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-base font-semibold text-gray-900 sm:text-lg">{pageTitle}</h1>
           </div>
 
           <AdminNotificationBell />
@@ -173,15 +181,15 @@ export function AdminLayout() {
             <button
               type="button"
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-800 hover:bg-white/60 transition-colors"
+              className="flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-gray-800 hover:bg-white/60 transition-colors sm:px-3"
               aria-expanded={userMenuOpen}
               aria-haspopup="true"
             >
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-luma-100 text-luma-800 text-xs font-bold overflow-hidden">
                 {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : (member?.full_name?.charAt(0) ?? adminRole?.charAt(0)?.toUpperCase() ?? 'A')}
               </div>
-              <span className="hidden md:block">{member?.full_name ?? 'Administrator'}</span>
-              <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <span className="hidden max-w-[10rem] truncate md:block">{member?.full_name ?? 'Administrator'}</span>
+              <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </button>
@@ -225,7 +233,7 @@ export function AdminLayout() {
           </div>
         </header>
 
-        <main id="admin-main" className="flex-1 overflow-y-auto p-4 lg:p-6" role="main">
+        <main id="admin-main" className="min-w-0 flex-1 overflow-y-auto overflow-x-clip p-4 pb-safe lg:p-6" role="main">
           <Outlet />
         </main>
       </div>
@@ -248,8 +256,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           <div className="text-[10px] font-medium uppercase tracking-wider text-luma-700">Administration</div>
         </div>
         {onClose && (
-          <button type="button" onClick={onClose} className="ml-auto rounded-lg p-1 text-gray-500 hover:bg-white/60 lg:hidden" aria-label="Close menu">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <button type="button" onClick={onClose} className="touch-target ml-auto rounded-lg text-gray-500 hover:bg-white/60 lg:hidden" aria-label="Close menu">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -283,10 +291,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           <button
             type="button"
             onClick={logout}
-            className="rounded-lg p-1.5 text-gray-500 hover:bg-white/60 hover:text-red-700 transition-colors"
+            className="touch-target rounded-lg text-gray-500 hover:bg-white/60 hover:text-red-700 transition-colors"
             aria-label="Logout"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
             </svg>
           </button>

@@ -135,11 +135,14 @@ export function Login() {
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">Verification Code</label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   value={totpCode}
                   onChange={(e) => { setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(null) }}
                   placeholder="000000"
                   maxLength={6}
                   autoFocus
+                  aria-label="Two-factor authentication code"
                   className={`${fieldClass} text-center font-mono text-xl tracking-[0.3em]`}
                 />
               </div>

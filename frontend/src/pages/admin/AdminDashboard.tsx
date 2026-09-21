@@ -425,8 +425,9 @@ export function AdminDashboard() {
       </div>
 
       {/* Global Date Range Filter */}
-      <div className="mt-6 flex flex-wrap items-center gap-3 glass-panel px-5 py-3">
-        <span className="text-sm font-medium text-gray-700">Date Range:</span>          <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+      <div className="mt-6 flex flex-wrap items-center gap-3 glass-panel px-4 py-3 sm:px-5">
+        <span className="text-sm font-medium text-gray-700">Date Range:</span>
+        <div className="flex max-w-full flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
           {([
             { value: 'today' as DatePreset, label: 'Today' },
             { value: '7d' as DatePreset, label: '7D' },
@@ -440,7 +441,7 @@ export function AdminDashboard() {
             <button
               key={p.value}
               onClick={() => setDatePreset(p.value)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={`min-h-9 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 datePreset === p.value ? 'bg-luma-600 text-white shadow-sm' : 'text-gray-500 hover:bg-white hover:text-gray-700'
               }`}
             >
@@ -467,7 +468,7 @@ export function AdminDashboard() {
             />
           </div>
         )}
-        <span className="ml-auto text-xs text-gray-400">
+        <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">
           Applied to contributions, claims, and transactions
         </span>
       </div>

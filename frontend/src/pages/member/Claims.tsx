@@ -278,17 +278,17 @@ export function Claims() {
 
       {/* Quick stats */}
       {!loading && claims.length > 0 && (
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-center">
-            <div className="text-lg font-bold text-gray-900">{claims.length}</div>
+        <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="rounded-lg border border-gray-200 bg-white px-2 py-2.5 text-center sm:px-3">
+            <div className="text-base font-bold text-gray-900 sm:text-lg">{claims.length}</div>
             <div className="text-[10px] font-medium uppercase text-gray-400">Total</div>
           </div>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-center">
-            <div className="text-lg font-bold text-amber-700">{submittedCount}</div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2.5 text-center sm:px-3">
+            <div className="text-base font-bold text-amber-700 sm:text-lg">{submittedCount}</div>
             <div className="text-[10px] font-medium uppercase text-amber-600">In Progress</div>
           </div>
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-center">
-            <div className="text-lg font-bold text-emerald-700">{approvedCount}</div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2.5 text-center sm:px-3">
+            <div className="text-base font-bold text-emerald-700 sm:text-lg">{approvedCount}</div>
             <div className="text-[10px] font-medium uppercase text-emerald-600">Approved</div>
           </div>
         </div>

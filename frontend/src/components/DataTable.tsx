@@ -109,7 +109,7 @@ export function DataTable<T extends Record<string, unknown>>({
     <div className="rounded-xl border border-gray-200 bg-white">
       {/* Desktop Table */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[36rem] text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
               {selectable && (

@@ -68,7 +68,7 @@ export function StatBar() {
             <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white backdrop-blur-sm">
               {item.icon}
             </div>
-            <div className="text-3xl font-extrabold text-white">{item.value ?? '—'}</div>
+            <div className={`text-2xl font-extrabold text-white sm:text-3xl ${typeof item.value === 'string' && item.value.length > 8 ? 'text-lg sm:text-2xl' : ''}`}>{item.value ?? '—'}</div>
             <div className="mt-1 text-sm font-medium text-white/80">{item.label}</div>
           </div>
         ))}
