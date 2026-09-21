@@ -8,11 +8,14 @@ import { describe, expect, it } from 'vitest'
 
 describe('Layout marketing chrome', () => {
   const layoutSrc = readFileSync(join(__dirname, '../Layout.tsx'), 'utf8')
+  const footerSrc = readFileSync(join(__dirname, '../SiteFooter.tsx'), 'utf8')
   const cssSrc = readFileSync(join(__dirname, '../../index.css'), 'utf8')
 
   it('does not include a fixed WhatsApp FAB', () => {
     expect(layoutSrc).not.toMatch(/fixed[^;{]*wa\.me/s)
+    expect(footerSrc).not.toMatch(/fixed[^;{]*wa\.me/s)
     expect(layoutSrc).not.toMatch(/aria-label="Chat on WhatsApp"/)
+    expect(footerSrc).not.toMatch(/aria-label="Chat on WhatsApp"/)
   })
 
   it('does not include a mobile sticky guest Join bar', () => {
@@ -25,5 +28,11 @@ describe('Layout marketing chrome', () => {
   it('does not include the removed top contact info bar markup', () => {
     expect(layoutSrc).not.toMatch(/bg-luma-900.*0798/)
     expect(layoutSrc).not.toMatch(/info@lumawelfare\.or\.ke.*pt-safe/)
+  })
+
+  it('delegates footer to SiteFooter as the sole contentinfo', () => {
+    expect(layoutSrc).toMatch(/<SiteFooter\s*\/>/)
+    expect(layoutSrc).not.toMatch(/role="contentinfo"/)
+    expect(footerSrc).toMatch(/role="contentinfo"/)
   })
 })

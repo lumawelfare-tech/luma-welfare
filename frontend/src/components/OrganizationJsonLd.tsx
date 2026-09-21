@@ -1,8 +1,13 @@
 import { useEffect } from 'react'
+import {
+  getOrganizationContactPoints,
+  getOrganizationSameAs,
+  siteConfig,
+} from '../config/siteConfig'
 
 /**
  * Inject Organization + WebSite JSON-LD without inline scripts
- * (CSP script-src 'self' — fetch static JSON then insert).
+ * (CSP script-src 'self' — fetch static JSON then enrich from siteConfig).
  */
 export function OrganizationJsonLd() {
   useEffect(() => {
@@ -18,8 +23,29 @@ export function OrganizationJsonLd() {
         try {
           const res = await fetch(path)
           if (!res.ok || cancelled) continue
-          const data = await res.json()
+          let data: Record<string, unknown> = await res.json()
           if (cancelled) return
+
+          if (path === '/ld-organization.json') {
+            const sameAs = getOrganizationSameAs()
+            const contactPoint = getOrganizationContactPoints()
+            data = {
+              ...data,
+              name: siteConfig.name,
+              email: siteConfig.email ?? data.email,
+              telephone: siteConfig.phoneE164 ?? data.telephone,
+              ...(sameAs.length > 0 ? { sameAs } : {}),
+              ...(contactPoint.length > 0 ? { contactPoint } : {}),
+            }
+            if (siteConfig.address) {
+              data.address = {
+                '@type': 'PostalAddress',
+                streetAddress: siteConfig.address,
+                addressCountry: 'KE',
+              }
+            }
+          }
+
           const script = document.createElement('script')
           script.id = id
           script.type = 'application/ld+json'

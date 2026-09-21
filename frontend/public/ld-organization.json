@@ -13,7 +13,24 @@
     "@type": "Country",
     "name": "Kenya"
   },
+  "contactPoint": [
+    {
+      "@type": "ContactPoint",
+      "contactType": "customer support",
+      "telephone": "+254798635024",
+      "areaServed": "KE",
+      "availableLanguage": "en"
+    },
+    {
+      "@type": "ContactPoint",
+      "contactType": "customer support",
+      "email": "info@lumawelfare.or.ke",
+      "areaServed": "KE",
+      "availableLanguage": "en"
+    }
+  ],
   "sameAs": [
-    "https://www.lumawelfare.or.ke"
+    "https://www.lumawelfare.or.ke",
+    "https://wa.me/254798635024"
   ]
 }

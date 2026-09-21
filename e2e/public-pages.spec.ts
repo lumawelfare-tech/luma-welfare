@@ -205,6 +205,62 @@ test.describe('Responsive Design', () => {
 })
 
 // ============================================================================
+// FOOTER
+// ============================================================================
+
+test.describe('Site footer', () => {
+  test('is the last landmark and links resolve without 404', async ({ page }) => {
+    await page.goto(`${BASE}/`)
+    await page.waitForSelector('[data-testid="site-footer"], footer', { timeout: 20_000 })
+
+    const footer = page.locator('[data-testid="site-footer"], footer[role="contentinfo"]').last()
+    await expect(footer).toBeVisible()
+
+    const isLast = await page.evaluate(() => {
+      const footers = Array.from(document.querySelectorAll('footer, [data-testid="site-footer"]'))
+      const last = footers[footers.length - 1]
+      if (!last) return false
+      let el: Element | null = last
+      while (el && el.parentElement && el.parentElement !== document.body) {
+        el = el.parentElement
+      }
+      const rootChildren = Array.from(document.querySelector('#root')?.children ?? document.body.children)
+      const lastMeaningful = [...rootChildren].reverse().find((n) => n instanceof HTMLElement)
+      return lastMeaningful != null && (lastMeaningful === el || lastMeaningful.contains(last))
+    })
+    expect(isLast).toBe(true)
+
+    const paths = [
+      '/about',
+      '/how-it-works',
+      '/packages',
+      '/register',
+      '/faq',
+      '/contact',
+      '/privacy',
+      '/terms',
+    ]
+    for (const path of paths) {
+      const link = footer.locator(`a[href="${path}"]`).first()
+      await expect(link).toBeVisible()
+      const response = await page.request.get(`${BASE}${path}`)
+      expect(response.status(), `${path} should not 404`).toBeLessThan(400)
+    }
+
+    const faqCount = await footer.locator('a[href="/faq"]').count()
+    expect(faqCount).toBe(1)
+  })
+
+  test('has no horizontal scroll at 375px', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await page.goto(`${BASE}/`)
+    await page.waitForSelector('[data-testid="site-footer"], footer', { timeout: 20_000 })
+    const bodyWidth = await page.evaluate(() => document.body.scrollWidth)
+    expect(bodyWidth).toBeLessThanOrEqual(375 + 8)
+  })
+})
+
+// ============================================================================
 // PERFORMANCE — SPA LOADING
 // ============================================================================
 

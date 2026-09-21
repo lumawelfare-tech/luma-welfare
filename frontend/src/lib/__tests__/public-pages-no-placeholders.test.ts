@@ -26,6 +26,7 @@ const PUBLIC_COMPONENT_FILES = [
   'HomeHero.tsx',
   'OrganizationJsonLd.tsx',
   'Layout.tsx',
+  'SiteFooter.tsx',
 ]
 
 const FORBIDDEN = [
