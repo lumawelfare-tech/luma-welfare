@@ -40,9 +40,10 @@ export function maskEmail(value: string | null | undefined): string {
 /**
  * Nested member blobs on contributions/subscriptions lists: mask phone + id.
  * Admin members list uses prepareMemberListRow instead (full phone, masked id only).
+ * Uses Record (not a generic T) so Deno/tsc allow property writes after `in` checks.
  */
-export function maskMemberListFields<T extends Record<string, unknown>>(row: T): T {
-  const next = { ...row }
+export function maskMemberListFields(row: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...row }
   if ('phone' in next && typeof next.phone === 'string') {
     next.phone = maskPhone(next.phone)
   }
