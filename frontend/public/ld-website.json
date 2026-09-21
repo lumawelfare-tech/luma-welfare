@@ -1,0 +1,13 @@
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Luma Welfare",
+  "url": "https://luma-welfare.vercel.app",
+  "description": "Community welfare platform in Kenya — membership packages, contributions, and claims.",
+  "publisher": {
+    "@type": "NGO",
+    "name": "Luma Welfare",
+    "url": "https://luma-welfare.vercel.app"
+  },
+  "inLanguage": "en-KE"
+}

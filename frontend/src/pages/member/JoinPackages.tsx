@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
+import { useHead } from '../../lib/seo'
 
 type Tier = { id: string; name: string; amount: number }
 type Package = {
@@ -15,6 +16,7 @@ type Package = {
 type Subscription = { id: string; package_id: string; status: string; packages?: { name: string }[] }
 
 export function JoinPackages() {
+  useHead('Join Packages', undefined, { noindex: true })
   const { member, registrationFeePaid } = useAuth()
   const [packages, setPackages] = useState<Package[]>([])
   const [mine, setMine] = useState<Subscription[]>([])

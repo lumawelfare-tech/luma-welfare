@@ -3,6 +3,7 @@ import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { MobileCardTable } from '../../components/MobileCardTable'
+import { useHead } from '../../lib/seo'
 
 type Subscription = { id: string; status: string; packages: { code: string; name: string }[]; package_tiers: { name: string; amount: number }[] }
 type Contribution = { id: string; subscription_id: string; period: string; amount: number; status: string; packages: { code: string; name: string }[]; created_at: string; notes?: string | null }
@@ -26,6 +27,7 @@ const statusStyle: Record<string, string> = {
 const PER_PAGE = 20
 
 export function Contributions() {
+  useHead('Contributions', undefined, { noindex: true })
   const { registrationFeePaid } = useAuth()
   const [rows, setRows] = useState<Contribution[]>([])
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])

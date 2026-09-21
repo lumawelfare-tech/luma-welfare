@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
+import { useHead } from '../../lib/seo'
 
 type FamilyMember = { id: string; full_name: string; relationship: string; id_number: string | null; tier: 'nuclear' | 'extended' }
 
 export function Family() {
+  useHead('Family Members', undefined, { noindex: true })
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [form, setForm] = useState({ full_name: '', relationship: 'spouse', tier: 'nuclear', id_number: '' })
   const [error, setError] = useState<string | null>(null)

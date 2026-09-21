@@ -12,7 +12,12 @@ const values = [
 ]
 
 export function About() {
-  useHead('About', 'Learn about Luma Welfare — our mission, values, and how we provide accessible welfare services for all members in Kenya.')
+  useHead('About', 'Learn about Luma Welfare — our mission, values, and how we provide accessible welfare services for all members in Kenya.', {
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'About', path: '/about' },
+    ],
+  })
   return (
     <div>
       <PageHero eyebrow="About Us" title="About Luma Welfare" />

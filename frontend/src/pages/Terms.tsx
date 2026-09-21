@@ -16,7 +16,12 @@ function Section({ number, title, children }: { number: number; title: string; c
 }
 
 export function Terms() {
-  useHead('Terms & Conditions | Luma Welfare', 'Terms and Conditions for using the Luma Welfare community welfare management platform.')
+  useHead('Terms & Conditions', 'Terms and Conditions for using the Luma Welfare community welfare management platform.', {
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'Terms & Conditions', path: '/terms' },
+    ],
+  })
 
   return (
     <div>

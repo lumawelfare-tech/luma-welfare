@@ -9,6 +9,8 @@ Allow: /terms
 Allow: /contact
 Allow: /news
 Allow: /gallery
+Allow: /media
+
 Disallow: /admin
 Disallow: /dashboard
 Disallow: /contributions
@@ -17,9 +19,11 @@ Disallow: /profile
 Disallow: /family
 Disallow: /claims
 Disallow: /notifications
+Disallow: /notification-preferences
 Disallow: /receipts-statements
 Disallow: /login
 Disallow: /register
+Disallow: /verify-email
 Disallow: /forgot-password
 Disallow: /reset-password
 

@@ -14,7 +14,12 @@ type GalleryItem = {
 }
 
 export function Gallery() {
-  useHead('Gallery', 'Photos from Luma Welfare events and member activities.')
+  useHead('Gallery', 'Photos from Luma Welfare events and member activities.', {
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'Gallery', path: '/gallery' },
+    ],
+  })
   const [items, setItems] = useState<GalleryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

@@ -47,7 +47,12 @@ const steps = [
 ]
 
 export function HowItWorks() {
-  useHead('How It Works', 'Four steps from joining Luma Welfare to claiming benefits. Register, contribute monthly, wait, and access your benefits.')
+  useHead('How It Works', 'Four steps from joining Luma Welfare to claiming benefits. Register, contribute monthly, wait, and access your benefits.', {
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'How It Works', path: '/how-it-works' },
+    ],
+  })
   return (
     <div>
       <PageHero

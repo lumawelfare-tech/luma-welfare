@@ -1,28 +1,37 @@
 import { useEffect } from 'react'
 
 /**
- * Inject Organization JSON-LD without inline scripts (CSP script-src 'self').
+ * Inject Organization + WebSite JSON-LD without inline scripts
+ * (CSP script-src 'self' — fetch static JSON then insert).
  */
 export function OrganizationJsonLd() {
   useEffect(() => {
     let cancelled = false
-    const existing = document.getElementById('luma-org-jsonld')
-    if (existing) return
+    const ids = ['luma-org-jsonld', 'luma-website-jsonld'] as const
+    const paths = ['/ld-organization.json', '/ld-website.json'] as const
 
-    fetch('/ld-organization.json')
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return
-        const script = document.createElement('script')
-        script.id = 'luma-org-jsonld'
-        script.type = 'application/ld+json'
-        script.textContent = JSON.stringify(data)
-        document.head.appendChild(script)
-      })
-      .catch(() => {
-        /* non-critical SEO enrichment */
-      })
+    async function load() {
+      for (let i = 0; i < paths.length; i++) {
+        const id = ids[i]
+        const path = paths[i]
+        if (document.getElementById(id)) continue
+        try {
+          const res = await fetch(path)
+          if (!res.ok || cancelled) continue
+          const data = await res.json()
+          if (cancelled) return
+          const script = document.createElement('script')
+          script.id = id
+          script.type = 'application/ld+json'
+          script.textContent = JSON.stringify(data)
+          document.head.appendChild(script)
+        } catch {
+          /* non-critical SEO enrichment */
+        }
+      }
+    }
 
+    void load()
     return () => {
       cancelled = true
     }

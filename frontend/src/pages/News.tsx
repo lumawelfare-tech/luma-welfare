@@ -16,7 +16,12 @@ type NewsItem = {
 }
 
 export function News() {
-  useHead('News & Events', 'Updates from the Luma Welfare office and upcoming member events.')
+  useHead('News & Events', 'Updates from the Luma Welfare office and upcoming member events.', {
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'News & Events', path: '/news' },
+    ],
+  })
   const [items, setItems] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

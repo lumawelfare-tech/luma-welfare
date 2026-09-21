@@ -1,18 +1,26 @@
 {
   "@context": "https://schema.org",
-  "@type": "Organization",
+  "@type": "NGO",
   "name": "Luma Welfare",
+  "alternateName": "Luma Welfare Kenya",
   "url": "https://luma-welfare.vercel.app",
   "logo": "https://luma-welfare.vercel.app/brand/luma-logo.jpeg",
-  "description": "Community welfare organization in Kenya. Members contribute monthly to support each other through key life events.",
+  "image": "https://luma-welfare.vercel.app/brand/luma-logo.jpeg",
+  "description": "Community welfare organization in Kenya. Members contribute monthly to support each other through key life events — hospital costs, education, business, building, and more.",
   "foundingDate": "2026",
+  "email": "info@lumawelfare.or.ke",
+  "telephone": "+254798635024",
   "address": {
     "@type": "PostalAddress",
+    "streetAddress": "P.O. Box 12345 – 00100",
+    "addressLocality": "Nairobi",
     "addressCountry": "KE"
   },
   "areaServed": {
     "@type": "Country",
     "name": "Kenya"
   },
-  "sameAs": []
+  "sameAs": [
+    "https://www.lumawelfare.or.ke"
+  ]
 }

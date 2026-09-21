@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
+import { useHead } from '../lib/seo'
 
 const OTP_LENGTH = 6
 const RESEND_SECONDS = 60
@@ -29,6 +30,7 @@ function messageFor(err: unknown): string {
 }
 
 export function VerifyEmail() {
+  useHead('Verify Email', undefined, { noindex: true })
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()

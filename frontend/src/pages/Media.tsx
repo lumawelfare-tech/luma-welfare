@@ -71,7 +71,12 @@ const PER_PAGE = 24
 /* ------------------------------------------------------------------ */
 
 export function Media() {
-  useHead('Media', 'Explore Luma Welfare\'s latest photos, videos, publications and media content.')
+  useHead('Media', 'Explore Luma Welfare\'s latest photos, videos, publications and media content.', {
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'Media', path: '/media' },
+    ],
+  })
 
   const [items, setItems] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)

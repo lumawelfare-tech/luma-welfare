@@ -32,7 +32,12 @@ function waitingLabel(p: Package): string {
 }
 
 export function PackagesPage() {
-  useHead('Packages', 'Explore Luma Welfare packages — affordable community welfare plans for hospital costs, education, business, building, and more.')
+  useHead('Packages', 'Explore Luma Welfare packages — affordable community welfare plans for hospital costs, education, business, building, and more.', {
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'Packages', path: '/packages' },
+    ],
+  })
   const [packages, setPackages] = useState<Package[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

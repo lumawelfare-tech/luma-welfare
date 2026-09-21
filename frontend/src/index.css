@@ -34,6 +34,15 @@
   --glass-blur-mobile: 8px;
 }
 
+/* Prefer swap if a webfont is later wired; local Inter / system UI avoid FOIT. */
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: local('Inter'), local('Segoe UI'), local('Helvetica Neue');
+}
+
 html {
   scroll-behavior: smooth;
   overflow-x: clip;

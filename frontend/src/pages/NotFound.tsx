@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
+import { useHead } from '../lib/seo'
 
 export function NotFound() {
+  useHead('Page Not Found', 'The page you are looking for does not exist.', { noindex: true })
   const reduceMotion = useReducedMotion()
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">

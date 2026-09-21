@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { ClaimTimeline } from '../../components/ClaimTimeline'
+import { useHead } from '../../lib/seo'
 
 type Subscription = { id: string; status: string; packages: { code: string; name: string }[]; qualification?: { status: string } | null }
 type Claim = {
@@ -57,6 +58,7 @@ const claimTypes = [
 ]
 
 export function Claims() {
+  useHead('Claims', undefined, { noindex: true })
   const { registrationFeePaid } = useAuth()
   const [claims, setClaims] = useState<Claim[]>([])
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])

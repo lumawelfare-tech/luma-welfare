@@ -27,7 +27,12 @@ const details = [
 ]
 
 export function Contact() {
-  useHead('Contact', 'Contact Luma Welfare — phone, WhatsApp, email, and address. Reach the welfare office for membership, payment, and claim questions.')
+  useHead('Contact', 'Contact Luma Welfare — phone, WhatsApp, email, and address. Reach the welfare office for membership, payment, and claim questions.', {
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'Contact', path: '/contact' },
+    ],
+  })
   return (
     <div>
       <PageHero

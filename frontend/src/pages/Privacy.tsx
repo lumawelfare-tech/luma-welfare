@@ -16,7 +16,12 @@ function Section({ number, title, children }: { number: number; title: string; c
 }
 
 export function Privacy() {
-  useHead('Privacy Policy | Luma Welfare', 'Privacy Policy for the Luma Welfare community welfare management platform.')
+  useHead('Privacy Policy', 'Privacy Policy for the Luma Welfare community welfare management platform.', {
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'Privacy Policy', path: '/privacy' },
+    ],
+  })
 
   return (
     <div>

@@ -224,7 +224,12 @@ function FaqItem({ item, isOpen, onToggle, id }: { item: FAQItem; isOpen: boolea
 }
 
 export function FAQ() {
-  useHead('FAQ | Luma Welfare', 'Frequently asked questions about Luma Welfare membership, packages, contributions, claims, and more.')
+  useHead('FAQ', 'Frequently asked questions about Luma Welfare membership, packages, contributions, claims, and more.', {
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'FAQ', path: '/faq' },
+    ],
+  })
 
   const [openId, setOpenId] = useState<string | null>(null)
   const [search, setSearch] = useState('')

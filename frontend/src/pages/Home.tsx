@@ -129,7 +129,10 @@ function CtaButton({
 }
 
 export function Home() {
-  useHead('Home', 'Luma Welfare is a community welfare organization in Kenya. Members contribute monthly to support each other through key life events.')
+  useHead(
+    'Luma Welfare — Community Welfare Platform in Kenya',
+    'Luma Welfare is a community welfare organization in Kenya. Members contribute monthly to support each other through key life events.',
+  )
   const reduceMotion = useReducedMotion()
 
   return (
@@ -185,6 +188,10 @@ export function Home() {
               <img
                 src="/brand/luma-logo.jpeg"
                 alt="Luma Welfare — Community Welfare Organization"
+                width={320}
+                height={320}
+                decoding="async"
+                fetchPriority="high"
                 className="max-h-80 rounded-3xl object-contain shadow-2xl"
               />
               <div className="glass absolute -bottom-4 -left-4 rounded-2xl px-4 py-3">

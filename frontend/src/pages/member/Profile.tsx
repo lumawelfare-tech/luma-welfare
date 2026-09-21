@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
+import { useHead } from '../../lib/seo'
 
 export function Profile() {
+  useHead('Profile', undefined, { noindex: true })
   const { member } = useAuth()
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)

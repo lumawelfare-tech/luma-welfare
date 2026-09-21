@@ -4,6 +4,7 @@ import { useToast } from '../../components/Toast'
 import { EmptyState } from '../../components/EmptyState'
 import { SkeletonRow } from '../../components/Skeleton'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { useHead } from '../../lib/seo'
 
 function escapeHtml(str: string | null | undefined): string {
   if (!str) return ''
@@ -211,6 +212,7 @@ ${r.reference ? `<div class="field"><span class="label">Reference</span><span>${
 }
 
 export function ReceiptsStatements() {
+  useHead('Receipts & Statements', undefined, { noindex: true })
   const { addToast } = useToast()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
