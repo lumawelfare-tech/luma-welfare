@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 
-export type ToastType = 'success' | 'error' | 'warning' | 'info'
+export type ToastType = 'success' | 'error' | 'warning' | 'info' | 'pending'
 
 export type Toast = {
   id: string
@@ -29,9 +30,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const addToast = useCallback(
     (type: ToastType, message: string, duration = 4000) => {
       const id = `toast-${++toastCounter}`
-      setToasts((prev) => [...prev, { id, type, message, duration }])
-      if (duration > 0) {
-        setTimeout(() => removeToast(id), duration)
+      // Pending/payment toasts linger longer by default (caller can override)
+      const resolvedDuration = duration === 4000 && type === 'pending' ? 6000 : duration
+      setToasts((prev) => [...prev, { id, type, message, duration: resolvedDuration }])
+      if (resolvedDuration > 0) {
+        setTimeout(() => removeToast(id), resolvedDuration)
       }
     },
     [removeToast],
@@ -53,12 +56,13 @@ export function useToast(): ToastContextValue {
 }
 
 function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: string) => void }) {
-  if (toasts.length === 0) return null
   return (
     <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
-      {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
-      ))}
+      <AnimatePresence initial={false}>
+        {toasts.map((toast) => (
+          <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
+        ))}
+      </AnimatePresence>
     </div>
   )
 }
@@ -88,16 +92,35 @@ const typeStyles: Record<ToastType, { bg: string; border: string; icon: string; 
     text: 'text-blue-800',
     icon: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z',
   },
+  pending: {
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+    text: 'text-amber-900',
+    icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
+  },
 }
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
   const styles = typeStyles[toast.type]
+  const reduceMotion = useReducedMotion()
+
   return (
-    <div
-      className={`pointer-events-auto flex items-start gap-3 rounded-xl border ${styles.bg} ${styles.border} px-4 py-3 shadow-lg animate-in slide-in-from-right-full duration-300`}
+    <motion.div
+      layout
+      initial={reduceMotion ? false : { opacity: 0, x: 40, y: 8 }}
+      animate={{ opacity: 1, x: 0, y: 0 }}
+      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 24, transition: { duration: 0.18 } }}
+      transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      className={`pointer-events-auto flex items-start gap-3 rounded-xl border ${styles.bg} ${styles.border} px-4 py-3 shadow-lg`}
       role="alert"
     >
-      <svg className={`mt-0.5 h-5 w-5 flex-shrink-0 ${styles.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <svg
+        className={`mt-0.5 h-5 w-5 flex-shrink-0 ${styles.text} ${toast.type === 'pending' ? 'animate-pulse motion-reduce:animate-none' : ''}`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
         <path strokeLinecap="round" strokeLinejoin="round" d={styles.icon} />
       </svg>
       <p className={`flex-1 text-sm font-medium ${styles.text}`}>{toast.message}</p>
@@ -110,6 +133,6 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
-    </div>
+    </motion.div>
   )
 }

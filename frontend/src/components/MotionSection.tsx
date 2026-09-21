@@ -9,6 +9,12 @@ type MotionSectionProps = {
   as?: 'section' | 'div'
 }
 
+/** Reveal duration aligned with --luma-motion-reveal (450ms). */
+const REVEAL_DURATION = 0.45
+const REVEAL_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
+/** Card hover aligned with --luma-motion-micro (~200ms). */
+const CARD_HOVER_DURATION = 0.2
+
 /**
  * Fade + slide-up when scrolled into view. Honours prefers-reduced-motion.
  */
@@ -32,7 +38,7 @@ export function MotionSection({
       initial={{ opacity: 0, y: 28 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-48px 0px' }}
-      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay }}
+      transition={{ duration: REVEAL_DURATION, ease: REVEAL_EASE, delay }}
     >
       {children}
     </Component>
@@ -57,7 +63,7 @@ export function MotionCard({ children, className = '', hover = true, onClick }: 
       whileHover={
         reduceMotion || !hover
           ? undefined
-          : { y: -4, transition: { duration: 0.2 } }
+          : { y: -4, transition: { duration: CARD_HOVER_DURATION } }
       }
       whileTap={reduceMotion || !hover ? undefined : { scale: 0.985 }}
     >

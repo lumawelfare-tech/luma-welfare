@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { scrollWindowToTop } from './ScrollToTop'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { SiteFooter } from './SiteFooter'
+import { PageTransition } from './PageTransition'
 
 const navLinks = [
   { to: '/', label: 'Home' },
@@ -21,6 +22,7 @@ export function Layout() {
   const { member, isAdmin, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
+  const [scrolled, setScrolled] = useState(false)
   const navigate = useNavigate()
   const reduceMotion = useReducedMotion()
   const mobileMenuRef = useRef<HTMLElement>(null)
@@ -51,6 +53,13 @@ export function Layout() {
     return () => { document.body.style.overflow = '' }
   }, [open])
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   const menuTransition = reduceMotion
     ? { duration: 0 }
     : { type: 'spring' as const, stiffness: 380, damping: 32 }
@@ -62,8 +71,16 @@ export function Layout() {
       </a>
 
       {/* Main navigation */}
-      <header className="glass-header sticky top-0 z-40 pt-safe">
-        <div className="container-luma flex h-16 min-w-0 items-center justify-between gap-2 sm:gap-4">
+      <header
+        className={`glass-header sticky top-0 z-40 pt-safe transition-[box-shadow,background-color] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          scrolled ? 'glass-header-scrolled' : ''
+        }`}
+      >
+        <div
+          className={`container-luma flex min-w-0 items-center justify-between gap-2 sm:gap-4 transition-[height] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            scrolled ? 'h-14' : 'h-16'
+          }`}
+        >
           <Link to="/" onClick={scrollWindowToTop} className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-luma-700 font-bold text-white text-sm shadow-sm shadow-luma-700/25">
               LW
@@ -241,7 +258,9 @@ export function Layout() {
       </header>
 
       <main id="main-content" className="min-w-0 flex-1" role="main">
-        <Outlet />
+        <PageTransition>
+          <Outlet />
+        </PageTransition>
       </main>
 
       <SiteFooter />

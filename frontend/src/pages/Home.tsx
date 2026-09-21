@@ -157,7 +157,7 @@ export function Home() {
               <MotionCard key={code}>
                 <Link
                   to="/packages"
-                  className="glass-card group block p-7 transition-colors hover:border-luma-300"
+                  className="glass-card luma-card-interactive group block p-7 transition-colors hover:border-luma-300"
                 >
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-luma-50/90 text-luma-700 group-hover:bg-luma-100 transition-colors">
                     {offerIcons[code]}

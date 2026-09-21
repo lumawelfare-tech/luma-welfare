@@ -1,14 +1,19 @@
 import { Link } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Icon } from './Icon'
 
 const HERO_COPY =
   'Affordable welfare packages for key life events — hospital, education, business, building, and more. Track contributions and eligibility in one place.'
+
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
 /**
  * Public homepage hero: brand-forward headline, one supporting line,
  * one primary CTA (Join) and one subordinate packages link.
  */
 export function HomeHero() {
+  const reduceMotion = useReducedMotion()
+
   return (
     <section
       aria-labelledby="home-hero-heading"
@@ -20,7 +25,12 @@ export function HomeHero() {
       </div>
 
       <div className="container-luma relative grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-2 lg:gap-12 lg:py-20">
-        <div className="relative z-10 min-w-0 max-w-xl">
+        <motion.div
+          className="relative z-10 min-w-0 max-w-xl"
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: EASE }}
+        >
           <p className="text-sm font-semibold uppercase tracking-[0.14em] text-luma-700">
             Luma Welfare
           </p>
@@ -41,7 +51,7 @@ export function HomeHero() {
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <Link
               to="/register"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-luma-700 px-6 py-3 text-sm font-bold text-white shadow-sm shadow-luma-700/20 transition-colors hover:bg-luma-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-600 focus-visible:ring-offset-2"
+              className="luma-btn luma-btn-primary px-6 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-600 focus-visible:ring-offset-2"
             >
               Join Luma
               <Icon name="arrow-right" className="h-4 w-4" />
@@ -53,9 +63,14 @@ export function HomeHero() {
               View packages
             </Link>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="relative z-10 mx-auto w-full max-w-lg lg:max-w-none">
+        <motion.div
+          className="relative z-10 mx-auto w-full max-w-lg lg:max-w-none"
+          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: EASE, delay: 0.08 }}
+        >
           <div className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-2xl bg-luma-50 sm:max-w-lg lg:max-w-none">
             <picture>
               <source srcSet="/brand/hero-family.webp" type="image/webp" />
@@ -70,7 +85,7 @@ export function HomeHero() {
               />
             </picture>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   )

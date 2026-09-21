@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { vi, type Mock } from 'vitest'
+import { afterAll, beforeAll, beforeEach, vi, type Mock } from 'vitest'
 import { StatBar } from '../StatBar'
 import { api } from '../../lib/api'
 
@@ -8,6 +8,31 @@ vi.mock('../../lib/api', () => ({
 }))
 
 const mockedApi = api as Mock
+
+beforeAll(() => {
+  class MockIntersectionObserver {
+    readonly root = null
+    readonly rootMargin = ''
+    readonly thresholds: readonly number[] = []
+    constructor(private readonly cb: IntersectionObserverCallback) {}
+    observe() {
+      this.cb(
+        [{ isIntersecting: true, intersectionRatio: 1 } as IntersectionObserverEntry],
+        this as unknown as IntersectionObserver,
+      )
+    }
+    unobserve() {}
+    disconnect() {}
+    takeRecords(): IntersectionObserverEntry[] {
+      return []
+    }
+  }
+  vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+})
+
+afterAll(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('StatBar', () => {
   beforeEach(() => {

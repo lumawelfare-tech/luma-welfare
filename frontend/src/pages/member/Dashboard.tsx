@@ -489,7 +489,7 @@ export function Dashboard() {
                     <button
                       onClick={handleSendStkPush}
                       disabled={payingFee || !payPhone.trim()}
-                      className="rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-50 transition-colors min-h-[44px]"
+                      className="luma-btn luma-btn-primary px-5 py-2.5 text-sm"
                     >
                       {payingFee ? 'Sending…' : 'Send STK Push'}
                     </button>
@@ -500,11 +500,14 @@ export function Dashboard() {
               {payStep === 'waiting' && (
                 <div className="px-6 py-10 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
-                    <svg className="h-6 w-6 text-amber-600 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <svg className="h-6 w-6 text-amber-600 animate-pulse motion-reduce:animate-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </div>
-                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Check Your Phone</h3>
+                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Waiting for M-Pesa</h3>
                   <p className="mt-1 text-sm text-gray-500">An M-Pesa payment request has been sent to your phone. Enter your M-Pesa PIN to complete the KSh 300 activation payment.</p>
-                  <p className="mt-3 text-xs text-gray-400">Waiting for payment confirmation…</p>
+                  <p className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-amber-800">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
+                    Waiting for confirmation…
+                  </p>
                   {payError && (
                     <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">{payError}</div>
                   )}
@@ -519,9 +522,9 @@ export function Dashboard() {
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
                     <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                   </div>
-                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Membership Activated!</h3>
+                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Confirmed</h3>
                   <p className="mt-1 text-sm text-gray-500">Your KSh 300 activation payment was successful. Your Luma Welfare membership is now active.</p>
-                  <button onClick={() => setShowPayModal(false)} className="mt-5 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-colors min-h-[44px]">
+                  <button onClick={() => setShowPayModal(false)} className="mt-5 luma-btn luma-btn-primary px-5 py-2.5 text-sm">
                     Explore Packages
                   </button>
                 </div>
@@ -532,10 +535,10 @@ export function Dashboard() {
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
                     <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                   </div>
-                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Payment Not Completed</h3>
+                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Failed</h3>
                   <p className="mt-1 text-sm text-gray-500">{payError || 'The payment was not completed.'}</p>
                   <div className="mt-5 flex gap-2 justify-center">
-                    <button onClick={() => { setPayStep('phone'); setPayError('') }} className="rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 transition-colors min-h-[44px]">
+                    <button onClick={() => { setPayStep('phone'); setPayError('') }} className="luma-btn luma-btn-primary px-5 py-2.5 text-sm">
                       Try Again
                     </button>
                     <button onClick={() => setShowPayModal(false)} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors min-h-[44px]">
@@ -598,11 +601,28 @@ export function Dashboard() {
       {/* Live pending banner */}
       {contribTracker.state === 'waiting' && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
-          Waiting for M-Pesa confirmation…
+          <span className="inline-flex items-center gap-2 font-medium">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
+            Waiting for M-Pesa…
+          </span>
         </div>
       )}
-      {(contribTracker.state === 'failed' || contribTracker.state === 'expired') && (
+      {contribTracker.state === 'failed' && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+          <p className="font-medium">Failed</p>
+          <p>{contribTracker.message}</p>
+          <button
+            type="button"
+            onClick={() => { setContribPaymentId(null); openContribPay(contribSubId) }}
+            className="mt-2 font-semibold underline"
+          >
+            Retry payment
+          </button>
+        </div>
+      )}
+      {contribTracker.state === 'expired' && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+          <p className="font-medium">Timed out</p>
           <p>{contribTracker.message}</p>
           <button
             type="button"
@@ -1107,33 +1127,54 @@ export function Dashboard() {
             {contribTracker.state === 'waiting' ? (
               <div className="px-6 py-10 text-center">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
-                  <svg className="h-6 w-6 text-amber-600 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <svg className="h-6 w-6 text-amber-600 animate-pulse motion-reduce:animate-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
-                <h4 className="mt-3 text-lg font-semibold text-gray-900">Waiting for M-Pesa confirmation…</h4>
+                <h4 className="mt-3 text-lg font-semibold text-gray-900">Waiting for M-Pesa</h4>
                 <p className="mt-1 text-sm text-gray-500">Enter your M-Pesa PIN on your phone. This screen updates automatically.</p>
+                <p className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-amber-800">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
+                  Waiting for confirmation…
+                </p>
               </div>
             ) : contribTracker.state === 'success' ? (
               <div className="px-6 py-10 text-center">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
                   <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                 </div>
-                <h4 className="mt-3 text-lg font-semibold text-gray-900">Payment confirmed</h4>
+                <h4 className="mt-3 text-lg font-semibold text-gray-900">Confirmed</h4>
                 {contribTracker.receipt && (
                   <p className="mt-1 text-sm text-gray-500">Receipt: {contribTracker.receipt}</p>
                 )}
-                <button type="button" onClick={closeContribPay} className="mt-5 rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 min-h-[44px]">
+                <button type="button" onClick={closeContribPay} className="mt-5 luma-btn luma-btn-primary px-5 py-2.5 text-sm">
                   Done
                 </button>
               </div>
-            ) : (contribTracker.state === 'failed' || contribTracker.state === 'expired') ? (
+            ) : contribTracker.state === 'failed' ? (
               <div className="px-6 py-10 text-center">
-                <h4 className="text-lg font-semibold text-gray-900">Payment not completed</h4>
+                <h4 className="text-lg font-semibold text-gray-900">Failed</h4>
                 <p className="mt-1 text-sm text-gray-500">{contribTracker.message}</p>
                 <div className="mt-5 flex justify-center gap-2">
                   <button
                     type="button"
                     onClick={() => { setContribPaymentId(null); setContribPayError('') }}
-                    className="rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 min-h-[44px]"
+                    className="luma-btn luma-btn-primary px-5 py-2.5 text-sm"
+                  >
+                    Retry
+                  </button>
+                  <button type="button" onClick={closeContribPay} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 min-h-[44px]">
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : contribTracker.state === 'expired' ? (
+              <div className="px-6 py-10 text-center">
+                <h4 className="text-lg font-semibold text-gray-900">Timed out</h4>
+                <p className="mt-1 text-sm text-gray-500">{contribTracker.message}</p>
+                <div className="mt-5 flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setContribPaymentId(null); setContribPayError('') }}
+                    className="luma-btn luma-btn-primary px-5 py-2.5 text-sm"
                   >
                     Retry
                   </button>
@@ -1182,7 +1223,7 @@ export function Dashboard() {
                     type="button"
                     onClick={startContributionPay}
                     disabled={contribPaying || pendingBlocked || !contribSubId}
-                    className="rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-50 min-h-[44px]"
+                    className="luma-btn luma-btn-primary px-5 py-2.5 text-sm"
                   >
                     {contribPaying ? 'Sending…' : 'Send STK Push'}
                   </button>

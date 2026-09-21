@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
+import { useReducedMotion } from 'framer-motion'
+
 type ProgressBarProps = {
   value: number
   max?: number
@@ -17,9 +20,41 @@ export function ProgressBar({
 }: ProgressBarProps) {
   const safeMax = max <= 0 ? 1 : max
   const pct = Math.max(0, Math.min(100, Math.round((value / safeMax) * 100)))
+  const reduceMotion = useReducedMotion()
+  const [filled, setFilled] = useState(Boolean(reduceMotion))
+  const barRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (reduceMotion) {
+      setFilled(true)
+      return
+    }
+
+    const el = barRef.current
+    if (!el) return
+
+    if (typeof IntersectionObserver === 'undefined' || import.meta.env.MODE === 'test') {
+      setFilled(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setFilled(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.4 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [reduceMotion])
+
+  const widthPct = filled ? pct : 0
 
   return (
-    <div className={className}>
+    <div className={className} ref={barRef}>
       {(label || ariaLabel) && (
         <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
           {label ? <span className="font-medium text-gray-600">{label}</span> : <span />}
@@ -35,8 +70,8 @@ export function ProgressBar({
         aria-label={ariaLabel ?? label ?? 'Progress'}
       >
         <div
-          className="h-full rounded-full bg-luma-600 transition-[width] duration-300 ease-out motion-reduce:transition-none"
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full bg-luma-600 transition-[width] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          style={{ width: `${widthPct}%` }}
         />
       </div>
     </div>

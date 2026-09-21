@@ -38,6 +38,12 @@
   --motion-base: 250ms;
   --motion-slow: 400ms;
 
+  /* Shared UX motion tokens (Increment 1) */
+  --luma-motion-micro: 180ms;
+  --luma-motion-ui: 280ms;
+  --luma-motion-reveal: 450ms;
+  --luma-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 
   /* Glass design tokens */
@@ -223,12 +229,79 @@ a, button {
 
 /* Design-system motion helpers (150–400ms; honor reduced-motion block below) */
 .luma-enter {
-  animation: luma-fade-up var(--motion-base) ease-out both;
+  animation: luma-fade-up var(--luma-motion-ui) var(--luma-ease-out) both;
 }
 
 @keyframes luma-fade-up {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Button micro-interactions — hover/active/focus/disabled */
+.luma-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition:
+    background-color var(--luma-motion-micro) var(--luma-ease-out),
+    color var(--luma-motion-micro) var(--luma-ease-out),
+    box-shadow var(--luma-motion-micro) var(--luma-ease-out),
+    transform var(--luma-motion-micro) var(--luma-ease-out),
+    opacity var(--luma-motion-micro) var(--luma-ease-out);
+}
+
+.luma-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.luma-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.luma-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.luma-btn-primary {
+  background-color: var(--color-luma-700);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0, 107, 46, 0.2);
+}
+
+.luma-btn-primary:hover:not(:disabled) {
+  background-color: var(--color-luma-800);
+  box-shadow: 0 4px 12px rgba(0, 107, 46, 0.22);
+}
+
+/* Interactive cards — lift + shadow; no essential info on hover only */
+.luma-card-interactive {
+  transition:
+    transform var(--luma-motion-ui) var(--luma-ease-out),
+    box-shadow var(--luma-motion-ui) var(--luma-ease-out),
+    border-color var(--luma-motion-ui) var(--luma-ease-out);
+}
+
+.luma-card-interactive:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(2, 46, 19, 0.12);
+  border-color: rgba(126, 205, 170, 0.55);
+}
+
+.luma-card-interactive:active {
+  transform: translateY(-1px);
+}
+
+/* Header scroll deepen */
+.glass-header-scrolled {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 28px rgba(2, 46, 19, 0.1);
+  border-bottom-color: rgba(226, 232, 240, 0.85);
 }
 
 /* Custom scrollbar */
@@ -281,6 +354,13 @@ a, button {
   .slide-in-from-bottom,
   .luma-enter {
     animation: none !important;
+  }
+
+  .luma-btn:hover:not(:disabled),
+  .luma-btn:active:not(:disabled),
+  .luma-card-interactive:hover,
+  .luma-card-interactive:active {
+    transform: none;
   }
 
   *,
