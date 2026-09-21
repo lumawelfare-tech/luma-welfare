@@ -26,11 +26,11 @@ describe('AppBootLoader', () => {
     mockedReduced.mockReturnValue(false)
   })
 
-  it('renders brand wordmark and mark without descriptive tagline', () => {
+  it('renders brand wordmark and mark', () => {
     render(<AppBootLoader />)
     expect(screen.getByText('Luma Welfare')).toBeInTheDocument()
     expect(screen.getByText('LW')).toBeInTheDocument()
-    expect(screen.queryByText('Community Welfare')).not.toBeInTheDocument()
+    expect(screen.getByText('Community Welfare')).toBeInTheDocument()
   })
 
   it('exposes an accessible loading status', () => {

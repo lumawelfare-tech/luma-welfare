@@ -63,6 +63,9 @@ export function AppBootLoader({
       <p className="mt-8 text-center text-xl font-bold tracking-tight text-luma-900 sm:text-2xl">
         Luma Welfare
       </p>
+      <p className="mt-1 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-luma-600">
+        Community Welfare
+      </p>
 
       {/* Loading dots */}
       <div className="mt-6 flex items-center gap-1.5" aria-hidden="true">
