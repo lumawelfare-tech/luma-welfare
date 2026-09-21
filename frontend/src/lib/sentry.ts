@@ -4,6 +4,30 @@ const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined
 const isProduction = import.meta.env.PROD
 const isDev = import.meta.env.DEV
 
+const PII_VALUE =
+  /\b(?:0[17]\d{8}|\+?254[17]\d{8}|\b\d{7,10}\b)\b/g
+const SENSITIVE_KEY = /token|secret|password|authorization|cookie|mpesa|service.?role|cron|phone|id_number|otp/i
+
+/** Exported for unit tests — scrub phone-like and secret-bearing text. */
+export function scrubPiiText(value: string): string {
+  return value
+    .replace(PII_VALUE, '[REDACTED]')
+    .replace(/Bearer\s+[A-Za-z0-9._\-]+/gi, 'Bearer [REDACTED]')
+}
+
+function scrubEventValue(value: unknown): unknown {
+  if (typeof value === 'string') return scrubPiiText(value)
+  if (Array.isArray(value)) return value.map(scrubEventValue)
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = SENSITIVE_KEY.test(k) ? '[REDACTED]' : scrubEventValue(v)
+    }
+    return out
+  }
+  return value
+}
+
 /**
  * Initialize Sentry for production error monitoring.
  * Only activates in production when a DSN is configured.
@@ -21,12 +45,10 @@ export function initSentry() {
     dsn: SENTRY_DSN,
     environment: import.meta.env.MODE || 'production',
 
-    // Performance monitoring
-    tracesSampleRate: 0.1, // 10% of transactions
-    replaysSessionSampleRate: 0.01, // 1% of sessions
-    replaysOnErrorSampleRate: 1.0, // 100% of error sessions
+    tracesSampleRate: 0.1,
+    replaysSessionSampleRate: 0.01,
+    replaysOnErrorSampleRate: 1.0,
 
-    // Integrations
     integrations: [
       Sentry.browserTracingIntegration(),
       Sentry.replayIntegration({
@@ -35,13 +57,9 @@ export function initSentry() {
       }),
     ],
 
-    // Release tracking
     release: import.meta.env.VITE_APP_VERSION || 'unknown',
-
-    // Don't send PII
     sendDefaultPii: false,
 
-    // Ignore common non-actionable errors
     ignoreErrors: [
       'ResizeObserver loop limit exceeded',
       'ResizeObserver loop completed with undelivered notifications',
@@ -51,46 +69,52 @@ export function initSentry() {
       'ChunkLoadError',
       'Loading chunk.* failed',
       'Loading CSS chunk.* failed',
-      // Browser extensions
       'Non-Error Captured',
     ],
 
-    // Before send hook to filter out noise and strip sensitive extras
     beforeSend(event) {
-      // Don't send events for development errors
       if (event.exception?.values?.[0]?.type === 'ChunkLoadError') {
-        return null // User needs to refresh
+        return null
       }
 
-      // Don't send events for network errors (user offline)
       if (event.exception?.values?.[0]?.value?.includes('Failed to fetch')) {
-        return null // Network issue, not a bug
+        return null
       }
 
-      // Strip common secret-bearing keys from extras/contexts if present
-      const sensitiveKey = /token|secret|password|authorization|cookie|mpesa|service.?role|cron/i
       if (event.extra) {
-        for (const key of Object.keys(event.extra)) {
-          if (sensitiveKey.test(key)) delete event.extra[key]
+        event.extra = scrubEventValue(event.extra) as Record<string, unknown>
+      }
+      if (event.contexts) {
+        event.contexts = scrubEventValue(event.contexts) as typeof event.contexts
+      }
+      if (event.request?.headers) {
+        for (const key of Object.keys(event.request.headers)) {
+          if (SENSITIVE_KEY.test(key)) {
+            event.request.headers[key] = '[REDACTED]'
+          }
         }
+      }
+      if (event.exception?.values) {
+        for (const ex of event.exception.values) {
+          if (ex.value) ex.value = scrubPiiText(ex.value)
+        }
+      }
+      if (event.message) {
+        event.message = scrubPiiText(event.message)
       }
 
       return event
     },
 
-    // Transport options
     transport: Sentry.makeBrowserOfflineTransport(Sentry.makeFetchTransport),
   })
 }
 
-/**
- * Capture an exception with additional context.
- */
 export function captureError(error: Error, context?: Record<string, unknown>) {
   if (isProduction && SENTRY_DSN) {
     Sentry.withScope(scope => {
       if (context) {
-        scope.setExtras(context)
+        scope.setExtras(scrubEventValue(context) as Record<string, unknown>)
       }
       Sentry.captureException(error)
     })
@@ -99,20 +123,15 @@ export function captureError(error: Error, context?: Record<string, unknown>) {
   }
 }
 
-/**
- * Capture a message for debugging.
- */
 export function captureMessage(message: string, level: 'info' | 'warning' | 'error' = 'info') {
   if (isProduction && SENTRY_DSN) {
-    Sentry.captureMessage(message, level)
+    Sentry.captureMessage(scrubPiiText(message), level)
   } else if (isDev) {
     console[level === 'error' ? 'error' : level === 'warning' ? 'warn' : 'info'](`[${level}]`, message)
   }
 }
 
-/**
- * Set user context for error tracking (without PII).
- */
+/** Set user context for error tracking (id + role only — no email/phone). */
 export function setSentryUser(user: { id: string; role?: string }) {
   if (isProduction && SENTRY_DSN) {
     Sentry.setUser({ id: user.id })
@@ -122,9 +141,6 @@ export function setSentryUser(user: { id: string; role?: string }) {
   }
 }
 
-/**
- * Clear user context on logout.
- */
 export function clearSentryUser() {
   if (isProduction && SENTRY_DSN) {
     Sentry.setUser(null)

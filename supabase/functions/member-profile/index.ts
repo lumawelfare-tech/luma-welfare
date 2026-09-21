@@ -2,6 +2,7 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, createUserClient, logAudit } from '../shared/supabase.ts'
 import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
+import { withLogging } from '../shared/logging.ts'
 
 /**
  * Member Profile — Update profile, avatar, password, data export, deletion request
@@ -14,7 +15,7 @@ import { rateLimitAsync } from '../shared/rate-limit.ts'
  * GET   /member-profile?action=deletion-request — latest deletion request status
  */
 
-Deno.serve(async (req) => {
+Deno.serve(withLogging('member-profile', async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
@@ -346,4 +347,4 @@ Deno.serve(async (req) => {
   } catch (err) {
     return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
-})
+}))

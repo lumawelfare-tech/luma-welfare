@@ -2,6 +2,7 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createUserClient, createAdminClient } from '../shared/supabase.ts'
 import { rateLimitAsync, addRateLimitHeaders } from '../shared/rate-limit.ts'
 import { parseLoginBody, ValidationError } from '../shared/validate.ts'
+import { withLogging } from '../shared/logging.ts'
 
 /**
  * Auth Login — authenticate user and check 2FA status
@@ -14,7 +15,7 @@ import { parseLoginBody, ValidationError } from '../shared/validate.ts'
  * - requires_2fa: true if admin has 2FA enabled (frontend must then call admin-2fa?action=verify)
  */
 
-Deno.serve(async (req) => {
+Deno.serve(withLogging('auth-login', async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
@@ -87,4 +88,4 @@ Deno.serve(async (req) => {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
-})
+}))

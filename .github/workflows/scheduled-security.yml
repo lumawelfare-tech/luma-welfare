@@ -1,0 +1,64 @@
+# Scheduled dependency audit + optional live RLS suite (Phase 4 ops).
+# RLS steps no-op gracefully when Supabase secrets are not configured.
+
+name: Scheduled security checks
+
+on:
+  schedule:
+    # Mondays 06:00 UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-security
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  npm-audit:
+    name: npm audit (prod)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Audit root (omit dev)
+        run: npm audit --omit=dev
+        continue-on-error: true
+      - name: Audit frontend (omit dev)
+        working-directory: frontend
+        run: npm audit --omit=dev
+        continue-on-error: true
+      - name: Fail on critical (root)
+        run: |
+          CRITICAL=$(npm audit --json --omit=dev 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const j=JSON.parse(s);console.log(j.metadata?.vulnerabilities?.critical||0)}catch{console.log(0)}})")
+          echo "critical=$CRITICAL"
+          if [ "$CRITICAL" != "0" ]; then exit 1; fi
+
+  rls-live:
+    name: Live RLS isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Run RLS suite
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run test:rls
+        # Live suite skips when SUPABASE_* secrets are unset.

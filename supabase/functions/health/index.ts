@@ -11,8 +11,9 @@
 import { corsHeaders } from '../shared/cors.ts'
 import { createAdminClient } from '../shared/supabase.ts'
 import { requireCronSecret } from '../shared/internal-auth.ts'
+import { withLogging } from '../shared/logging.ts'
 
-Deno.serve(async (req) => {
+Deno.serve(withLogging('health', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -51,7 +52,7 @@ Deno.serve(async (req) => {
         latencyMs: Math.round(performance.now() - dbStart),
         error: error ? 'Query failed' : undefined,
       }
-    } catch (err) {
+    } catch {
       checks.database = {
         status: 'unhealthy',
         latencyMs: Math.round(performance.now() - dbStart),
@@ -63,7 +64,6 @@ Deno.serve(async (req) => {
     if (detailed) {
       const authStart = performance.now()
       try {
-        // Simple auth check — just verify the service responds
         const { error } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1 })
         checks.auth = {
           status: error && error.message.includes('not found') ? 'healthy' : (error ? 'degraded' : 'healthy'),
@@ -97,11 +97,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Determine overall status
     const allHealthy = Object.values(checks).every(c => c.status === 'healthy')
     const anyUnhealthy = Object.values(checks).some(c => c.status === 'unhealthy')
     const overallStatus = anyUnhealthy ? 'unhealthy' : allHealthy ? 'healthy' : 'degraded'
-
     const totalLatency = Math.round(performance.now() - startTime)
 
     const response: Record<string, unknown> = {
@@ -112,14 +110,14 @@ Deno.serve(async (req) => {
 
     if (detailed) {
       response.checks = checks
-      response.version = 'phase-5'
+      response.version = 'phase-4-ops'
     }
 
     return new Response(JSON.stringify(response), {
       status: overallStatus === 'unhealthy' ? 503 : 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
-  } catch (err) {
+  } catch {
     return new Response(JSON.stringify({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
@@ -129,4 +127,4 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
-})
+}))

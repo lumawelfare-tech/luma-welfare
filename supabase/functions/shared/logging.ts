@@ -1,5 +1,5 @@
 /**
- * LUMA WELFARE — PHASE 6: STRUCTURED LOGGING & ERROR TAXONOMY
+ * LUMA WELFARE — STRUCTURED LOGGING & ERROR TAXONOMY
  *
  * Features:
  * - Request correlation IDs for tracing across components
@@ -7,9 +7,12 @@
  * - Error taxonomy with consistent codes
  * - Safe user-facing error messages
  * - Sensitive data redaction
+ * - Optional Sentry capture (no-op without SENTRY_DSN)
  *
- * No external dependencies. No sensitive data logged.
+ * No required external dependencies. No sensitive data logged.
  */
+
+import { captureEdgeException } from './sentry.ts'
 
 // ============================================================================
 // TYPES
@@ -75,7 +78,11 @@ const SENSITIVE_FIELDS = [
   'cookie', 'access_token', 'refresh_token', 'service_role',
   'mpesa_consumer_key', 'mpesa_consumer_secret', 'mpesa_passkey',
   'otp', 'two_factor_secret', 'two_factor_recovery_codes',
+  'phone', 'id_number', 'national_id', 'alt_phone',
 ]
+
+const PII_VALUE_RE =
+  /\b(?:0[17]\d{8}|\+?254[17]\d{8})\b/g
 
 /**
  * Redact sensitive fields from an object.
@@ -85,6 +92,8 @@ function redactSensitive(obj: Record<string, unknown>): Record<string, unknown> 
   for (const [key, value] of Object.entries(obj)) {
     if (SENSITIVE_FIELDS.some(f => key.toLowerCase().includes(f))) {
       result[key] = '[REDACTED]'
+    } else if (typeof value === 'string') {
+      result[key] = value.replace(PII_VALUE_RE, '[REDACTED]')
     } else if (typeof value === 'object' && value !== null) {
       result[key] = '[object]'
     } else {
@@ -300,6 +309,7 @@ export function withLogging(
           status_code: err.statusCode,
           duration_ms: Math.round(durationMs),
         })
+        await captureEdgeException(err, { functionName, requestId, extra: { code: err.code } })
 
         const response = errorResponse(err.code, err.statusCode, requestId, err.message)
         const newHeaders = new Headers(response.headers)
@@ -312,6 +322,7 @@ export function withLogging(
         status_code: 500,
         duration_ms: Math.round(durationMs),
       })
+      await captureEdgeException(err, { functionName, requestId })
 
       return errorResponse('INTERNAL_ERROR', 500, requestId)
     }

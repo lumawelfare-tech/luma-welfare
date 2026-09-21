@@ -140,6 +140,10 @@ async function apiInternal<T = unknown>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     apikey: config.publishableKey,
+    'x-request-id':
+      (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? `req_${crypto.randomUUID()}`
+        : `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
   }
 
   if (accessToken) {

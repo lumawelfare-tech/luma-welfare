@@ -7,6 +7,7 @@ import {
 } from 'react'
 import { api, setSession, clearSession, ApiError } from '../lib/api'
 import { supabase } from '../lib/supabase'
+import { setSentryUser, clearSentryUser } from '../lib/sentry'
 
 export type Member = {
   id: string
@@ -112,6 +113,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAdmin(profile.isAdmin)
         setAdminRole(profile.adminRole)
         setRegistrationFeePaid(profile.registrationFeePaid)
+        if (profile.member?.id) {
+          setSentryUser({
+            id: profile.member.id,
+            role: profile.isAdmin ? (profile.adminRole ?? 'admin') : 'member',
+          })
+        }
       }
     }
 
@@ -126,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAdmin(false)
         setAdminRole(null)
         clearSession()
+        clearSentryUser()
         return
       }
 
@@ -157,6 +165,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAdmin(profile.isAdmin)
         setAdminRole(profile.adminRole)
         setRegistrationFeePaid(profile.registrationFeePaid)
+        if (profile.member?.id) {
+          setSentryUser({
+            id: profile.member.id,
+            role: profile.isAdmin ? (profile.adminRole ?? 'admin') : 'member',
+          })
+        }
 
         // After OAuth sign-in, redirect admins to admin dashboard
         if (session?.user && session.user.app_metadata?.provider !== 'email' && profile.isAdmin) {
@@ -253,6 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function logout() {
     clearSession()
+    clearSentryUser()
     supabase.auth.signOut()
     setMember(null)
     setIsAdmin(false)
