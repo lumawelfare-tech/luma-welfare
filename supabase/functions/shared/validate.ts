@@ -57,6 +57,8 @@ export type RegisterInput = {
   idNumber: string | null
   acceptedPrivacy: true
   acceptedTerms: true
+  privacyPolicyVersion: string
+  termsVersion: string
 }
 
 export function parseRegisterBody(input: unknown): RegisterInput {
@@ -91,6 +93,11 @@ export function parseRegisterBody(input: unknown): RegisterInput {
   if (body.acceptedTerms !== true) {
     throw new ValidationError('You must accept the Terms & Conditions to create an account.')
   }
+  const privacyPolicyVersion = requireString(body, 'privacyPolicyVersion', 'Privacy Policy version')
+  const termsVersion = requireString(body, 'termsVersion', 'Terms version')
+  if (privacyPolicyVersion.length > 64 || termsVersion.length > 64) {
+    throw new ValidationError('Invalid legal document version.')
+  }
   let idNumber: string | null = null
   if (idRaw != null && idRaw !== '') {
     if (typeof idRaw !== 'string') {
@@ -107,6 +114,8 @@ export function parseRegisterBody(input: unknown): RegisterInput {
     idNumber,
     acceptedPrivacy: true,
     acceptedTerms: true,
+    privacyPolicyVersion,
+    termsVersion,
   }
 }
 

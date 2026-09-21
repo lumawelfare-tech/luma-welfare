@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useHead } from '../lib/seo'
 import { PageHero } from '../components/PageHero'
+import { LegalDraftBanner, LegalContactBlock } from '../components/LegalDraftBanner'
+import { legalConfig, displayLegalValue } from '../config/legal'
 
 function Section({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
   return (
@@ -15,7 +17,18 @@ function Section({ number, title, children }: { number: number; title: string; c
   )
 }
 
+/**
+ * Privacy Policy — regenerated from what the codebase actually does.
+ * Organisation-specific facts come from frontend/src/config/legal.ts (placeholders omitted on render).
+ */
 export function Privacy() {
+  const entity = displayLegalValue(legalConfig.legalEntityName) ?? legalConfig.tradingName
+  const effective = displayLegalValue(legalConfig.effectiveDateDisplay)
+  const meta = [
+    `Version ${legalConfig.privacyPolicyVersion}`,
+    effective ? `Effective ${effective}` : 'Effective date pending legal confirmation',
+  ].join(' · ')
+
   useHead('Privacy Policy', 'Privacy Policy for the Luma Welfare community welfare management platform.', {
     breadcrumbs: [
       { name: 'Home', path: '/' },
@@ -28,175 +41,138 @@ export function Privacy() {
       <PageHero
         eyebrow="Legal"
         title="Privacy Policy"
-        description="How we collect, use, store, and protect your personal information."
-        meta="Last updated: September 2026"
+        description={`How ${entity} collects, uses, stores, and protects personal information on this platform.`}
+        meta={meta}
       />
 
       <div className="container-luma py-14">
         <div className="glass-card mx-auto max-w-3xl p-8 sm:p-10">
-          <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            <strong>DRAFT:</strong> review by a legal professional before relying on this policy.
-            It is written from what the platform currently collects and stores (see{' '}
-            <code className="text-xs">docs/DATA_INVENTORY.md</code>). It does <em>not</em> claim ODPC certification or legal compliance.
-          </div>
+          <LegalDraftBanner documentLabel="Privacy Policy" />
 
           <Section number={1} title="Introduction">
             <p>
-              Luma Welfare ("we," "our," or "us") is a community welfare organisation committed to protecting the privacy and security of our members' personal information. This Privacy Policy explains how we collect, use, store, and safeguard information when you use the Luma Welfare platform and services.
+              This Privacy Policy describes how {entity} (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;), trading as {legalConfig.tradingName},
+              processes personal data when you use the Luma Welfare web application (the &quot;Platform&quot;).
             </p>
             <p>
-              Processing is intended to align with Kenya&apos;s Data Protection Act, 2019. By creating an account you are asked to accept this policy and our Terms. If you do not agree, please do not use the service.
+              The Platform is built for community welfare membership in Kenya. We intend processing to align with the
+              Kenya Data Protection Act, 2019. This document is prepared for legal review; it does not by itself
+              constitute registration with the Office of the Data Protection Commissioner (ODPC) or a compliance certificate.
+            </p>
+            <p>
+              Creating an account requires accepting this Privacy Policy (version {legalConfig.privacyPolicyVersion}) and our Terms.
+              If we publish a new version, signed-in members may be asked to re-accept before continuing.
             </p>
           </Section>
 
           <Section number={2} title="Information We Collect">
-            <p>We collect information that you provide directly to us and information necessary to operate the platform:</p>
+            <p>Based on current product behaviour, we process:</p>
             <ul className="list-disc space-y-2 pl-6">
-              <li><strong>Account information:</strong> Full name, email address, phone number, and password (handled securely through authentication).</li>
-              <li><strong>Profile information:</strong> Profile photo, identification number, and other profile details you choose to provide.</li>
-              <li><strong>Family member information:</strong> Names and details of family members you add to your account.</li>
-              <li><strong>Package and subscription information:</strong> Your package selections and subscription status.</li>
-              <li><strong>Contribution information:</strong> Payment records, transaction references, amounts, and payment dates you submit.</li>
-              <li><strong>Claim information:</strong> Claims you submit, supporting documents, and related correspondence.</li>
-              <li><strong>Communication:</strong> Messages and information you send through forms or other platform features.</li>
-              <li><strong>Technical information:</strong> Information automatically collected to operate and secure the service, such as browser type, device information, and IP address.</li>
+              <li><strong>Account &amp; identity:</strong> full name, email, phone, optional national ID number, membership number, profile photo, and profile fields you choose to add (for example county, location, occupation, alternate phone).</li>
+              <li><strong>Authentication data:</strong> passwords (handled by Supabase Auth; not stored in plain text by the app), session tokens, and email one-time passcodes (hashed) for verification.</li>
+              <li><strong>Family / next of kin:</strong> details you add under Family Members.</li>
+              <li><strong>Subscriptions &amp; qualification:</strong> package selections, subscription status, and qualification state.</li>
+              <li><strong>Contributions:</strong> amounts, periods, status, notes, and references you or admins record. Online M-Pesa collection exists in code but remains disabled unless payments are explicitly enabled.</li>
+              <li><strong>Claims &amp; evidence:</strong> claim details and supporting files stored in a private Storage bucket, accessed via short-lived signed URLs.</li>
+              <li><strong>Communications:</strong> in-app notifications, notification preferences, optional web-push subscription endpoints, and messages you submit via the public contact form.</li>
+              <li><strong>Technical / security:</strong> request metadata needed to operate and secure the service (for example IP-related rate limiting, browser/user-agent where logged for security or consent records).</li>
+              <li><strong>Admin &amp; audit:</strong> administrative actions recorded in audit logs; admin accounts may use step-up 2FA.</li>
             </ul>
           </Section>
 
-          <Section number={3} title="How We Use Information">
-            <p>We use the information we collect for the following purposes:</p>
+          <Section number={3} title="Purposes">
             <ul className="list-disc space-y-2 pl-6">
-              <li>Creating and managing your membership account</li>
-              <li>Authenticating your identity and securing your account</li>
-              <li>Managing your package subscriptions and tracking qualification</li>
-              <li>Recording and processing contributions</li>
-              <li>Processing and reviewing claims</li>
-              <li>Communicating important service updates, claim status changes, and payment notifications</li>
-              <li>Providing customer and member support</li>
-              <li>Maintaining platform security and preventing misuse</li>
-              <li>Generating reports and improving the service</li>
-              <li>Complying with applicable obligations</li>
+              <li>Registering and authenticating members</li>
+              <li>Managing packages, contributions, claims, and eligibility</li>
+              <li>Member support and service messages</li>
+              <li>Security, abuse prevention, and troubleshooting</li>
+              <li>Admin reporting and operational oversight</li>
+              <li>Meeting record-keeping and legal obligations where applicable</li>
             </ul>
           </Section>
 
-          <Section number={4} title="Authentication">
+          <Section number={4} title="Where Data Is Stored and Who Processes It">
             <p>
-              Luma Welfare uses Supabase Auth for secure authentication. The following authentication methods are supported:
+              Application data is stored primarily on <strong>Supabase</strong> (authentication, Postgres with row-level security, Edge Functions, and Storage).
+              The public website is hosted on <strong>Vercel</strong> (including optional cron routes that call Edge Functions).
             </p>
+            <p>Other processors used by the current codebase when configured:</p>
             <ul className="list-disc space-y-2 pl-6">
-              <li><strong>Email and password:</strong> You create an account with an email address and password. Passwords are securely hashed and never stored in plain text.</li>
-              <li><strong>Email verification:</strong> New accounts require email verification before full access is granted.</li>
-              <li><strong>Google Sign-In:</strong> You may use your Google account to sign in if you have already registered with a matching email address. Google Sign-In is an authentication method, not a registration method.</li>
+              <li><strong>Resend:</strong> transactional email (OTP, notifications) when <code className="text-xs">RESEND_API_KEY</code> is set.</li>
+              <li><strong>Sentry:</strong> optional error monitoring when a DSN is set. Browser events scrub sensitive fields; session replay (if enabled) masks text and blocks media. Only a user id (not email/phone) is attached when signed in.</li>
+              <li><strong>Google:</strong> optional Sign-In for existing members (OAuth). Google does not create new memberships.</li>
             </ul>
             <p>
-              Authentication tokens are used to maintain your session securely. You may sign out at any time.
+              Payment processors (M-Pesa / Daraja) are integrated in code but gated off; related payment fields are not actively collected through online checkout while payments remain disabled.
             </p>
           </Section>
 
-          <Section number={5} title="Data Storage">
+          <Section number={5} title="Cookies, Local Storage, and Similar Technologies">
             <p>
-              Application data is stored using Supabase, a cloud-based platform that provides database, authentication, and storage services. Data is transmitted over encrypted connections (HTTPS/TLS).
+              The Platform uses <strong>browser local storage / session storage</strong> for authentication session material and related UX state required to keep you signed in. A <strong>service worker</strong> may cache assets and support offline/background sync and push delivery where you allow notifications.
             </p>
             <p>
-              We take reasonable steps to protect your information, but no method of electronic storage or transmission is completely secure. We cannot guarantee absolute security.
+              We do <strong>not</strong> use advertising cookies or third-party marketing analytics pixels. If Sentry is enabled in production, it may set its own first-party storage needed for error/replay SDKs as described above — not for advertising.
             </p>
           </Section>
 
-          <Section number={6} title="Service Providers">
-            <p>
-              We may use third-party infrastructure and service providers to operate the platform. These providers process data only as necessary to deliver their services:
-            </p>
+          <Section number={6} title="Security Measures (as implemented)">
             <ul className="list-disc space-y-2 pl-6">
-              <li><strong>Supabase:</strong> Database hosting, authentication, edge functions, and storage.</li>
-              <li><strong>Vercel:</strong> Frontend hosting and deployment.</li>
-              <li><strong>Resend:</strong> Transactional email delivery (when applicable).</li>
+              <li>HTTPS/TLS in transit</li>
+              <li>Supabase Auth password hashing and JWTs</li>
+              <li>Row-level security so members generally see only their own records</li>
+              <li>Role-based admin permissions and audit logging</li>
+              <li>Rate limiting on sensitive Edge Function routes</li>
+              <li>PII scrubbing in client and Edge logging / Sentry pipelines</li>
             </ul>
-            <p>
-              These providers are bound by their own privacy policies and terms of service.
-            </p>
+            <p>No system is perfectly secure; please use a strong unique password and protect your device.</p>
           </Section>
 
-          <Section number={7} title="Cookies and Local Storage">
-            <p>
-              Luma Welfare uses browser local storage to maintain your authentication session. This is necessary for the platform to function and keep you signed in.
-            </p>
-            <p>
-              We do not use analytics cookies, advertising trackers, or third-party tracking technologies. We do not use cookies for purposes beyond what is necessary to operate the service.
-            </p>
-          </Section>
-
-          <Section number={8} title="Data Security">
-            <p>
-              We use reasonable technical and organisational measures designed to protect personal information, including:
-            </p>
+          <Section number={7} title="Retention (as coded)">
             <ul className="list-disc space-y-2 pl-6">
-              <li>Encrypted data transmission (HTTPS/TLS)</li>
-              <li>Secure password hashing through Supabase Auth</li>
-              <li>Role-based access controls limiting who can access member data</li>
-              <li>Row-level security ensuring members can only access their own records</li>
-              <li>Audit logging of administrative actions</li>
-              <li>Secure server-side processing for sensitive operations</li>
+              <li>Membership and financial history: retained while needed for operations and record-keeping; closed accounts may still retain contribution/claim history.</li>
+              <li>In-app notifications: cleanup jobs target roughly 90 days (read) / 180 days (unread).</li>
+              <li>Non-financial audit logs: cleanup may remove older entries after about 2 years; financially relevant audit events are retained longer.</li>
+              <li>Claim documents: retained as needed to decide and document claims.</li>
+              <li>Deletion requests: tracked until processed; fulfilment is manual and may retain records required by law or legitimate interests.</li>
             </ul>
-            <p>
-              While we strive to protect your information, no method of transmission or storage is 100% secure. We encourage you to use strong passwords and keep your login credentials confidential.
-            </p>
+            <p>Exact statutory retention periods should be confirmed with counsel.</p>
           </Section>
 
-          <Section number={9} title="Data Retention">
-            <p>
-              We retain personal information as needed to operate membership, contributions, and claims, and to meet record-keeping needs:
-            </p>
+          <Section number={8} title="Your Rights under Kenyan Data Protection Law">
+            <p>Subject to the Data Protection Act, 2019 and applicable exceptions, you may:</p>
             <ul className="list-disc space-y-2 pl-6">
-              <li>Account and membership data while your membership is active, and afterwards where financial or legal records require it</li>
-              <li>In-app notifications: generally cleaned after about 90 days (read) or 180 days (unread)</li>
-              <li>Non-financial audit logs: may be cleaned after about 2 years; financial audit events are retained longer</li>
-              <li>Claim evidence in private storage for as long as needed to decide and document claims</li>
+              <li><strong>Access / portability:</strong> Profile → Download my data (application JSON export; claim file bytes are metadata-listed).</li>
+              <li><strong>Rectification:</strong> update profile fields in Profile.</li>
+              <li><strong>Erasure (request):</strong> submit a deletion request from Profile for admin review.</li>
+              <li><strong>Objection / restriction / complaint:</strong> contact us using the details below; you may also complain to the ODPC where applicable.</li>
             </ul>
           </Section>
 
-          <Section number={10} title="Your Rights">
-            <p>Subject to applicable law, you may:</p>
-            <ul className="list-disc space-y-2 pl-6">
-              <li><strong>Access / export:</strong> download a copy of your application data from Profile → Download my data</li>
-              <li><strong>Correct:</strong> update profile fields from your Profile page</li>
-              <li><strong>Request deletion:</strong> submit a deletion request from Profile (fulfilment is reviewed; contribution, claim, and other records required by law or legitimate interests may be retained)</li>
-              <li>Ask questions about how your personal data is handled</li>
-            </ul>
+          <Section number={9} title="Children">
             <p>
-              You may also contact us using the details below. Complaints may be directed to the Office of the Data Protection Commissioner (ODPC) where applicable.
+              The Platform is not designed for children to create accounts. If you believe a child provided personal data without appropriate authority, contact us so we can review.
             </p>
           </Section>
 
-          <Section number={11} title="Children's Privacy">
+          <Section number={10} title="Changes">
             <p>
-              Luma Welfare is not specifically designed to collect information from children. If you believe a child has provided personal information to us without appropriate consent, please contact us so we can address the situation.
+              Material updates receive a new <strong>policy version</strong> ({legalConfig.privacyPolicyVersion} is current).
+              Members who accepted an older version may be required to re-consent in the member portal.
             </p>
           </Section>
 
-          <Section number={12} title="Changes to This Policy">
-            <p>
-              We may update this Privacy Policy from time to time. When we make significant changes, we will notify members through appropriate channels, such as platform notifications or email. The latest version will always be available on this page.
-            </p>
-          </Section>
-
-          <Section number={13} title="Contact">
-            <p>If you have questions about this Privacy Policy or how your information is handled, please contact us:</p>
-            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-5">
-              <div className="space-y-2 text-sm text-gray-700">
-                <p><strong>Luma Welfare</strong></p>
-                <p>📧 info@lumawelfare.or.ke</p>
-                <p>📞 0798 635 024</p>
-                <p>💬 <a href="https://wa.me/254798635024" target="_blank" rel="noopener noreferrer" className="text-luma-700 hover:text-luma-800 underline">WhatsApp</a></p>
-              </div>
-            </div>
+          <Section number={11} title="Contact">
+            <p>Questions about this Privacy Policy or personal data:</p>
+            <LegalContactBlock />
           </Section>
 
           <div className="mt-12 rounded-xl border border-luma-200 bg-luma-50 p-6 text-center">
             <p className="text-sm text-gray-600">
-              <strong>DRAFT</strong> — for informational purposes only; does not constitute legal advice or a compliance claim.
+              Document version <strong>{legalConfig.privacyPolicyVersion}</strong>. Not legal advice.
             </p>
             <div className="mt-4 flex justify-center gap-4">
-              <Link to="/terms" className="text-sm font-medium text-luma-700 hover:text-luma-800">Terms & Conditions →</Link>
+              <Link to="/terms" className="text-sm font-medium text-luma-700 hover:text-luma-800">Terms &amp; Conditions →</Link>
               <Link to="/faq" className="text-sm font-medium text-luma-700 hover:text-luma-800">FAQ →</Link>
             </div>
           </div>

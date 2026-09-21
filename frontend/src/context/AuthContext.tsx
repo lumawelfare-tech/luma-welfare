@@ -27,6 +27,10 @@ export type Member = {
   occupation: string | null
   created_at: string | null
   updated_at: string | null
+  privacy_accepted_at?: string | null
+  terms_accepted_at?: string | null
+  privacy_policy_version?: string | null
+  terms_version?: string | null
 }
 
 export type LoginResult = {
@@ -52,9 +56,12 @@ type AuthState = {
     idNumber?: string
     acceptedPrivacy: true
     acceptedTerms: true
+    privacyPolicyVersion: string
+    termsVersion: string
   }) => Promise<void>
   logout: () => void
   setTwoFaVerified: (v: boolean) => void
+  refreshMember: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -261,8 +268,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     idNumber?: string
     acceptedPrivacy: true
     acceptedTerms: true
+    privacyPolicyVersion: string
+    termsVersion: string
   }): Promise<void> {
     await api('/auth/register', { method: 'POST', body: input })
+  }
+
+  async function refreshMember(): Promise<void> {
+    const profile = await loadProfile()
+    setMember(profile.member)
+    setIsAdmin(profile.isAdmin)
+    setAdminRole(profile.adminRole)
+    setRegistrationFeePaid(profile.registrationFeePaid)
   }
 
   function logout() {
@@ -276,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTwoFaVerified(false)
   }
   return (
-    <AuthContext.Provider value={{ member, isAdmin, adminRole, registrationFeePaid, twoFaVerified, loading, login, signInWithGoogle, register, logout, setTwoFaVerified }}>
+    <AuthContext.Provider value={{ member, isAdmin, adminRole, registrationFeePaid, twoFaVerified, loading, login, signInWithGoogle, register, logout, setTwoFaVerified, refreshMember }}>
       {children}
     </AuthContext.Provider>
   )

@@ -30,6 +30,8 @@ describe('parseRegisterBody', () => {
     phone: '0712345678',
     acceptedPrivacy: true as const,
     acceptedTerms: true as const,
+    privacyPolicyVersion: '2026-09-21.1',
+    termsVersion: '2026-09-21.1',
   }
 
   it('accepts a valid Kenya registration payload', () => {

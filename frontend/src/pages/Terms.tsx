@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useHead } from '../lib/seo'
 import { PageHero } from '../components/PageHero'
+import { LegalDraftBanner, LegalContactBlock } from '../components/LegalDraftBanner'
+import { legalConfig, displayLegalValue } from '../config/legal'
 
 function Section({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
   return (
@@ -15,7 +17,18 @@ function Section({ number, title, children }: { number: number; title: string; c
   )
 }
 
+/**
+ * Terms & Conditions — aligned to current product behaviour for lawyer review.
+ */
 export function Terms() {
+  const entity = displayLegalValue(legalConfig.legalEntityName) ?? legalConfig.tradingName
+  const effective = displayLegalValue(legalConfig.effectiveDateDisplay)
+  const forum = displayLegalValue(legalConfig.disputeForum)
+  const meta = [
+    `Version ${legalConfig.termsVersion}`,
+    effective ? `Effective ${effective}` : 'Effective date pending legal confirmation',
+  ].join(' · ')
+
   useHead('Terms & Conditions', 'Terms and Conditions for using the Luma Welfare community welfare management platform.', {
     breadcrumbs: [
       { name: 'Home', path: '/' },
@@ -28,178 +41,103 @@ export function Terms() {
       <PageHero
         eyebrow="Legal"
         title="Terms & Conditions"
-        description="The terms governing your use of the Luma Welfare platform and services."
-        meta="Last updated: September 2026"
+        description={`Rules for using the ${legalConfig.tradingName} platform.`}
+        meta={meta}
       />
 
       <div className="container-luma py-14">
         <div className="glass-card mx-auto max-w-3xl p-8 sm:p-10">
-          <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            <strong>DRAFT:</strong> review by a legal professional before relying on these terms.
-            This text reflects how the product works today and is not legal advice.
-          </div>
+          <LegalDraftBanner documentLabel="Terms & Conditions" />
 
-          <Section number={1} title="Acceptance of Terms">
+          <Section number={1} title="Acceptance">
             <p>
-              By accessing or using the Luma Welfare platform ("the Service"), you agree to be bound by these Terms & Conditions. If you do not agree to these terms, please do not use the Service.
-            </p>
-            <p>
-              New accounts must accept these Terms and the Privacy Policy during registration. Continued use after updates constitutes acceptance of the revised terms when we post them.
+              By accessing or using the Platform operated by {entity} (trading as {legalConfig.tradingName}),
+              you agree to these Terms (version {legalConfig.termsVersion}) and the Privacy Policy.
+              Registration requires affirmative acceptance. Updated versions may require re-acceptance while signed in.
             </p>
           </Section>
 
-          <Section number={2} title="About Luma Welfare">
+          <Section number={2} title="The Service">
             <p>
-              Luma Welfare is a community welfare platform that enables members to contribute monthly to welfare packages and submit claims when eligible. The platform manages membership, package subscriptions, contribution tracking, claim processing, and related administrative functions.
+              {legalConfig.tradingName} provides a web application for community welfare membership: registration,
+              package subscriptions, contribution tracking, claim submission/review, notifications, and related admin tools.
+              It is not a bank, insurer, or investment product.
             </p>
           </Section>
 
-          <Section number={3} title="Eligibility">
-            <p>
-              To use Luma Welfare, you must create an account and provide accurate registration information. You are responsible for maintaining the accuracy of your account information.
-            </p>
-          </Section>
-
-          <Section number={4} title="Account Registration">
-            <p>When you create an account, you agree to:</p>
+          <Section number={3} title="Eligibility and Accounts">
+            <p>You must provide accurate registration information and keep credentials confidential. You are responsible for activity under your account.</p>
             <ul className="list-disc space-y-2 pl-6">
-              <li>Provide accurate, current, and complete information during registration</li>
-              <li>Maintain the security of your password and login credentials</li>
-              <li>Not share your account credentials with others</li>
-              <li>Not allow others to use your account</li>
-              <li>Promptly update your information if it changes</li>
-              <li>Accept responsibility for all activity that occurs under your account</li>
+              <li>Email verification (OTP) is required before full access.</li>
+              <li>Google Sign-In is available only for already-registered emails; it does not create new accounts.</li>
+              <li>A one-time activation fee of KSh 300 applies after verification before package access (as implemented today).</li>
             </ul>
           </Section>
 
-          <Section number={5} title="Email Verification">
-            <p>
-              New accounts require email verification. You must verify your email address before you can access full platform features. A one-time passcode (OTP) is sent to the email address you provided during registration — enter this code on the verification page to confirm your address.
-            </p>
-          </Section>
-
-          <Section number={6} title="Google Authentication">
-            <p>
-              Luma Welfare supports Google Sign-In as an alternative authentication method. Google Sign-In is only available for accounts that have already been registered through the standard registration process with a matching email address. Google Sign-In does not create new accounts.
-            </p>
-          </Section>
-
-          <Section number={7} title="Membership Activation">
-            <p>
-              After registration and email verification (via a one-time passcode), a one-time activation fee of KSh 300 is required to activate your membership and access welfare packages. This fee is separate from package contributions and is non-recurring.
-            </p>
-          </Section>
-
-          <Section number={8} title="Packages">
-            <p>Luma Welfare offers various welfare packages. When you subscribe to a package:</p>
+          <Section number={4} title="Packages, Contributions, and Claims">
             <ul className="list-disc space-y-2 pl-6">
-              <li>Each package has its own contribution amount, waiting period, and eligibility rules</li>
-              <li>You should review the specific package details before subscribing</li>
-              <li>Eligibility and qualification depend on package-specific rules and your contribution history</li>
-              <li>You may subscribe to multiple packages simultaneously</li>
-              <li>Each package subscription is tracked independently</li>
-            </ul>
-            <p>
-              Package details, including contribution amounts and waiting periods, are available on the Packages page and may be updated from time to time.
-            </p>
-          </Section>
-
-          <Section number={9} title="Contributions">
-            <p>
-              Contributions are payments you make toward your package subscriptions. You may record contributions through the platform. Currently, contributions are recorded manually and verified by administrators.
-            </p>
-            <p>
-              Online payment functionality may be introduced in the future. When available, additional terms may apply to payment processing.
-            </p>
-          </Section>
-
-          <Section number={10} title="Claims">
-            <p>
-              When you are eligible, you may submit claims against your subscribed packages. Claims are reviewed and processed by administrators. Submission of a claim does not guarantee approval or payment.
-            </p>
-            <p>
-              You are responsible for providing accurate and complete information when submitting claims, including any required supporting documents.
-            </p>
-          </Section>
-
-          <Section number={11} title="Prohibited Use">
-            <p>You must not:</p>
-            <ul className="list-disc space-y-2 pl-6">
-              <li>Attempt to gain unauthorised access to the platform or other users' accounts</li>
-              <li>Use the platform for any unlawful purpose</li>
-              <li>Submit false, misleading, or fraudulent information</li>
-              <li>Interfere with or disrupt the platform's operation</li>
-              <li>Attempt to bypass security controls or access restrictions</li>
-              <li>Upload malicious content or code</li>
-              <li>Abuse communication or notification features</li>
-              <li>Use automated tools to access the platform without permission</li>
-              <li>Impersonate another person or entity</li>
+              <li>Each package has its own contribution rules, waiting period, and eligibility logic.</li>
+              <li>You may hold multiple packages; each is tracked separately.</li>
+              <li>Contributions are recorded in-app and verified by administrators. Online M-Pesa checkout remains disabled unless payments are enabled by operators.</li>
+              <li>Submitting a claim does not guarantee approval or payout. You must provide accurate information and required documents.</li>
             </ul>
           </Section>
 
-          <Section number={12} title="Account Suspension and Closure">
+          <Section number={5} title="Acceptable Use">
+            <p>You must not misuse the Platform, including unauthorised access, fraud, false claims, interference with security controls, or abusive automation.</p>
+          </Section>
+
+          <Section number={6} title="Suspension and Closure">
             <p>
-              Luma Welfare reserves the right to suspend or close accounts where necessary for security reasons, to address misuse, to comply with applicable obligations, or for other legitimate operational reasons. Affected members will be notified where practicable.
+              We may suspend or close accounts for security, misuse, legal compliance, or operational reasons.
+              We will notify you where practicable.
             </p>
           </Section>
 
-          <Section number={13} title="Content">
+          <Section number={7} title="Content and Intellectual Property">
             <p>
-              Website content, branding, images, and text are the property of Luma Welfare and may not be reproduced without permission. User-submitted content (including profile information, claims, and documents) remains your responsibility, but you grant Luma Welfare the right to use such content as necessary to operate the service.
+              Platform branding and site content belong to {entity} / {legalConfig.tradingName}.
+              You retain responsibility for content you upload; you grant us rights needed to operate membership, claims, and administration.
             </p>
           </Section>
 
-          <Section number={14} title="Third-Party Services">
+          <Section number={8} title="Third-Party Infrastructure">
             <p>
-              The platform relies on third-party infrastructure and services (including Supabase, Vercel, and Resend) to operate. Luma Welfare is not responsible for the availability, performance, or practices of these third-party services.
+              The Platform depends on providers including Supabase, Vercel, Resend (email), optional Sentry, and optional Google OAuth.
+              Their availability and practices are governed by their terms.
             </p>
           </Section>
 
-          <Section number={15} title="Service Availability">
+          <Section number={9} title="Disclaimers">
             <p>
-              We aim to provide reliable access to the platform, but we do not guarantee uninterrupted availability. The service may be temporarily unavailable due to maintenance, technical issues, or circumstances beyond our control.
+              The Platform is provided to support community welfare operations. Except as required by law, we do not provide warranties beyond what these Terms expressly state.
+              Package rules and community decisions govern benefits; these Terms do not replace package-specific rules.
             </p>
           </Section>
 
-          <Section number={16} title="Disclaimers">
+          <Section number={10} title="Changes">
             <p>
-              The Luma Welfare platform is provided to support community welfare management. While we work to ensure the accuracy and reliability of the platform, we make no representations or warranties beyond what is expressly stated in these terms.
-            </p>
-            <p>
-              Luma Welfare is not a financial institution, insurer, or registered investment entity. Package contributions and benefits are governed by the rules established by the Luma Welfare community, not by these Terms & Conditions alone.
+              Material updates receive a new terms version. Continued use after re-consent (when prompted) constitutes acceptance of the updated Terms.
             </p>
           </Section>
 
-          <Section number={17} title="Changes to Terms">
+          <Section number={11} title="Governing Law">
             <p>
-              We may update these Terms & Conditions from time to time. Significant changes will be communicated through appropriate channels. Continued use of the platform after changes are posted constitutes acceptance of the updated terms.
+              These Terms are governed by {legalConfig.governingLaw}.
+              {forum
+                ? ` Disputes shall be subject to ${forum}.`
+                : ' The competent courts or dispute forum will be confirmed by legal counsel (placeholder pending review).'}
             </p>
           </Section>
 
-          <Section number={18} title="Governing Law">
-            <p>
-              These Terms & Conditions are governed by the laws applicable to the operations of Luma Welfare in Kenya. Any disputes arising from the use of the platform shall be resolved in accordance with applicable Kenyan law.
-            </p>
-            <p className="text-xs text-gray-400 italic">
-              Note: The specific governing law and jurisdiction details should be confirmed by Luma Welfare's legal advisors.
-            </p>
-          </Section>
-
-          <Section number={19} title="Contact">
-            <p>If you have questions about these Terms & Conditions, please contact us:</p>
-            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-5">
-              <div className="space-y-2 text-sm text-gray-700">
-                <p><strong>Luma Welfare</strong></p>
-                <p>📧 info@lumawelfare.or.ke</p>
-                <p>📞 0798 635 024</p>
-                <p>💬 <a href="https://wa.me/254798635024" target="_blank" rel="noopener noreferrer" className="text-luma-700 hover:text-luma-800 underline">WhatsApp</a></p>
-              </div>
-            </div>
+          <Section number={12} title="Contact">
+            <p>Questions about these Terms:</p>
+            <LegalContactBlock />
           </Section>
 
           <div className="mt-12 rounded-xl border border-luma-200 bg-luma-50 p-6 text-center">
             <p className="text-sm text-gray-600">
-              These Terms & Conditions are for informational purposes and do not constitute legal advice.
+              Document version <strong>{legalConfig.termsVersion}</strong>. Not legal advice.
             </p>
             <div className="mt-4 flex justify-center gap-4">
               <Link to="/privacy" className="text-sm font-medium text-luma-700 hover:text-luma-800">Privacy Policy →</Link>

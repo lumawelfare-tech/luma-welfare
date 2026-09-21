@@ -4,6 +4,7 @@ import { sendEmail, buildOtpEmail } from '../shared/email.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { generateOtp, hashOtp, OTP_TTL_MINUTES, OtpConfigError } from '../shared/otp.ts'
 import { parseRegisterBody, ValidationError } from '../shared/validate.ts'
+import { PRIVACY_POLICY_VERSION, TERMS_VERSION } from '../shared/legal-versions.ts'
 
 /**
  * auth-register — creates the Supabase Auth user, a member record in
@@ -41,7 +42,14 @@ Deno.serve(async (req) => {
       return json(400, { message: 'Invalid JSON body.', code: 'VALIDATION' })
     }
 
-    const { email, password, fullName, phone, idNumber } = parseRegisterBody(raw)
+    const { email, password, fullName, phone, idNumber, privacyPolicyVersion, termsVersion } = parseRegisterBody(raw)
+
+    if (privacyPolicyVersion !== PRIVACY_POLICY_VERSION || termsVersion !== TERMS_VERSION) {
+      return json(400, {
+        message: 'Please refresh the page and accept the current Privacy Policy and Terms.',
+        code: 'LEGAL_VERSION_MISMATCH',
+      })
+    }
 
     const adminClient = createAdminClient()
     const consentAt = new Date().toISOString()
@@ -73,6 +81,8 @@ Deno.serve(async (req) => {
       status: 'pending_approval',
       privacy_accepted_at: consentAt,
       terms_accepted_at: consentAt,
+      privacy_policy_version: privacyPolicyVersion,
+      terms_version: termsVersion,
     })
 
     if (memberError) {
@@ -80,6 +90,23 @@ Deno.serve(async (req) => {
       console.error('auth-register: member insert failed', memberError.code ?? 'DB')
       return json(500, { message: 'Could not create membership. Please try again.', code: 'DB_ERROR' })
     }
+
+    await adminClient.from('member_legal_acceptances').insert([
+      {
+        member_id: userId,
+        document_type: 'privacy',
+        document_version: privacyPolicyVersion,
+        accepted_at: consentAt,
+        source: 'registration',
+      },
+      {
+        member_id: userId,
+        document_type: 'terms',
+        document_version: termsVersion,
+        accepted_at: consentAt,
+        source: 'registration',
+      },
+    ])
 
     await logAudit(adminClient, {
       actor_id: userId,

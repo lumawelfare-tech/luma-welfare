@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../lib/api'
 import { useHead } from '../lib/seo'
 import { AuthCard, fieldClass, alertErrorClass } from '../components/PageHero'
+import { legalConfig } from '../config/legal'
 
 export function Register() {
   useHead('Register', undefined, { noindex: true })
@@ -63,6 +64,8 @@ export function Register() {
         password: form.password,
         acceptedPrivacy: true,
         acceptedTerms: true,
+        privacyPolicyVersion: legalConfig.privacyPolicyVersion,
+        termsVersion: legalConfig.termsVersion,
       })
       navigate('/verify-email', {
         state: { email: form.email.trim() },

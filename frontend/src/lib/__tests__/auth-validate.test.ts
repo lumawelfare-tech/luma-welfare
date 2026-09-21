@@ -37,6 +37,8 @@ describe('parseRegisterBody', () => {
       idNumber: '12345678',
       acceptedPrivacy: true,
       acceptedTerms: true,
+      privacyPolicyVersion: '2026-09-21.1',
+      termsVersion: '2026-09-21.1',
     })
     expect(r.email).toBe('member@example.com')
     expect(r.phone).toBe('0712345678')
@@ -61,6 +63,10 @@ describe('parseRegisterBody', () => {
         password: 'short',
         fullName: 'A',
         phone: '0712345678',
+        acceptedPrivacy: true,
+        acceptedTerms: true,
+        privacyPolicyVersion: '2026-09-21.1',
+        termsVersion: '2026-09-21.1',
       }),
     ).toThrow(/8 characters/)
     expect(() =>
@@ -69,6 +75,10 @@ describe('parseRegisterBody', () => {
         password: 'Secret12',
         fullName: 'A',
         phone: '123',
+        acceptedPrivacy: true,
+        acceptedTerms: true,
+        privacyPolicyVersion: '2026-09-21.1',
+        termsVersion: '2026-09-21.1',
       }),
     ).toThrow(/Kenyan phone/)
   })

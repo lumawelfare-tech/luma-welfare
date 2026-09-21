@@ -1,9 +1,10 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { LegalConsentGate } from './LegalConsentGate'
 
 /**
  * Member-gated routes. Server-side authorization remains authoritative.
- * Client checks only redirect for UX.
+ * Client checks only redirect for UX. Re-consent gate when legal versions change.
  */
 export function RequireMember() {
   const { member, loading } = useAuth()
@@ -41,5 +42,9 @@ export function RequireMember() {
     )
   }
 
-  return <Outlet />
+  return (
+    <LegalConsentGate>
+      <Outlet />
+    </LegalConsentGate>
+  )
 }

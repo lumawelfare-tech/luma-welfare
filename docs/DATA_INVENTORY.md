@@ -30,7 +30,9 @@ M-Pesa / Daraja payment fields exist in schema and code but **payments remain di
 | Admin accounts | Admin profile, 2FA state, RBAC | `admins`, `roles`, `permissions` | Admins / service role | While staff account active |
 | Public content | News, gallery, media, org contact/stats keys | Content tables + public `media` bucket | Public read (intentional) | Editorial lifecycle |
 | Deletion requests | Reason, status, timestamps | `data_deletion_requests` | Requesting member (insert/read own); admins process | Until fulfilled / closed |
-| Consent timestamps | `privacy_accepted_at`, `terms_accepted_at` | `members` | Stored at registration | Same as member record |
+| Consent timestamps | `privacy_accepted_at`, `terms_accepted_at` | `members` | Stored at registration / re-consent | Same as member record |
+| Consent versions | `privacy_policy_version`, `terms_version` | `members` | Compared to current published versions for re-consent | Same as member record |
+| Consent history | document type/version, accepted_at, source | `member_legal_acceptances` | Member can read own rows; writes via Edge (service role) | Append-only history |
 
 ## Minimization notes (engineering)
 
@@ -55,7 +57,8 @@ M-Pesa / Daraja payment fields exist in schema and code but **payments remain di
 - [ ] ODPC registration (data controller) if required for Luma Welfare’s scale/activities
 - [ ] Appoint / designate DPO where required
 - [ ] DPIA for high-risk processing (claims evidence, ID numbers, family data)
-- [ ] Legal review of Privacy Policy and Terms (pages marked DRAFT)
+- [ ] Legal review of Privacy Policy and Terms (`draftPendingLegalReview` in `frontend/src/config/legal.ts`)
+- [ ] Fill legal placeholders; see `docs/LEGAL_REVIEW_PACKET.md` and `docs/ODPC_REGISTRATION_CHECKLIST.md`
 - [ ] Confirm retention periods with counsel vs coded cleanup jobs
-- [ ] Apply migration `20260921150000_phase3_data_protection.sql` on staging/prod
+- [ ] Apply migrations `20260921150000_phase3_data_protection.sql` and `20260921160000_phase3_legal_versions.sql` on staging/prod
 - [ ] Process deletion queue in admin ops (no auto-purge of financial history)

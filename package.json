@@ -16,6 +16,7 @@
     "test:rls": "npx vitest run --config frontend/vitest.workspace-rls.ts",
     "scan:bundle": "npx tsx scripts/scan-client-bundle.ts",
     "guard:backend": "npx tsx scripts/guard-no-legacy-backend.ts",
+    "check:legal": "npx tsx scripts/check-legal-config.ts",
     "test:all": "npm run test && npm run test:qualify && npm run test:e2e",
     "audit": "npm audit",
     "audit:fix": "npm audit fix",

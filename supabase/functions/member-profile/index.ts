@@ -3,6 +3,7 @@ import { getAuthenticatedUser, createAdminClient, createUserClient, logAudit } f
 import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { withLogging } from '../shared/logging.ts'
+import { PRIVACY_POLICY_VERSION, TERMS_VERSION } from '../shared/legal-versions.ts'
 
 /**
  * Member Profile — Update profile, avatar, password, data export, deletion request
@@ -11,6 +12,7 @@ import { withLogging } from '../shared/logging.ts'
  * POST  /member-profile?action=avatar       — upload avatar image
  * POST  /member-profile?action=password     — change password
  * GET   /member-profile?action=export       — download personal data JSON
+ * POST  /member-profile?action=accept-legal — re-accept Privacy/Terms versions
  * POST  /member-profile?action=deletion-request — request account deletion
  * GET   /member-profile?action=deletion-request — latest deletion request status
  */
@@ -102,6 +104,79 @@ Deno.serve(withLogging('member-profile', async (req) => {
       return new Response(JSON.stringify({ request: data }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    // POST — accept current Privacy/Terms versions (re-consent)
+    if (req.method === 'POST' && action === 'accept-legal') {
+      const rl = await rateLimitAsync(req, 'member-accept-legal', { userId: user.id, adminClient, windowMs: 300_000, max: 10 })
+      if (!rl.ok) return rl.response!
+
+      let body: Record<string, unknown>
+      try {
+        body = await req.json()
+      } catch {
+        return new Response(JSON.stringify({ message: 'Invalid JSON body.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (body.acceptedPrivacy !== true || body.acceptedTerms !== true) {
+        return new Response(JSON.stringify({ message: 'You must accept both documents.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      if (body.privacyPolicyVersion !== PRIVACY_POLICY_VERSION || body.termsVersion !== TERMS_VERSION) {
+        return new Response(JSON.stringify({
+          message: 'Please refresh and accept the current Privacy Policy and Terms.',
+          code: 'LEGAL_VERSION_MISMATCH',
+        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const consentAt = new Date().toISOString()
+      const { error: updErr } = await adminClient.from('members').update({
+        privacy_accepted_at: consentAt,
+        terms_accepted_at: consentAt,
+        privacy_policy_version: PRIVACY_POLICY_VERSION,
+        terms_version: TERMS_VERSION,
+      }).eq('id', user.id)
+
+      if (updErr) {
+        return new Response(JSON.stringify({ message: 'Could not save acceptance.' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      await adminClient.from('member_legal_acceptances').insert([
+        {
+          member_id: user.id,
+          document_type: 'privacy',
+          document_version: PRIVACY_POLICY_VERSION,
+          accepted_at: consentAt,
+          source: 'reconsent',
+        },
+        {
+          member_id: user.id,
+          document_type: 'terms',
+          document_version: TERMS_VERSION,
+          accepted_at: consentAt,
+          source: 'reconsent',
+        },
+      ])
+
+      await logAudit(adminClient, {
+        actor_id: user.id,
+        action: 'accepted_legal_documents',
+        resource: 'member',
+        resource_id: user.id,
+        meta: { privacy: PRIVACY_POLICY_VERSION, terms: TERMS_VERSION },
+      })
+
+      return new Response(JSON.stringify({
+        ok: true,
+        privacy_policy_version: PRIVACY_POLICY_VERSION,
+        terms_version: TERMS_VERSION,
+        accepted_at: consentAt,
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // POST — deletion request

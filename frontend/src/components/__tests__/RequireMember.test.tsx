@@ -3,12 +3,20 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi, type Mock } from 'vitest'
 import { RequireMember } from '../RequireMember'
 import { useAuth } from '../../context/AuthContext'
+import { legalConfig } from '../../config/legal'
 
 vi.mock('../../context/AuthContext', () => ({
   useAuth: vi.fn(),
 }))
 
 const mockedUseAuth = useAuth as Mock
+
+const activeMember = {
+  status: 'active' as const,
+  email: 'test@example.com',
+  privacy_policy_version: legalConfig.privacyPolicyVersion,
+  terms_version: legalConfig.termsVersion,
+}
 
 const renderWithRouter = (initialPath: string) =>
   render(
@@ -20,19 +28,21 @@ const renderWithRouter = (initialPath: string) =>
         <Route path="/login" element={<div>Login Page</div>} />
         <Route path="/verify-email" element={<div>Verify Email Page</div>} />
         <Route path="/dashboard" element={<div>Dashboard Page</div>} />
+        <Route path="/privacy" element={<div>Privacy Page</div>} />
+        <Route path="/terms" element={<div>Terms Page</div>} />
       </Routes>
     </MemoryRouter>,
   )
 
 describe('RequireMember', () => {
   it('shows loading state while auth is loading', () => {
-    mockedUseAuth.mockReturnValue({ member: null, loading: true })
+    mockedUseAuth.mockReturnValue({ member: null, loading: true, refreshMember: vi.fn() })
     renderWithRouter('/protected')
     expect(screen.getByText('Checking your account…')).toBeInTheDocument()
   })
 
   it('redirects to login when not authenticated', () => {
-    mockedUseAuth.mockReturnValue({ member: null, loading: false })
+    mockedUseAuth.mockReturnValue({ member: null, loading: false, refreshMember: vi.fn() })
     renderWithRouter('/protected')
     expect(screen.getByText('Login Page')).toBeInTheDocument()
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
@@ -42,24 +52,38 @@ describe('RequireMember', () => {
     mockedUseAuth.mockReturnValue({
       member: { status: 'pending_approval', email: 'test@example.com' },
       loading: false,
+      refreshMember: vi.fn(),
     })
     renderWithRouter('/protected')
     expect(screen.getByText('Verify Email Page')).toBeInTheDocument()
   })
 
-  it('renders outlet when authenticated with active status', () => {
+  it('renders outlet when authenticated with active status and current legal versions', () => {
     mockedUseAuth.mockReturnValue({
-      member: { status: 'active', email: 'test@example.com' },
+      member: activeMember,
       loading: false,
+      refreshMember: vi.fn(),
     })
     renderWithRouter('/protected')
     expect(screen.getByText('Protected Content')).toBeInTheDocument()
+  })
+
+  it('prompts re-consent when legal versions are outdated', () => {
+    mockedUseAuth.mockReturnValue({
+      member: { ...activeMember, privacy_policy_version: 'old', terms_version: 'old' },
+      loading: false,
+      refreshMember: vi.fn(),
+    })
+    renderWithRouter('/protected')
+    expect(screen.getByText(/Updated legal terms/i)).toBeInTheDocument()
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
   })
 
   it('blocks suspended members from the portal', () => {
     mockedUseAuth.mockReturnValue({
       member: { status: 'suspended', email: 'test@example.com' },
       loading: false,
+      refreshMember: vi.fn(),
     })
     renderWithRouter('/protected')
     expect(screen.getByRole('alert')).toHaveTextContent(/suspended/i)
@@ -70,6 +94,7 @@ describe('RequireMember', () => {
     mockedUseAuth.mockReturnValue({
       member: { status: 'closed', email: 'test@example.com' },
       loading: false,
+      refreshMember: vi.fn(),
     })
     renderWithRouter('/protected')
     expect(screen.getByRole('alert')).toHaveTextContent(/closed/i)
