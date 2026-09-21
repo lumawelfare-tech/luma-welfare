@@ -28,16 +28,27 @@ describe('parseRegisterBody', () => {
     password: 'Password1',
     fullName: 'Jane Doe',
     phone: '0712345678',
+    acceptedPrivacy: true as const,
+    acceptedTerms: true as const,
   }
 
   it('accepts a valid Kenya registration payload', () => {
     const r = parseRegisterBody(good)
     expect(r.email).toBe('member@example.com')
     expect(r.phone).toBe('0712345678')
+    expect(r.acceptedPrivacy).toBe(true)
+    expect(r.acceptedTerms).toBe(true)
   })
 
   it('rejects weak passwords and bad phones', () => {
     expect(() => parseRegisterBody({ ...good, password: 'short' })).toThrow(ValidationError)
     expect(() => parseRegisterBody({ ...good, phone: '123' })).toThrow(ValidationError)
+  })
+
+  it('requires privacy and terms consent', () => {
+    expect(() => parseRegisterBody({ ...good, acceptedPrivacy: false })).toThrow(ValidationError)
+    expect(() => parseRegisterBody({ ...good, acceptedTerms: false })).toThrow(ValidationError)
+    const { acceptedPrivacy: _p, acceptedTerms: _t, ...without } = good
+    expect(() => parseRegisterBody(without)).toThrow(ValidationError)
   })
 })

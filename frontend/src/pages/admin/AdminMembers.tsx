@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
+import { maskPhone } from '../../lib/pii'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
@@ -282,7 +283,7 @@ export function AdminMembers() {
         </button>
       ),
     },
-    { key: 'phone', header: 'Phone', sortable: true },
+    { key: 'phone', header: 'Phone', sortable: true, render: (m) => maskPhone(m.phone) },
     {
       key: 'status',
       header: 'Status',
@@ -461,7 +462,7 @@ export function AdminMembers() {
                       {m.status.replace('_', ' ')}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500">{m.phone}</div>
+                  <div className="text-xs text-gray-500">{maskPhone(m.phone)}</div>
                   <div className="flex gap-2">
                     {m.status === 'pending_approval' && (
                       <button

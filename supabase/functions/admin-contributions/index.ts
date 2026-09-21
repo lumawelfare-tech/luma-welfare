@@ -3,6 +3,7 @@ import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSession
 import { sendNotification } from '../shared/notifications.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
+import { maskMemberListFields } from '../shared/pii.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -52,8 +53,11 @@ Deno.serve(async (req) => {
       if (error) throw new Error(error.message)
 
       const result = data?.[0] ?? { contributions: [], total: 0, page, per_page: perPage, pages: 1 }
+      const masked = ((result.contributions ?? []) as Record<string, unknown>[]).map((row) =>
+        maskMemberListFields(row),
+      )
       return new Response(JSON.stringify({
-        contributions: result.contributions ?? [],
+        contributions: masked,
         total: Number(result.total) ?? 0,
         page: result.page ?? page,
         per_page: result.per_page ?? perPage,

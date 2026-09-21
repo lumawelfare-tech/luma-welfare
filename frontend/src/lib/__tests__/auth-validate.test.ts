@@ -35,9 +35,23 @@ describe('parseRegisterBody', () => {
       fullName: 'Jane Doe',
       phone: '0712345678',
       idNumber: '12345678',
+      acceptedPrivacy: true,
+      acceptedTerms: true,
     })
     expect(r.email).toBe('member@example.com')
     expect(r.phone).toBe('0712345678')
+    expect(r.acceptedPrivacy).toBe(true)
+  })
+
+  it('rejects missing privacy/terms consent', () => {
+    expect(() =>
+      parseRegisterBody({
+        email: 'a@b.co',
+        password: 'Secret12',
+        fullName: 'A',
+        phone: '0712345678',
+      }),
+    ).toThrow(/Privacy Policy/)
   })
 
   it('rejects weak passwords and bad phones', () => {

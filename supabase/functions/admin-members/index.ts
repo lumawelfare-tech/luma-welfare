@@ -2,6 +2,7 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
+import { maskMemberListFields } from '../shared/pii.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -50,8 +51,11 @@ Deno.serve(async (req) => {
       if (error) throw new Error(error.message)
 
       const result = data?.[0] ?? { members: [], total: 0, page, per_page: perPage, pages: 1 }
+      const maskedMembers = ((result.members ?? []) as Record<string, unknown>[]).map((m) =>
+        maskMemberListFields(m),
+      )
       return new Response(JSON.stringify({
-        members: result.members ?? [],
+        members: maskedMembers,
         total: Number(result.total) ?? 0,
         page: result.page ?? page,
         per_page: result.per_page ?? perPage,
@@ -76,6 +80,14 @@ Deno.serve(async (req) => {
         adminClient.from('family_members').select('*').eq('member_id', resourceId).eq('is_active', true),
         adminClient.from('contributions').select('id, period, amount, status, package_id, created_at').eq('member_id', resourceId).order('period', { ascending: false }),
       ])
+
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: 'viewed_member_detail',
+        resource: 'member',
+        resource_id: resourceId,
+      })
 
       return new Response(JSON.stringify({
         member,

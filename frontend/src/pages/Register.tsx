@@ -19,8 +19,10 @@ export function Register() {
     password: '',
     confirm: '',
   })
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof typeof form, string>>>({})
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof typeof form | 'consent', string>>>({})
   const [busy, setBusy] = useState(false)
 
   function set<K extends keyof typeof form>(key: K, value: string) {
@@ -29,7 +31,7 @@ export function Register() {
   }
 
   function validate(): boolean {
-    const next: Partial<Record<keyof typeof form, string>> = {}
+    const next: Partial<Record<keyof typeof form | 'consent', string>> = {}
     if (!form.fullName.trim()) next.fullName = 'Enter your full name.'
     if (!form.email.trim()) next.email = 'Enter your email.'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) next.email = 'Enter a valid email address.'
@@ -39,6 +41,9 @@ export function Register() {
       next.password = 'Password must contain at least one letter and one number.'
     }
     if (form.password !== form.confirm) next.confirm = 'Passwords do not match.'
+    if (!acceptedPrivacy || !acceptedTerms) {
+      next.consent = 'Accept the Privacy Policy and Terms & Conditions to continue.'
+    }
     setFieldErrors(next)
     return Object.keys(next).length === 0
   }
@@ -56,6 +61,8 @@ export function Register() {
         phone: form.phone.trim(),
         idNumber: form.idNumber.trim() || undefined,
         password: form.password,
+        acceptedPrivacy: true,
+        acceptedTerms: true,
       })
       navigate('/verify-email', {
         state: { email: form.email.trim() },
@@ -174,6 +181,46 @@ export function Register() {
             className={fieldClass}
           />
           {fieldErrors.confirm && <p id="reg-confirm-error" className="mt-1 text-xs text-red-700" role="alert">{fieldErrors.confirm}</p>}
+        </div>
+
+        <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+          <label className="flex items-start gap-3 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-luma-700 focus:ring-luma-600"
+              checked={acceptedPrivacy}
+              onChange={(e) => {
+                setAcceptedPrivacy(e.target.checked)
+                setFieldErrors((fe) => ({ ...fe, consent: undefined }))
+              }}
+            />
+            <span>
+              I have read and agree to the{' '}
+              <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-luma-800 hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-luma-700 focus:ring-luma-600"
+              checked={acceptedTerms}
+              onChange={(e) => {
+                setAcceptedTerms(e.target.checked)
+                setFieldErrors((fe) => ({ ...fe, consent: undefined }))
+              }}
+            />
+            <span>
+              I have read and agree to the{' '}
+              <Link to="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-luma-800 hover:underline">
+                Terms &amp; Conditions
+              </Link>
+              .
+            </span>
+          </label>
+          {fieldErrors.consent && <p className="text-xs text-red-700" role="alert">{fieldErrors.consent}</p>}
         </div>
 
         {error && (

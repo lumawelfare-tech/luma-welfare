@@ -3,6 +3,7 @@ import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSession
 import { evaluateQualification } from '../shared/qualify.ts'
 import { buildIlikeOrFilter } from '../shared/search.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
+import { maskMemberListFields } from '../shared/pii.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -115,7 +116,13 @@ Deno.serve(async (req) => {
       query = query.range((page - 1) * perPage, page * perPage - 1)
       const { data, error, count } = await query
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ subscriptions: data ?? [], total: count ?? 0, page, per_page: perPage, pages: Math.ceil((count ?? 0) / perPage) }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({
+        subscriptions: ((data ?? []) as Record<string, unknown>[]).map((row) => maskMemberListFields(row)),
+        total: count ?? 0,
+        page,
+        per_page: perPage,
+        pages: Math.ceil((count ?? 0) / perPage),
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // PATCH /admin-subscriptions/:id — approve/reject/pause/cancel

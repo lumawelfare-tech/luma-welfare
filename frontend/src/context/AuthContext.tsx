@@ -49,6 +49,8 @@ type AuthState = {
     fullName: string
     phone: string
     idNumber?: string
+    acceptedPrivacy: true
+    acceptedTerms: true
   }) => Promise<void>
   logout: () => void
   setTwoFaVerified: (v: boolean) => void
@@ -243,6 +245,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fullName: string
     phone: string
     idNumber?: string
+    acceptedPrivacy: true
+    acceptedTerms: true
   }): Promise<void> {
     await api('/auth/register', { method: 'POST', body: input })
   }

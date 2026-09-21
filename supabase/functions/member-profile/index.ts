@@ -1,12 +1,17 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, createUserClient, logAudit } from '../shared/supabase.ts'
 import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 /**
- * Member Profile — Update profile and upload avatar
+ * Member Profile — Update profile, avatar, password, data export, deletion request
  *
- * PATCH /member-profile              — update profile fields
- * POST  /member-profile?action=avatar — upload avatar image
+ * PATCH /member-profile                     — update profile fields
+ * POST  /member-profile?action=avatar       — upload avatar image
+ * POST  /member-profile?action=password     — change password
+ * GET   /member-profile?action=export       — download personal data JSON
+ * POST  /member-profile?action=deletion-request — request account deletion
+ * GET   /member-profile?action=deletion-request — latest deletion request status
  */
 
 Deno.serve(async (req) => {
@@ -19,9 +24,136 @@ Deno.serve(async (req) => {
 
     const adminClient = createAdminClient()
     const url = new URL(req.url)
+    const action = url.searchParams.get('action')
+
+    // GET — personal data export
+    if (req.method === 'GET' && action === 'export') {
+      const rl = await rateLimitAsync(req, 'member-data-export', { userId: user.id, adminClient, windowMs: 300_000, max: 5 })
+      if (!rl.ok) return rl.response!
+
+      const [memberRes, familyRes, subsRes, contribRes, claimsRes, notifRes, deletionRes] =
+        await Promise.all([
+          adminClient.from('members').select('*').eq('id', user.id).single(),
+          adminClient.from('family_members').select('*').eq('member_id', user.id),
+          adminClient.from('subscriptions').select('id, status, started_at, next_due_date, cancelled_at, package_id, created_at').eq('member_id', user.id),
+          adminClient.from('contributions').select('id, period, amount, status, package_id, created_at, notes').eq('member_id', user.id),
+          adminClient.from('claims').select('id, claim_number, claim_type, status, description, amount_requested, submitted_at, created_at, updated_at').eq('member_id', user.id),
+          adminClient.from('notifications').select('id, subject, body, status, created_at').eq('member_id', user.id).order('created_at', { ascending: false }).limit(200),
+          adminClient.from('data_deletion_requests').select('id, status, reason, created_at, processed_at').eq('member_id', user.id),
+        ])
+
+      if (memberRes.error || !memberRes.data) {
+        return new Response(JSON.stringify({ message: 'Profile not found' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const claimIds = (claimsRes.data ?? []).map((c: { id: string }) => c.id)
+      let claimDocuments: unknown[] = []
+      if (claimIds.length > 0) {
+        const { data: docs } = await adminClient
+          .from('claim_documents')
+          .select('id, claim_id, document_type, file_name, file_type, size_bytes, created_at, uploaded_at')
+          .in('claim_id', claimIds)
+        claimDocuments = docs ?? []
+      }
+
+      await logAudit(adminClient, {
+        actor_id: user.id,
+        action: 'exported_personal_data',
+        resource: 'member',
+        resource_id: user.id,
+      })
+
+      const payload = {
+        exported_at: new Date().toISOString(),
+        notice: 'This export reflects data held in Luma Welfare application tables. Auth credentials are never included. Claim file contents are listed by metadata only — download evidence from Claims while signed in.',
+        member: memberRes.data,
+        family_members: familyRes.data ?? [],
+        subscriptions: subsRes.data ?? [],
+        contributions: contribRes.data ?? [],
+        claims: claimsRes.data ?? [],
+        claim_documents: claimDocuments,
+        notifications: notifRes.data ?? [],
+        deletion_requests: deletionRes.data ?? [],
+      }
+
+      return new Response(JSON.stringify(payload, null, 2), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Content-Disposition': 'attachment; filename="luma-welfare-my-data.json"',
+        },
+      })
+    }
+
+    // GET — latest deletion request
+    if (req.method === 'GET' && action === 'deletion-request') {
+      const { data, error } = await adminClient
+        .from('data_deletion_requests')
+        .select('id, status, reason, created_at, processed_at, admin_notes')
+        .eq('member_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      return new Response(JSON.stringify({ request: data }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // POST — deletion request
+    if (req.method === 'POST' && action === 'deletion-request') {
+      const rl = await rateLimitAsync(req, 'member-deletion-request', { userId: user.id, adminClient, windowMs: 3_600_000, max: 3 })
+      if (!rl.ok) return rl.response!
+
+      let reason: string | null = null
+      try {
+        const body = await req.json()
+        if (typeof body?.reason === 'string') reason = body.reason.trim().slice(0, 500) || null
+      } catch {
+        /* empty body is ok */
+      }
+
+      const { data: open } = await adminClient
+        .from('data_deletion_requests')
+        .select('id, status')
+        .eq('member_id', user.id)
+        .in('status', ['pending', 'in_progress'])
+        .limit(1)
+        .maybeSingle()
+
+      if (open) {
+        return new Response(JSON.stringify({
+          message: 'You already have an open deletion request.',
+          code: 'DELETION_PENDING',
+          request: open,
+        }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const { data, error } = await adminClient
+        .from('data_deletion_requests')
+        .insert({ member_id: user.id, reason, status: 'pending' })
+        .select('id, status, reason, created_at')
+        .single()
+      if (error) throw new Error(error.message)
+
+      await logAudit(adminClient, {
+        actor_id: user.id,
+        action: 'requested_data_deletion',
+        resource: 'data_deletion_request',
+        resource_id: data.id,
+      })
+
+      return new Response(JSON.stringify({
+        request: data,
+        message: 'Deletion request submitted. An administrator will review it. Financial and legal records may be retained as required.',
+      }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     // POST — upload avatar
-    if (req.method === 'POST' && url.searchParams.get('action') === 'avatar') {
+    if (req.method === 'POST' && action === 'avatar') {
       const body = await req.json()
       const { fileName, fileData, fileType } = body
 
@@ -111,7 +243,7 @@ Deno.serve(async (req) => {
     }
 
     // POST — change password
-    if (req.method === 'POST' && url.searchParams.get('action') === 'password') {
+    if (req.method === 'POST' && action === 'password') {
       const body = await req.json()
       const { currentPassword, newPassword } = body
 

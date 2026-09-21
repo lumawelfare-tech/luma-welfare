@@ -55,6 +55,8 @@ export type RegisterInput = {
   fullName: string
   phone: string
   idNumber: string | null
+  acceptedPrivacy: true
+  acceptedTerms: true
 }
 
 export function parseRegisterBody(input: unknown): RegisterInput {
@@ -83,6 +85,12 @@ export function parseRegisterBody(input: unknown): RegisterInput {
   if (!KENYA_PHONE_RE.test(phone)) {
     throw new ValidationError('Enter a valid Kenyan phone number.')
   }
+  if (body.acceptedPrivacy !== true) {
+    throw new ValidationError('You must accept the Privacy Policy to create an account.')
+  }
+  if (body.acceptedTerms !== true) {
+    throw new ValidationError('You must accept the Terms & Conditions to create an account.')
+  }
   let idNumber: string | null = null
   if (idRaw != null && idRaw !== '') {
     if (typeof idRaw !== 'string') {
@@ -91,7 +99,15 @@ export function parseRegisterBody(input: unknown): RegisterInput {
     idNumber = idRaw.trim().slice(0, 32) || null
   }
 
-  return { email, password, fullName, phone, idNumber }
+  return {
+    email,
+    password,
+    fullName,
+    phone,
+    idNumber,
+    acceptedPrivacy: true,
+    acceptedTerms: true,
+  }
 }
 
 export type VerifyEmailInput =

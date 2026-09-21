@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
     const { email, password, fullName, phone, idNumber } = parseRegisterBody(raw)
 
     const adminClient = createAdminClient()
+    const consentAt = new Date().toISOString()
 
     const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
       email,
@@ -70,6 +71,8 @@ Deno.serve(async (req) => {
       id_number: idNumber,
       email,
       status: 'pending_approval',
+      privacy_accepted_at: consentAt,
+      terms_accepted_at: consentAt,
     })
 
     if (memberError) {

@@ -29,14 +29,22 @@ export function Terms() {
         eyebrow="Legal"
         title="Terms & Conditions"
         description="The terms governing your use of the Luma Welfare platform and services."
-        meta="Last updated: August 2026"
+        meta="Last updated: September 2026"
       />
 
       <div className="container-luma py-14">
         <div className="glass-card mx-auto max-w-3xl p-8 sm:p-10">
+          <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <strong>DRAFT:</strong> review by a legal professional before relying on these terms.
+            This text reflects how the product works today and is not legal advice.
+          </div>
+
           <Section number={1} title="Acceptance of Terms">
             <p>
               By accessing or using the Luma Welfare platform ("the Service"), you agree to be bound by these Terms & Conditions. If you do not agree to these terms, please do not use the Service.
+            </p>
+            <p>
+              New accounts must accept these Terms and the Privacy Policy during registration. Continued use after updates constitutes acceptance of the revised terms when we post them.
             </p>
           </Section>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useHead } from '../../lib/seo'
@@ -22,6 +23,13 @@ export function Profile() {
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState(false)
 
+  // Privacy / data rights
+  const [exporting, setExporting] = useState(false)
+  const [requestingDeletion, setRequestingDeletion] = useState(false)
+  const [privacyNotice, setPrivacyNotice] = useState<string | null>(null)
+  const [privacyError, setPrivacyError] = useState<string | null>(null)
+  const [deletionStatus, setDeletionStatus] = useState<string | null>(null)
+
   // eslint-disable-next-line oxc/react/set-state-in-effect — deriving form/avatarPreview from member prop; legitimate prop→state sync
   useEffect(() => {
     if (member) {
@@ -38,6 +46,19 @@ export function Profile() {
       setAvatarPreview((member as any).photo_url ?? null)
     }
   }, [member])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const d = await api<{ request: { status: string } | null }>('/member/profile?action=deletion-request', { auth: true })
+        if (!cancelled) setDeletionStatus(d.request?.status ?? null)
+      } catch {
+        /* non-blocking */
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -272,6 +293,88 @@ export function Profile() {
           {changingPassword ? 'Changing…' : 'Change Password'}
         </button>
       </form>
+
+      {/* Privacy & data rights */}
+      <section className="mt-6 glass-panel p-6">
+        <h3 className="text-sm font-semibold text-gray-900">Privacy &amp; data rights</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          Under Kenya&apos;s Data Protection Act, 2019 you can access, correct, or request deletion of your personal data.
+          Correction is available in the form above. Export and deletion requests are logged.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={async () => {
+              setPrivacyError(null)
+              setPrivacyNotice(null)
+              setExporting(true)
+              try {
+                const data = await api<Record<string, unknown>>('/member/profile?action=export', { auth: true })
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = 'luma-welfare-my-data.json'
+                a.click()
+                URL.revokeObjectURL(url)
+                setPrivacyNotice('Your data export downloaded. Keep it secure.')
+              } catch (err) {
+                setPrivacyError(err instanceof ApiError ? err.message : 'Could not export your data.')
+              } finally {
+                setExporting(false)
+              }
+            }}
+            className="rounded-lg bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-60 transition-all min-h-[44px]"
+          >
+            {exporting ? 'Preparing…' : 'Download my data'}
+          </button>
+          <button
+            type="button"
+            disabled={requestingDeletion || deletionStatus === 'pending' || deletionStatus === 'in_progress'}
+            onClick={async () => {
+              if (!window.confirm('Submit a deletion request? Financial and legal records may still be retained. An administrator will review your request.')) {
+                return
+              }
+              setPrivacyError(null)
+              setPrivacyNotice(null)
+              setRequestingDeletion(true)
+              try {
+                const res = await api<{ request: { status: string }; message: string }>(
+                  '/member/profile?action=deletion-request',
+                  { method: 'POST', auth: true, body: { reason: 'Member-requested account deletion' } },
+                )
+                setDeletionStatus(res.request?.status ?? 'pending')
+                setPrivacyNotice(res.message)
+              } catch (err) {
+                setPrivacyError(err instanceof ApiError ? err.message : 'Could not submit deletion request.')
+              } finally {
+                setRequestingDeletion(false)
+              }
+            }}
+            className="rounded-lg border border-red-200 px-5 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60 transition-all min-h-[44px]"
+          >
+            {deletionStatus === 'pending' || deletionStatus === 'in_progress'
+              ? 'Deletion request pending'
+              : requestingDeletion
+                ? 'Submitting…'
+                : 'Request account deletion'}
+          </button>
+        </div>
+        {deletionStatus && (
+          <p className="mt-3 text-xs text-gray-500">
+            Latest deletion request status: <span className="font-medium text-gray-700">{deletionStatus}</span>
+          </p>
+        )}
+        {privacyError && <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{privacyError}</div>}
+        {privacyNotice && <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">{privacyNotice}</div>}
+        <p className="mt-4 text-xs text-gray-500">
+          Policies:{' '}
+          <Link to="/privacy" className="text-luma-700 hover:underline">Privacy</Link>
+          {' · '}
+          <Link to="/terms" className="text-luma-700 hover:underline">Terms</Link>
+        </p>
+      </section>
     </div>
   )
 }

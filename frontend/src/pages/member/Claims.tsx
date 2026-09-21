@@ -303,6 +303,8 @@ export function Claims() {
           </div>
           <p className="text-sm text-gray-500 mb-4">
             Describe your welfare claim. You can save as draft and upload documents before submitting.
+            Supporting documents may include sensitive personal data; upload only what is needed for review.
+            See our <a href="/privacy" className="text-luma-700 underline">Privacy Policy</a>.
           </p>
           <form ref={formRef} onSubmit={(e) => submitClaim(e, true)} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

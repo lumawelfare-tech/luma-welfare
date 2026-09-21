@@ -266,11 +266,24 @@ export function safeLog(endpoint: string, message: string, data?: Record<string,
 }
 
 function redactSensitive(obj: Record<string, unknown>): Record<string, unknown> {
-  const sensitive = ['password', 'token', 'secret', 'key', 'authorization', 'cookie']
+  const sensitive = [
+    'password',
+    'token',
+    'secret',
+    'key',
+    'authorization',
+    'cookie',
+    'phone',
+    'id_number',
+    'idnumber',
+    'national_id',
+    'otp',
+  ]
   const result: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(obj)) {
-    if (sensitive.some(s => key.toLowerCase().includes(s))) {
+    const lower = key.toLowerCase()
+    if (sensitive.some((s) => lower.includes(s))) {
       result[key] = '[REDACTED]'
     } else if (typeof value === 'object' && value !== null) {
       result[key] = '[object]'

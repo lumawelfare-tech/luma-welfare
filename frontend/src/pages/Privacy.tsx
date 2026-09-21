@@ -29,17 +29,23 @@ export function Privacy() {
         eyebrow="Legal"
         title="Privacy Policy"
         description="How we collect, use, store, and protect your personal information."
-        meta="Last updated: August 2026"
+        meta="Last updated: September 2026"
       />
 
       <div className="container-luma py-14">
         <div className="glass-card mx-auto max-w-3xl p-8 sm:p-10">
+          <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <strong>DRAFT:</strong> review by a legal professional before relying on this policy.
+            It is written from what the platform currently collects and stores (see{' '}
+            <code className="text-xs">docs/DATA_INVENTORY.md</code>). It does <em>not</em> claim ODPC certification or legal compliance.
+          </div>
+
           <Section number={1} title="Introduction">
             <p>
               Luma Welfare ("we," "our," or "us") is a community welfare organisation committed to protecting the privacy and security of our members' personal information. This Privacy Policy explains how we collect, use, store, and safeguard information when you use the Luma Welfare platform and services.
             </p>
             <p>
-              By using our platform, you agree to the collection and use of information as described in this policy. If you do not agree with the practices described here, please do not use the service.
+              Processing is intended to align with Kenya&apos;s Data Protection Act, 2019. By creating an account you are asked to accept this policy and our Terms. If you do not agree, please do not use the service.
             </p>
           </Section>
 
@@ -138,21 +144,26 @@ export function Privacy() {
 
           <Section number={9} title="Data Retention">
             <p>
-              We retain your personal information for as long as necessary to provide the services you use, maintain accurate records, comply with applicable obligations, resolve disputes, and protect the platform. Account and membership data may be retained after account closure where required for record-keeping purposes.
+              We retain personal information as needed to operate membership, contributions, and claims, and to meet record-keeping needs:
             </p>
+            <ul className="list-disc space-y-2 pl-6">
+              <li>Account and membership data while your membership is active, and afterwards where financial or legal records require it</li>
+              <li>In-app notifications: generally cleaned after about 90 days (read) or 180 days (unread)</li>
+              <li>Non-financial audit logs: may be cleaned after about 2 years; financial audit events are retained longer</li>
+              <li>Claim evidence in private storage for as long as needed to decide and document claims</li>
+            </ul>
           </Section>
 
           <Section number={10} title="Your Rights">
-            <p>You have the right to:</p>
+            <p>Subject to applicable law, you may:</p>
             <ul className="list-disc space-y-2 pl-6">
-              <li>Request access to the personal information we hold about you</li>
-              <li>Request correction of inaccurate information</li>
-              <li>Request deletion of your account and personal data, subject to applicable record-keeping requirements</li>
+              <li><strong>Access / export:</strong> download a copy of your application data from Profile → Download my data</li>
+              <li><strong>Correct:</strong> update profile fields from your Profile page</li>
+              <li><strong>Request deletion:</strong> submit a deletion request from Profile (fulfilment is reviewed; contribution, claim, and other records required by law or legitimate interests may be retained)</li>
               <li>Ask questions about how your personal data is handled</li>
-              <li>Contact us about any privacy concerns</li>
             </ul>
             <p>
-              To exercise any of these rights, please contact us using the details provided below.
+              You may also contact us using the details below. Complaints may be directed to the Office of the Data Protection Commissioner (ODPC) where applicable.
             </p>
           </Section>
 
@@ -182,7 +193,7 @@ export function Privacy() {
 
           <div className="mt-12 rounded-xl border border-luma-200 bg-luma-50 p-6 text-center">
             <p className="text-sm text-gray-600">
-              This Privacy Policy is for informational purposes and does not constitute legal advice.
+              <strong>DRAFT</strong> — for informational purposes only; does not constitute legal advice or a compliance claim.
             </p>
             <div className="mt-4 flex justify-center gap-4">
               <Link to="/terms" className="text-sm font-medium text-luma-700 hover:text-luma-800">Terms & Conditions →</Link>
