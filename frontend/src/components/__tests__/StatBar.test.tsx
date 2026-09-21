@@ -14,14 +14,15 @@ describe('StatBar', () => {
     mockedApi.mockReset()
   })
 
-  it('renders loading placeholder before stats load', () => {
+  it('shows a loading skeleton before stats resolve (no placeholder copy)', () => {
     mockedApi.mockReturnValue(new Promise(() => {}))
-    render(<StatBar />)
-    const dashes = screen.getAllByText('—')
-    expect(dashes.length).toBeGreaterThan(0)
+    const { container } = render(<StatBar />)
+    expect(container.querySelector('[aria-busy="true"]')).toBeTruthy()
+    expect(screen.queryByText('Awaiting confirmation')).not.toBeInTheDocument()
+    expect(screen.queryByText('—')).not.toBeInTheDocument()
   })
 
-  it('renders stat values from API response', async () => {
+  it('renders only confirmed numeric stats', async () => {
     mockedApi.mockResolvedValue({
       stats: {
         members: 142,
@@ -35,51 +36,48 @@ describe('StatBar', () => {
       expect(screen.getByText('142+')).toBeInTheDocument()
     })
     expect(screen.getByText('92%')).toBeInTheDocument()
+    expect(screen.getByText('Members')).toBeInTheDocument()
+    expect(screen.getByText('Commitment')).toBeInTheDocument()
+    expect(screen.queryByText('Successful Claims')).not.toBeInTheDocument()
+    expect(screen.queryByText('Lives Touched')).not.toBeInTheDocument()
+    expect(screen.queryByText('Awaiting confirmation')).not.toBeInTheDocument()
   })
 
-  it('shows "Awaiting confirmation" for unconfirmed claims/lives', async () => {
+  it('omits the entire bar when no stats are confirmed', async () => {
     mockedApi.mockResolvedValue({
       stats: {
-        members: 50,
+        members: null,
         successful_claims: null,
         lives_touched: null,
-        commitment: 80,
+        commitment: null,
       },
     })
-    render(<StatBar />)
+    const { container } = render(<StatBar />)
     await waitFor(() => {
-      expect(screen.getAllByText('Awaiting confirmation')).toHaveLength(2)
+      expect(mockedApi).toHaveBeenCalledWith('/settings?resource=settings')
     })
+    expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows "Awaiting confirmation" as single string for null unconfirmed values', async () => {
-    mockedApi.mockResolvedValue({
-      stats: { successful_claims: 12, lives_touched: 340 },
-    })
-    render(<StatBar />)
-    await waitFor(() => {
-      expect(screen.getByText('12+')).toBeInTheDocument()
-      expect(screen.getByText('340+')).toBeInTheDocument()
-    })
-  })
-
-  it('handles empty stats response', async () => {
+  it('omits the bar on empty settings payload', async () => {
     mockedApi.mockResolvedValue({})
-    render(<StatBar />)
+    const { container } = render(<StatBar />)
     await waitFor(() => {
-      expect(mockedApi).toHaveBeenCalledWith('/settings?resource=settings')
+      expect(mockedApi).toHaveBeenCalled()
     })
+    expect(container).toBeEmptyDOMElement()
   })
 
-  it('does not crash on API failure', async () => {
+  it('omits the bar on API failure', async () => {
     mockedApi.mockRejectedValue(new Error('Network error'))
-    render(<StatBar />)
+    const { container } = render(<StatBar />)
     await waitFor(() => {
       expect(mockedApi).toHaveBeenCalledWith('/settings?resource=settings')
     })
+    expect(container).toBeEmptyDOMElement()
   })
 
-  it('formats large numbers with locale', async () => {
+  it('formats large confirmed numbers with locale', async () => {
     mockedApi.mockResolvedValue({
       stats: {
         members: 12345,
@@ -93,15 +91,7 @@ describe('StatBar', () => {
       expect(screen.getByText('12,345+')).toBeInTheDocument()
       expect(screen.getByText('67,890+')).toBeInTheDocument()
       expect(screen.getByText('120,000+')).toBeInTheDocument()
+      expect(screen.getByText('100%')).toBeInTheDocument()
     })
-  })
-
-  it('renders all four stat labels', () => {
-    mockedApi.mockReturnValue(new Promise(() => {}))
-    render(<StatBar />)
-    expect(screen.getByText('Happy Members')).toBeInTheDocument()
-    expect(screen.getByText('Successful Claims')).toBeInTheDocument()
-    expect(screen.getByText('Lives Touched')).toBeInTheDocument()
-    expect(screen.getByText('Commitment')).toBeInTheDocument()
   })
 })

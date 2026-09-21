@@ -162,7 +162,7 @@ export function AdminSettings() {
 
   const keyDescriptions: Record<string, string> = {
     org_contact: 'Email, phone, and address displayed on the public website.',
-    stats: 'Controls which statistics are shown publicly on the homepage.',
+    stats: 'Public homepage statistics. Leave a field null or omit it until the figure is confirmed — unconfirmed values are never shown.',
     mpesa: 'M-Pesa payment integration settings (STK Push, business number, etc.).',
   }
 
@@ -180,7 +180,12 @@ export function AdminSettings() {
   const jsonFieldLabels: Record<string, Record<string, string>> = {
     org_contact: { email: 'Email Address', phone: 'Phone Number', address: 'Physical Address', website: 'Website URL' },
     mpesa: { shortcode: 'Business Shortcode', passkey: 'Passkey', consumer_key: 'Consumer Key', consumer_secret: 'Consumer Secret', TillNumber: 'Till Number', paybill: 'Paybill Number', callback_url: 'Callback URL' },
-    stats: { total_members: 'Show Total Members', active_members: 'Show Active Members', total_packages: 'Show Total Packages' },
+    stats: {
+      members: 'Confirmed member count (homepage)',
+      successful_claims: 'Confirmed successful claims (homepage)',
+      lives_touched: 'Confirmed lives touched (homepage)',
+      commitment: 'Confirmed commitment % (homepage)',
+    },
   }
 
   const jsonFieldTypes: Record<string, Record<string, string>> = {

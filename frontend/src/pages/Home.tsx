@@ -286,8 +286,8 @@ export function Home() {
             Ready to Secure Your Family&apos;s Future?
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-white/90">
-            Join Kenyan families who trust Luma Welfare for affordable, transparent community support.
-            Registration is free — pay only when you choose a package.
+            Register for free, choose a welfare package that fits your family, and contribute monthly
+            with transparent tracking for every package you hold.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <CtaButton to="/register" variant="light">Join Now — Free Registration</CtaButton>

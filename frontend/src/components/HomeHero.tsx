@@ -15,7 +15,7 @@ const BENEFITS = [
 /**
  * Premium public homepage hero — HTML content + family visual.
  * Routes: /register (Join Luma), /packages (View Packages).
- * Live stats remain in StatBar below (unchanged).
+ * Live stats (StatBar) render only confirmed figures from platform settings.
  */
 export function HomeHero() {
   return (

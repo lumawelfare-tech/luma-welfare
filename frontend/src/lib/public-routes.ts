@@ -70,7 +70,7 @@ export const PUBLIC_ROUTES: PublicRoute[] = [
     path: '/contact',
     title: 'Contact',
     description:
-      'Contact Luma Welfare — phone, WhatsApp, email, and address. Reach the welfare office for membership, payment, and claim questions.',
+      'Contact Luma Welfare — phone, WhatsApp, and email. Reach the welfare office for membership, payment, and claim questions.',
     changefreq: 'monthly',
     priority: 0.6,
   },

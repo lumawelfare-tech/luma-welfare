@@ -78,13 +78,6 @@ export function Layout() {
               </svg>
               <span className="hidden md:inline">info@lumawelfare.or.ke</span>
             </a>
-            <span className="hidden items-center gap-1.5 lg:flex">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              P.O. Box 12345 – 00100, Nairobi
-            </span>
           </div>
           <div className="flex flex-none items-center gap-2 sm:gap-3">
             <span className="hidden text-white/70 md:inline">Building stronger communities together</span>
@@ -350,13 +343,6 @@ export function Layout() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                   <span className="text-luma-200">info@lumawelfare.or.ke</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <svg className="mt-0.5 h-4 w-4 flex-none text-luma-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span className="text-luma-200">P.O. Box 12345 – 00100, Nairobi, Kenya</span>
                 </li>
               </ul>
             </div>

@@ -16,7 +16,6 @@ const PHONE_TEL = '0798635024'
 const EMAIL = 'info@lumawelfare.or.ke'
 const WHATSAPP = 'https://wa.me/254798635024'
 const WEBSITE = 'https://www.lumawelfare.or.ke'
-const ADDRESS = 'P.O. Box 12345 – 00100, Nairobi, Kenya'
 
 function WhatsAppGlyph({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -26,7 +25,7 @@ function WhatsAppGlyph({ className = 'h-4 w-4' }: { className?: string }) {
   )
 }
 
-type ChannelIcon = 'phone' | 'mail' | 'home' | 'globe' | 'whatsapp'
+type ChannelIcon = 'phone' | 'mail' | 'globe' | 'whatsapp'
 
 const channels: {
   label: string
@@ -57,13 +56,6 @@ const channels: {
     href: `mailto:${EMAIL}`,
     icon: 'mail',
     hint: 'Membership & documentation',
-  },
-  {
-    label: 'Address',
-    value: ADDRESS,
-    href: null,
-    icon: 'home',
-    hint: 'Postal address',
   },
   {
     label: 'Website',
@@ -100,7 +92,7 @@ const emptyForm: FormState = {
 }
 
 export function Contact() {
-  useHead('Contact', 'Contact Luma Welfare — phone, WhatsApp, email, and address. Reach the welfare office for membership, payment, and claim questions.', {
+  useHead('Contact', 'Contact Luma Welfare — phone, WhatsApp, and email. Reach the welfare office for membership, payment, and claim questions.', {
     breadcrumbs: [
       { name: 'Home', path: '/' },
       { name: 'Contact', path: '/contact' },

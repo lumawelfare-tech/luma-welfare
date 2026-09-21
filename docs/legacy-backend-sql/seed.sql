@@ -158,7 +158,7 @@ where r.name = 'support';
 -- ---------------------------------------------------------------------------
 insert into platform_settings (key, value, description) values
 ('org_contact', '{"phone":"0798635024","whatsapp":"0798635024","email":"info@lumawelfare.or.ke","address":"P.O. Box 12345 - 00100, Nairobi, Kenya","website":"www.lumawelfare.or.ke"}', 'Public contact details. Confirm with Luma before publishing (older flyers show different numbers).'),
-('stats', '{"members":150,"successful_claims":null,"lives_touched":null,"commitment":100}', 'Confirmed figures only. successful_claims and lives_touched stay null until Luma confirms them.'),
+('stats', '{"members":null,"successful_claims":null,"lives_touched":null,"commitment":null}', 'Confirmed figures only. Leave null until Luma confirms each value — the homepage omits unconfirmed stats.'),
 ('mpesa', '{"paybill":"522522","account":"454545#","env":"sandbox"}', 'M-Pesa Paybill configuration. Switch env to production before go-live.');
 
 -- ---------------------------------------------------------------------------
