@@ -382,7 +382,17 @@ Deno.serve(async (req) => {
 
           if (memberErr) {
             await adminClient.auth.admin.deleteUser(authUser.user.id)
-            results.push({ row: rowNum, email, status: 'error', message: memberErr.message })
+            const dbCode = (memberErr as { code?: string }).code
+            if (dbCode === '23505') {
+              results.push({
+                row: rowNum,
+                email,
+                status: 'error',
+                message: 'That ID number or email is already registered.',
+              })
+            } else {
+              results.push({ row: rowNum, email, status: 'error', message: 'Could not create membership.' })
+            }
             continue
           }
 
