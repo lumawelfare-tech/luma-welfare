@@ -37,6 +37,7 @@ export function pathToFunctionName(path: string): string | null {
   if (cleanPath === 'admin/dashboard') return 'admin-dashboard'
   if (cleanPath.startsWith('admin/monitoring') || cleanPath.startsWith('admin/health')) return 'admin-monitoring'
   if (cleanPath.startsWith('admin/reports')) return 'admin-reports'
+  if (cleanPath.startsWith('admin/delete-member')) return 'admin-delete-member'
   if (cleanPath.startsWith('admin/members')) return 'admin-members'
   if (cleanPath.startsWith('admin/reveal-member-id')) return 'admin-reveal-member-id'
   if (cleanPath.startsWith('admin/packages')) return 'admin-packages'

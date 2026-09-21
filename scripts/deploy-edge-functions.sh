@@ -98,6 +98,7 @@ ALL_FUNCTIONS=(
   admin-claims
   admin-contributions
   admin-dashboard
+  admin-delete-member
   admin-gallery
   admin-media
   admin-members

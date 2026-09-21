@@ -105,6 +105,9 @@ verify_jwt = true
 [functions.admin-members]
 verify_jwt = true
 
+[functions.admin-delete-member]
+verify_jwt = true
+
 [functions.admin-reveal-member-id]
 verify_jwt = true
 

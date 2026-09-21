@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
       subscriptions: subscriptions ?? [],
       isAdmin,
       adminRole,
+      isSuperadmin: adminRecord?.is_superadmin === true,
       registrationFeePaid,
     }), {
       status: 200,

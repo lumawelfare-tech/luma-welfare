@@ -220,6 +220,38 @@ export function parseMemberProfilePatchBody(input: unknown): MemberProfilePatchI
   }
 }
 
+export type DeleteMemberInput = { memberIds: string[] }
+
+/** Parse single or bulk permanent-delete payload (max 25). */
+export function parseDeleteMemberBody(input: unknown): DeleteMemberInput {
+  const body = asRecord(input)
+  const ids: string[] = []
+
+  const single = body.memberId ?? body.member_id
+  if (typeof single === 'string' && UUID_RE.test(single.trim())) {
+    ids.push(single.trim())
+  }
+
+  const list = body.memberIds ?? body.member_ids
+  if (Array.isArray(list)) {
+    for (const item of list) {
+      if (typeof item !== 'string' || !UUID_RE.test(item.trim())) {
+        throw new ValidationError('Each member id must be a valid UUID.')
+      }
+      ids.push(item.trim())
+    }
+  }
+
+  const unique = [...new Set(ids)]
+  if (unique.length === 0) {
+    throw new ValidationError('At least one member_id is required.')
+  }
+  if (unique.length > 25) {
+    throw new ValidationError('Maximum 25 members per delete request.')
+  }
+  return { memberIds: unique }
+}
+
 export type VerifyEmailInput =
   | { action: 'verify'; email: string; code: string }
   | { action: 'resend'; email: string }
