@@ -1,6 +1,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
 import { assertMemberActive } from '../shared/member-status.ts'
+import { withSignedClaimDocumentUrls } from '../shared/storage-signed.ts'
 
 /**
  * Member Claims — Submit, List, Detail, Document Upload
@@ -58,7 +59,9 @@ Deno.serve(async (req) => {
         .select('*')
         .eq('claim_id', claim.id)
 
-      return new Response(JSON.stringify({ claim, documents: documents ?? [] }), {
+      const signedDocs = await withSignedClaimDocumentUrls(adminClient, documents ?? [])
+
+      return new Response(JSON.stringify({ claim, documents: signedDocs }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -201,10 +204,8 @@ Deno.serve(async (req) => {
         throw new Error(`Storage upload failed: ${uploadErr.message}`)
       }
 
-      // Get public URL
-      const { data: urlData } = adminClient.storage
-        .from('claim-documents')
-        .getPublicUrl(storagePath)
+      // Persist storage path only — private bucket; downloads use short-lived signed URLs.
+      const storedPath = storagePath
 
       // Save document record
       const { data: doc, error: docErr } = await adminClient
@@ -212,7 +213,7 @@ Deno.serve(async (req) => {
         .insert({
           claim_id: claimId,
           file_name: fileName,
-          file_url: urlData.publicUrl,
+          file_url: storedPath,
           file_type: fileType || null,
           size_bytes: decodedSize,
           uploaded_by: user.id,
@@ -231,7 +232,9 @@ Deno.serve(async (req) => {
         meta: { claim_id: claimId, file_name: fileName },
       })
 
-      return new Response(JSON.stringify({ document: doc }), {
+      const [signedDoc] = await withSignedClaimDocumentUrls(adminClient, [doc])
+
+      return new Response(JSON.stringify({ document: signedDoc }), {
         status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

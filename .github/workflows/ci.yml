@@ -202,6 +202,15 @@ jobs:
           # (Previous failures: runner local TZ shifted eligibleFrom by one calendar day.)
           TZ: UTC
 
+      - name: Run live RLS isolation (optional)
+        run: npm run test:rls
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        # Suite self-skips when secrets are empty; never fail the job for missing Docker/secrets.
+        continue-on-error: true
+
       - name: Run edge function integration tests
         run: |
           echo "=== Edge Function Integration Tests ==="
@@ -236,6 +245,9 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+      - name: Scan client bundle for leaked secrets
+        run: npm run scan:bundle
 
       - name: Verify build output
         run: |

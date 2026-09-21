@@ -3,6 +3,7 @@ import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSession
 import { sendNotification } from '../shared/notifications.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
+import { withSignedClaimDocumentUrls } from '../shared/storage-signed.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -61,7 +62,8 @@ Deno.serve(async (req) => {
       const { data: claim, error } = await adminClient.from('claims').select('*').eq('id', claimId).single()
       if (error) throw new Error('Claim not found')
       const { data: documents } = await adminClient.from('claim_documents').select('*').eq('claim_id', claim.id)
-      return new Response(JSON.stringify({ claim, documents: documents ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      const signedDocs = await withSignedClaimDocumentUrls(adminClient, documents ?? [])
+      return new Response(JSON.stringify({ claim, documents: signedDocs }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // POST /admin-claims?action=batch — batch reject claims

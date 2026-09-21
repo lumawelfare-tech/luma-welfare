@@ -3,7 +3,7 @@
  * Reflects a single allowlisted Origin (never a comma-separated ACAO value).
  *
  * Exact origin matching only. Preview hosts must be listed explicitly in
- * CORS_ALLOWED_ORIGIN — there is no *.vercel.app wildcard.
+ * CORS_ALLOWED_ORIGIN — no Vercel preview hostname wildcards.
  */
 
 import { CSP_DIRECTIVES } from './security.ts'
