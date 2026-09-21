@@ -10,7 +10,7 @@ import { CSP_DIRECTIVES } from './security.ts'
 
 function getAllowedOrigins(): string[] {
   const raw = Deno.env.get('CORS_ALLOWED_ORIGIN')
-    ?? 'https://luma-welfare.vercel.app,http://localhost:5173,http://localhost:4173'
+    ?? 'https://luma-welfare.vercel.app,http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,http://127.0.0.1:4173'
   return raw.split(',').map((o) => o.trim()).filter(Boolean)
 }
 

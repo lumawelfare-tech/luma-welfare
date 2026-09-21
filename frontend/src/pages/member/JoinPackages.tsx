@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useHead } from '../../lib/seo'
+import { PageHeader } from '../../components/PageHeader'
+import { StatusBadge } from '../../components/StatusBadge'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState } from '../../components/ErrorState'
 
 type Tier = { id: string; name: string; amount: number }
 type Package = {
@@ -25,6 +29,7 @@ export function JoinPackages() {
   const [cancelingId, setCancelingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   function reloadSubscriptions() {
     api<{ subscriptions: Subscription[] }>('/auth/me', { auth: true })
@@ -33,13 +38,21 @@ export function JoinPackages() {
   }
 
   useEffect(() => {
-    api<{ packages: Package[] }>('/packages?resource=packages')
-      .then((d) => setPackages(d.packages))
-      .catch((e) => setError(e.message))
-    reloadSubscriptions()
+    setLoading(true)
+    Promise.all([
+      api<{ packages: Package[] }>('/packages?resource=packages'),
+      api<{ subscriptions: Subscription[] }>('/auth/me', { auth: true }).catch(() => ({ subscriptions: [] as Subscription[] })),
+    ])
+      .then(([pkgData, meData]) => {
+        setPackages(pkgData.packages ?? [])
+        setMine(meData.subscriptions ?? [])
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load packages.'))
+      .finally(() => setLoading(false))
   }, [])
 
   const joinedIds = new Set(mine.filter((s) => s.status !== 'cancelled').map((s) => s.package_id))
+  const activeSubs = mine.filter((s) => s.status !== 'cancelled')
 
   async function join(p: Package) {
     setError(null)
@@ -52,7 +65,7 @@ export function JoinPackages() {
         auth: true,
         body: { packageId: p.id, packageTierId: tierId || undefined },
       })
-      setNotice(`${p.name} added! Your subscription is pending activation.`)
+      setNotice(`${p.name} added. Your subscription is pending activation.`)
       reloadSubscriptions()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not join this package.')
@@ -91,7 +104,6 @@ export function JoinPackages() {
     )
   }
 
-  // Block package access if registration fee is not paid
   if (!registrationFeePaid) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
@@ -108,126 +120,152 @@ export function JoinPackages() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Explore Packages</h1>
-        <p className="mt-1 text-sm text-gray-500">Find the welfare packages available to you. Each is tracked separately.</p>
-      </div>
+      <PageHeader
+        title="Explore Packages"
+        description="Choose welfare packages available to you. Each package is tracked separately with its own contributions and qualification rules."
+      />
 
-      {notice && <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
-      {error && <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {notice && (
+        <div className="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800" role="status">
+          {notice}
+        </div>
+      )}
+      {error && (
+        <div className="mb-4">
+          <ErrorState message={error} onRetry={() => { setError(null); reloadSubscriptions() }} />
+        </div>
+      )}
 
-      {/* Active Subscriptions */}
-      {mine.filter(s => s.status !== 'cancelled').length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Your Active Subscriptions</h2>
+      {activeSubs.length > 0 && (
+        <section className="mb-8" aria-labelledby="your-packages-heading">
+          <h2 id="your-packages-heading" className="text-sm font-semibold text-gray-900 mb-3">Your packages</h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {mine.filter(s => s.status !== 'cancelled').map((sub) => (
-              <div key={sub.id} className="flex items-center justify-between rounded-xl border border-luma-200 bg-luma-50/50 px-4 py-3">
-                <div>
+            {activeSubs.map((sub) => (
+              <div key={sub.id} className="flex items-center justify-between gap-3 glass-panel px-4 py-3">
+                <div className="min-w-0">
                   <span className="text-sm font-medium text-gray-900">{sub.packages?.[0]?.name ?? 'Package'}</span>
-                  <span className={`ml-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${sub.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                    {sub.status}
-                  </span>
+                  <div className="mt-1">
+                    <StatusBadge status={sub.status}>{sub.status}</StatusBadge>
+                  </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => cancelSubscription(sub)}
                   disabled={cancelingId === sub.id}
-                  className="text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50 transition-colors"
+                  className="shrink-0 text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50 transition-colors min-h-[44px] px-2"
                 >
                   {cancelingId === sub.id ? 'Cancelling…' : 'Cancel'}
                 </button>
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {loading && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-64 animate-pulse rounded-xl bg-gray-100" />
+          ))}
         </div>
       )}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {packages.map((p) => {
-          const joined = joinedIds.has(p.id)
-          const minAmount = p.tiers.length > 0 ? Math.min(...p.tiers.map(t => t.amount)) : 0
-          const maxAmount = p.tiers.length > 0 ? Math.max(...p.tiers.map(t => t.amount)) : 0
-          return (
-            <div key={p.id} className={`flex flex-col rounded-xl border bg-white p-5 transition-all ${joined ? 'border-luma-200 bg-luma-50/50' : 'border-gray-200 hover:shadow-md'}`}>
-              {/* Header with badge */}
-              <div className="flex items-start justify-between gap-2">
-                <h2 className="font-semibold text-gray-900">{p.name}</h2>
-                {joined && <span className="inline-flex rounded-full bg-luma-100 px-2 py-0.5 text-[10px] font-semibold text-luma-700">Joined</span>}
-              </div>
-              <p className="mt-2 flex-1 text-sm text-gray-500 line-clamp-3">{p.description}</p>
+      {!loading && packages.length === 0 && !error && (
+        <EmptyState
+          title="No packages available"
+          message="Welfare packages will appear here when they are published."
+          icon="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+        />
+      )}
 
-              {/* Pricing card */}
-              <div className="mt-4 rounded-lg bg-gray-50 p-3">
-                {p.tiers.length === 1 ? (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold text-luma-700">KSh {p.tiers[0].amount.toLocaleString('en-KE')}</span>
-                    <span className="text-sm text-gray-500">/month</span>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold text-luma-700">KSh {minAmount.toLocaleString('en-KE')}</span>
-                      {minAmount !== maxAmount && <span className="text-sm text-gray-500">– KSh {maxAmount.toLocaleString('en-KE')}</span>}
-                      <span className="text-sm text-gray-500">/month</span>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-400">Multiple contribution tiers available</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Benefits list */}
-              <div className="mt-3 space-y-1.5">
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <svg className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  <span>Monthly welfare contributions</span>
-                </div>
-                {p.waiting_period_months != null && p.waiting_period_months > 0 ? (
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <svg className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span>{p.waiting_period_months}-month waiting period before claims</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <svg className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
-                    <span>No waiting period — eligible immediately</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <svg className="h-3.5 w-3.5 text-luma-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  <span>Welfare support when you need it</span>
-                </div>
-              </div>
-
-              {/* Tier selector */}
-              {p.tiers.length > 1 && (
-                <select
-                  value={tierChoice[p.id] ?? ''}
-                  onChange={(e) => setTierChoice((t) => ({ ...t, [p.id]: e.target.value }))}
-                  className="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:ring-1 focus:ring-luma-500 min-h-[44px]"
-                  aria-label="Select contribution tier"
-                >
-                  <option value="" disabled>Choose your contribution tier</option>
-                  {p.tiers.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name} — KSh {t.amount.toLocaleString('en-KE')}/month</option>
-                  ))}
-                </select>
-              )}
-
-              <button
-                onClick={() => join(p)}
-                disabled={joined || busyId === p.id || (p.tiers.length > 1 && !tierChoice[p.id])}
-                className={`mt-4 w-full rounded-lg py-2.5 text-sm font-semibold transition-all disabled:cursor-not-allowed min-h-[44px] ${
-                  joined
-                    ? 'bg-gray-100 text-gray-400'
-                    : 'bg-luma-700 text-white hover:bg-luma-800 active:bg-luma-900 disabled:bg-gray-200 disabled:text-gray-400'
+      {!loading && packages.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {packages.map((p) => {
+            const joined = joinedIds.has(p.id)
+            const minAmount = p.tiers.length > 0 ? Math.min(...p.tiers.map((t) => t.amount)) : 0
+            const maxAmount = p.tiers.length > 0 ? Math.max(...p.tiers.map((t) => t.amount)) : 0
+            return (
+              <article
+                key={p.id}
+                className={`flex flex-col glass-panel p-5 transition-shadow duration-[var(--motion-fast)] ${
+                  joined ? 'ring-1 ring-luma-200' : 'hover:shadow-md'
                 }`}
               >
-                {joined ? 'Already joined' : busyId === p.id ? 'Joining…' : 'Join Package'}
-              </button>
-            </div>
-          )
-        })}
-      </div>
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="font-semibold text-gray-900">{p.name}</h2>
+                  {joined && <StatusBadge tone="success">Joined</StatusBadge>}
+                </div>
+                <p className="mt-2 flex-1 text-sm text-gray-500 line-clamp-3">{p.description}</p>
+
+                <div className="mt-4 rounded-lg bg-gray-50/80 p-3">
+                  {p.tiers.length === 1 ? (
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-luma-700">KSh {p.tiers[0].amount.toLocaleString('en-KE')}</span>
+                      <span className="text-sm text-gray-500">/month</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-baseline gap-1 flex-wrap">
+                        <span className="text-2xl font-bold text-luma-700">KSh {minAmount.toLocaleString('en-KE')}</span>
+                        {minAmount !== maxAmount && (
+                          <span className="text-sm text-gray-500">– KSh {maxAmount.toLocaleString('en-KE')}</span>
+                        )}
+                        <span className="text-sm text-gray-500">/month</span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-400">Multiple contribution tiers available</p>
+                    </div>
+                  )}
+                </div>
+
+                <ul className="mt-3 space-y-1.5">
+                  <li className="flex items-center gap-2 text-xs text-gray-600">
+                    <svg className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Monthly welfare contributions
+                  </li>
+                  <li className="flex items-center gap-2 text-xs text-gray-600">
+                    {p.waiting_period_months != null && p.waiting_period_months > 0 ? (
+                      <svg className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    ) : (
+                      <svg className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    )}
+                    {p.waiting_period_months != null && p.waiting_period_months > 0
+                      ? `${p.waiting_period_months}-month waiting period before claims`
+                      : 'No fixed waiting period — stay current on contributions'}
+                  </li>
+                </ul>
+
+                {p.tiers.length > 1 && (
+                  <select
+                    value={tierChoice[p.id] ?? ''}
+                    onChange={(e) => setTierChoice((t) => ({ ...t, [p.id]: e.target.value }))}
+                    className="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:ring-1 focus:ring-luma-500 min-h-[44px]"
+                    aria-label={`Select contribution tier for ${p.name}`}
+                    disabled={joined}
+                  >
+                    <option value="" disabled>Choose your contribution tier</option>
+                    {p.tiers.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name} — KSh {t.amount.toLocaleString('en-KE')}/month</option>
+                    ))}
+                  </select>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => join(p)}
+                  disabled={joined || busyId === p.id || (p.tiers.length > 1 && !tierChoice[p.id])}
+                  className={`mt-4 w-full rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed min-h-[44px] ${
+                    joined
+                      ? 'bg-gray-100 text-gray-400'
+                      : 'bg-luma-700 text-white hover:bg-luma-800 disabled:bg-gray-200 disabled:text-gray-400'
+                  }`}
+                >
+                  {joined ? 'Already joined' : busyId === p.id ? 'Joining…' : 'Join Package'}
+                </button>
+              </article>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

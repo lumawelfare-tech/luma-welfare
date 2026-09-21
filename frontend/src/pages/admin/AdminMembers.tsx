@@ -8,6 +8,7 @@ import { maskPhone } from '../../lib/pii'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { FilterBar } from '../../components/FilterBar'
+import { FilterDrawer } from '../../components/FilterDrawer'
 import { SearchInput } from '../../components/SearchInput'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
@@ -76,6 +77,7 @@ export function AdminMembers() {
 
   // Bulk dialogs
   const [bulkAction, setBulkAction] = useState<'active' | 'suspended' | 'closed' | null>(null)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   const load = useCallback(async (pageNum = 1) => {
     setError(null)
@@ -411,10 +413,11 @@ export function AdminMembers() {
       {/* Filters */}
       <div className="mt-6">
         <FilterBar
-          options={[...MEMBER_STATUS_FILTERS]}
+          options={MEMBER_STATUS_FILTERS}
           value={filter}
           onChange={applyFilter}
           aria-label="Filter members by status"
+          onOpenMobileFilters={() => setMobileFiltersOpen(true)}
           search={
             <SearchInput
               value={query}
@@ -424,6 +427,39 @@ export function AdminMembers() {
             />
           }
         />
+        <FilterDrawer
+          open={mobileFiltersOpen}
+          onClose={() => setMobileFiltersOpen(false)}
+          title="Filter members"
+          footer={
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen(false)}
+              className="w-full min-h-[44px] rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800"
+            >
+              Show results
+            </button>
+          }
+        >
+          <fieldset>
+            <legend className="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</legend>
+            <div className="mt-2 flex flex-col gap-1">
+              {MEMBER_STATUS_FILTERS.map((opt) => (
+                <button
+                  key={opt.value || 'all'}
+                  type="button"
+                  onClick={() => applyFilter(opt.value)}
+                  aria-pressed={filter === opt.value}
+                  className={`rounded-lg px-3 py-3 text-left text-sm font-medium min-h-[44px] ${
+                    filter === opt.value ? 'bg-luma-100 text-luma-800' : 'bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </FilterDrawer>
       </div>
 
       {error && (
@@ -651,9 +687,7 @@ export function AdminMembers() {
                             <td className="px-3 py-2 text-gray-500">{r.row || '—'}</td>
                             <td className="px-3 py-2 text-gray-600">{r.email || '—'}</td>
                             <td className="px-3 py-2">
-                              <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                r.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                              }`}>{r.status}</span>
+                              <StatusBadge status={r.status}>{r.status}</StatusBadge>
                             </td>
                             <td className="px-3 py-2 text-gray-600">{r.message}</td>
                           </tr>
@@ -719,7 +753,7 @@ export function AdminMembers() {
                             <div className="text-sm font-medium">{String((sub.packages as Record<string, unknown>)?.name ?? '—')}</div>
                             <div className="text-xs text-gray-500">{String((sub.package_tiers as Record<string, unknown>)?.name ?? '')}</div>
                           </div>
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${sub.status === 'active' ? 'bg-emerald-100 text-emerald-700' : sub.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>{String(sub.status)}</span>
+                          <StatusBadge status={String(sub.status)}>{String(sub.status)}</StatusBadge>
                         </div>
                       ))}
                     </div>

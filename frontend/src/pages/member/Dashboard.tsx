@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { PageHeader } from '../../components/PageHeader'
 import { StatusBadge } from '../../components/StatusBadge'
 import { ProgressBar } from '../../components/ProgressBar'
+import { ActivityTimeline, activityToneFromStatus } from '../../components/ActivityTimeline'
 import {
   initiateContributionPayment,
   mapPaymentUiStatus,
@@ -951,33 +952,28 @@ export function Dashboard() {
                 </div>
               </div>
 
-              {/* Recent Notifications */}
+              {/* Recent activity (from member notifications — not admin audit logs) */}
               <div className="glass-panel p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">Recent activity</h3>
                   {unreadCount > 0 && (
                     <span className="rounded-full bg-luma-100 px-2 py-0.5 text-[10px] font-bold text-luma-700">{unreadCount} unread</span>
                   )}
                 </div>
-                {notifications.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-4">No notifications yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {notifications.map((n) => (
-                      <div key={n.id} className={`rounded-lg px-3 py-2.5 text-xs ${n.status === 'queued' ? 'bg-luma-50/50' : 'bg-gray-50'}`}>
-                        <div className="flex items-start gap-2">
-                          {n.status === 'queued' && <span className="mt-1 h-1.5 w-1.5 rounded-full bg-luma-500 flex-shrink-0" />}
-                          <div className="min-w-0">
-                            <div className="font-semibold text-gray-900 truncate">{n.subject ?? 'Notification'}</div>
-                            <div className="mt-0.5 text-gray-500 line-clamp-2">{n.body}</div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    <Link to="/notifications" className="block text-center text-xs font-medium text-luma-600 hover:text-luma-700 pt-1">
-                      View all →
-                    </Link>
-                  </div>
+                <ActivityTimeline
+                  items={notifications.map((n) => ({
+                    id: n.id,
+                    title: n.subject ?? 'Update',
+                    detail: n.body,
+                    at: n.created_at,
+                    tone: activityToneFromStatus(n.status),
+                  }))}
+                  emptyMessage="No recent activity yet."
+                />
+                {notifications.length > 0 && (
+                  <Link to="/notifications" className="mt-3 block text-center text-xs font-medium text-luma-600 hover:text-luma-700 pt-1">
+                    View all →
+                  </Link>
                 )}
               </div>
             </div>

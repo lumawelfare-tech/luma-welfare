@@ -17,6 +17,7 @@ import {
 } from 'recharts'
 import type { DashboardData, DatePreset } from './Dashboard.types'
 import { ClaimsPieChart, MembershipFunnel, ContribChart, PackageBarChart } from './DashboardCharts'
+import { StatusBadge } from '../../components/StatusBadge'
 
 const REFRESH_INTERVAL = 30_000 // 30 seconds
 
@@ -382,15 +383,6 @@ export function AdminDashboard() {
     },
   ]
 
-  const statusColor = (s: string) => {
-    switch (s) {
-      case 'Verified': return 'bg-emerald-100 text-emerald-700'
-      case 'Pending': return 'bg-amber-100 text-amber-700'
-      case 'Failed': return 'bg-red-100 text-red-700'
-      default: return 'bg-gray-100 text-gray-600'
-    }
-  }
-
   return (
     <div className="container-luma py-10">
       <div className="flex items-center justify-between">
@@ -577,7 +569,7 @@ export function AdminDashboard() {
                           <td className="px-5 py-2.5 text-gray-500 text-xs">{t.period ?? '—'}</td>
                           <td className="px-5 py-2.5 font-semibold text-gray-900">{formatKes(t.amount)}</td>
                           <td className="px-5 py-2.5">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusColor(t.status)}`}>{t.status}</span>
+                            <StatusBadge status={t.status}>{t.status}</StatusBadge>
                           </td>
                           <td className="px-5 py-2.5 text-gray-500 text-xs">
                             {new Date(t.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
@@ -696,9 +688,7 @@ export function AdminDashboard() {
                     <td className="px-4 py-3 text-gray-600">{t.package_name}</td>
                     <td className="px-4 py-3 font-semibold text-gray-900">{formatKes(t.amount)}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor(t.status)}`}>
-                        {t.status}
-                      </span>
+                      <StatusBadge status={t.status}>{t.status}</StatusBadge>
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       {new Date(t.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -860,7 +850,7 @@ export function AdminDashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${r.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{r.status}</span>
+                  <StatusBadge status={r.status}>{r.status}</StatusBadge>
                   <span className="text-xs text-gray-400">{timeAgo(new Date(r.generated_at))}</span>
                 </div>
               </div>

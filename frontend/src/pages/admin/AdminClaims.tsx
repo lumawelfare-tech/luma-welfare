@@ -7,7 +7,9 @@ import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { FilterBar } from '../../components/FilterBar'
+import { FilterDrawer } from '../../components/FilterDrawer'
 import { SearchInput } from '../../components/SearchInput'
+import { StatusBadge } from '../../components/StatusBadge'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { exportClaimRecordsCSV, exportClaimRecordsExcel, exportClaimRecordsPDF, type ClaimRecord } from '../../lib/exports'
 
@@ -34,16 +36,6 @@ type ClaimDocument = {
   file_name: string
   file_url: string
   uploaded_at: string
-}
-
-const statusStyles: Record<string, string> = {
-  Draft: 'bg-gray-100 text-gray-600 border-gray-200',
-  Submitted: 'bg-blue-50 text-blue-700 border-blue-200',
-  'Under Review': 'bg-amber-50 text-amber-700 border-amber-200',
-  'Additional Information Required': 'bg-orange-50 text-orange-700 border-orange-200',
-  Approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Rejected: 'bg-red-50 text-red-700 border-red-200',
-  Paid: 'bg-purple-50 text-purple-700 border-purple-200',
 }
 
 const filterTabs = [
@@ -75,6 +67,7 @@ export function AdminClaims() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const perPage = 50
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   // Export
   const [exporting, setExporting] = useState<'csv' | 'excel' | 'pdf' | null>(null)
@@ -356,9 +349,7 @@ export function AdminClaims() {
       render: (row) => {
         const cl = row as unknown as Claim
         return (
-          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusStyles[cl.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-            {cl.status}
-          </span>
+          <StatusBadge status={cl.status}>{cl.status}</StatusBadge>
         )
       },
     },
@@ -446,6 +437,7 @@ export function AdminClaims() {
         value={filter}
         onChange={applyFilter}
         aria-label="Filter claims by status"
+        onOpenMobileFilters={() => setMobileFiltersOpen(true)}
         search={
           <SearchInput
             value={query}
@@ -455,6 +447,39 @@ export function AdminClaims() {
           />
         }
       />
+      <FilterDrawer
+        open={mobileFiltersOpen}
+        onClose={() => setMobileFiltersOpen(false)}
+        title="Filter claims"
+        footer={
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(false)}
+            className="w-full min-h-[44px] rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800"
+          >
+            Show results
+          </button>
+        }
+      >
+        <fieldset>
+          <legend className="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</legend>
+          <div className="mt-2 flex flex-col gap-1">
+            {filterTabs.map((opt) => (
+              <button
+                key={opt.value || 'all'}
+                type="button"
+                onClick={() => applyFilter(opt.value)}
+                aria-pressed={filter === opt.value}
+                className={`rounded-lg px-3 py-3 text-left text-sm font-medium min-h-[44px] ${
+                  filter === opt.value ? 'bg-luma-100 text-luma-800' : 'bg-gray-50 text-gray-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      </FilterDrawer>
 
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
 
@@ -486,9 +511,7 @@ export function AdminClaims() {
                   <button onClick={() => viewDetail(cl)} className="font-medium text-luma-700 hover:underline text-left">
                     {cl.claim_number}
                   </button>
-                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusStyles[cl.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                    {cl.status}
-                  </span>
+                  <StatusBadge status={cl.status}>{cl.status}</StatusBadge>
                 </div>
                 <div className="text-sm text-gray-900">{cl.members?.full_name ?? 'Unknown'}</div>
                 <div className="text-xs text-gray-500">{cl.packages?.name ?? '—'} · {cl.claim_type ?? '—'}</div>
@@ -536,9 +559,7 @@ export function AdminClaims() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{detail.claim_number}</h3>
-                  <span className={`mt-1 inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusStyles[detail.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                    {detail.status}
-                  </span>
+                  <StatusBadge status={detail.status} className="mt-1">{detail.status}</StatusBadge>
                 </div>
                 <button onClick={() => setDetail(null)} aria-label="Close claim detail" className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>

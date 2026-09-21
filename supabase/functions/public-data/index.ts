@@ -1,4 +1,4 @@
-import { handleCors, corsHeaders } from '../shared/cors.ts'
+import { handleCors, getCorsHeaders } from '../shared/cors.ts'
 import { createAdminClient } from '../shared/supabase.ts'
 
 /** Keys safe to expose publicly. Never include mpesa credentials or secrets. */
@@ -8,8 +8,10 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
+  const cors = getCorsHeaders(req)
+
   if (req.method !== 'GET') {
-    return new Response(JSON.stringify({ message: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ message: 'Method not allowed' }), { status: 405, headers: { ...cors, 'Content-Type': 'application/json' } })
   }
 
   try {
@@ -36,7 +38,7 @@ Deno.serve(async (req) => {
           ...p, tiers: (tiers ?? []).filter((t) => t.package_id === p.id),
           rules: rulesByPackage.get(p.id) ?? {},
         })),
-      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } })
     }
 
     if (resource === 'settings') {
@@ -48,7 +50,7 @@ Deno.serve(async (req) => {
       for (const row of data ?? []) {
         if (PUBLIC_SETTINGS_KEYS.has(row.key)) settings[row.key] = row.value
       }
-      return new Response(JSON.stringify(settings), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify(settings), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } })
     }
 
     if (resource === 'news') {
@@ -56,7 +58,7 @@ Deno.serve(async (req) => {
         .from('news_events').select('id, title, body, type, event_date, published_at')
         .eq('is_published', true).order('published_at', { ascending: false })
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ items: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ items: data ?? [] }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } })
     }
 
     if (resource === 'gallery') {
@@ -64,7 +66,7 @@ Deno.serve(async (req) => {
         .from('gallery_items').select('id, title, image_url, caption, created_at')
         .order('created_at', { ascending: false })
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ items: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ items: data ?? [] }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } })
     }
 
     if (resource === 'media') {
@@ -85,12 +87,12 @@ Deno.serve(async (req) => {
 
       const { data, error, count } = await query
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ items: data ?? [], total: count ?? 0, page, per_page: perPage, pages: Math.ceil((count ?? 0) / perPage) }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ items: data ?? [], total: count ?? 0, page, per_page: perPage, pages: Math.ceil((count ?? 0) / perPage) }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } })
     }
 
-    return new Response(JSON.stringify({ message: 'Unknown resource' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ message: 'Unknown resource' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
   } catch (err) {
     console.error('public-data error:', err)
-    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred.', code: 'INTERNAL' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })
   }
 })

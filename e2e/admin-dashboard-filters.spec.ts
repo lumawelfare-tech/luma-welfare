@@ -1,0 +1,55 @@
+/**
+ * Smoke: admin dashboard metric deep-links land on filtered list screens.
+ * Skips without E2E_ADMIN_* credentials. Soft-skips when 2FA blocks UI login.
+ */
+import { test, expect } from '@playwright/test'
+import { BASE_URL, E2E_ADMIN, hasAdminCreds } from './helpers/env'
+import { loginUi } from './helpers/auth'
+
+test.describe('Admin dashboard filter deep links', () => {
+  test.skip(!hasAdminCreds, 'Set E2E_ADMIN_EMAIL/PASSWORD + SUPABASE_URL + anon key')
+
+  test('metric links open members/claims/contributions/subscriptions with status query', async ({ page }) => {
+    test.setTimeout(90_000)
+    await loginUi(page, E2E_ADMIN.email, E2E_ADMIN.password)
+
+    if (page.url().includes('verify') || await page.getByText(/two-factor|authenticator/i).isVisible().catch(() => false)) {
+      test.skip(true, 'Admin account has 2FA enabled — use a test admin without 2FA for UI E2E')
+    }
+
+    await page.goto(`${BASE_URL}/admin/dashboard`)
+    await expect(page.getByRole('heading', { name: /admin dashboard/i })).toBeVisible({ timeout: 25_000 })
+
+    // Active Members → /admin/members?status=active
+    await page.getByRole('link', { name: /view active members/i }).click()
+    await expect(page).toHaveURL(/\/admin\/members\?status=active/)
+    await expect(page.getByRole('button', { name: /^Active$/i }).or(page.getByRole('button', { pressed: true, name: /active/i })).first()).toBeVisible({ timeout: 20_000 })
+
+    await page.goto(`${BASE_URL}/admin/dashboard`)
+    await page.getByRole('link', { name: /view pending claims/i }).click()
+    await expect(page).toHaveURL(/\/admin\/claims\?status=Submitted/)
+    await expect(page.getByRole('heading', { name: /claim/i }).first()).toBeVisible({ timeout: 20_000 })
+
+    await page.goto(`${BASE_URL}/admin/dashboard`)
+    await page.getByRole('link', { name: /view confirmed revenue/i }).click()
+    await expect(page).toHaveURL(/\/admin\/contributions\?status=Verified/)
+
+    await page.goto(`${BASE_URL}/admin/dashboard`)
+    await page.getByRole('link', { name: /view active subscriptions/i }).click()
+    await expect(page).toHaveURL(/\/admin\/subscriptions\?status=active/)
+  })
+
+  test('direct status query params select the matching filter chip', async ({ page }) => {
+    test.setTimeout(90_000)
+    await loginUi(page, E2E_ADMIN.email, E2E_ADMIN.password)
+    if (page.url().includes('verify') || await page.getByText(/two-factor|authenticator/i).isVisible().catch(() => false)) {
+      test.skip(true, 'Admin account has 2FA enabled')
+    }
+
+    await page.goto(`${BASE_URL}/admin/members?status=pending_approval`)
+    await expect(page).toHaveURL(/status=pending_approval/)
+    const pending = page.getByRole('button', { name: /^Pending$/i }).first()
+    await expect(pending).toBeVisible({ timeout: 20_000 })
+    await expect(pending).toHaveAttribute('aria-pressed', 'true')
+  })
+})

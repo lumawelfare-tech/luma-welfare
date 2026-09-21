@@ -7,7 +7,9 @@ import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { FilterBar } from '../../components/FilterBar'
+import { FilterDrawer } from '../../components/FilterDrawer'
 import { SearchInput } from '../../components/SearchInput'
+import { StatusBadge } from '../../components/StatusBadge'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { exportContributionRecordsCSV, exportContributionRecordsExcel, exportContributionRecordsPDF, type ContributionRecord } from '../../lib/exports'
 
@@ -53,14 +55,6 @@ function buildFilterSummary(args: { filter: string; query: string; dateFrom: str
   return parts.length > 0 ? `Filters: ${parts.join(' | ')}` : 'All contributions'
 }
 
-const statusStyles: Record<string, string> = {
-  Pending: 'bg-amber-50 text-amber-700 border-amber-200',
-  Verified: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Failed: 'bg-red-50 text-red-700 border-red-200',
-  Late: 'bg-orange-50 text-orange-700 border-orange-200',
-}
-
 const filterOptions = [
   { value: 'Pending', label: 'Pending' },
   { value: 'Verified', label: 'Verified' },
@@ -95,6 +89,7 @@ export function AdminContributions() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const perPage = 50
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   // Export
   const [exporting, setExporting] = useState<'csv' | 'excel' | 'pdf' | null>(null)
@@ -297,9 +292,7 @@ export function AdminContributions() {
       render: (row) => {
         const c = row as unknown as Contribution
         return (
-          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusStyles[c.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-            {c.status}
-          </span>
+          <StatusBadge status={c.status}>{c.status}</StatusBadge>
         )
       },
     },
@@ -390,6 +383,51 @@ export function AdminContributions() {
           value={filter}
           onChange={applyFilter}
           aria-label="Filter contributions by status"
+          onOpenMobileFilters={() => setMobileFiltersOpen(true)}
+          extras={
+            <>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500">From</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-luma-500"
+                  aria-label="Date from"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500">To</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-luma-500"
+                  aria-label="Date to"
+                />
+              </div>
+              <select
+                value={packageId}
+                onChange={(e) => setPackageId(e.target.value)}
+                className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-luma-500"
+                aria-label="Filter by package"
+              >
+                <option value="">All packages</option>
+                {packages.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              {(dateFrom || dateTo || packageId) && (
+                <button
+                  type="button"
+                  onClick={() => { setDateFrom(''); setDateTo(''); setPackageId('') }}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Clear filters
+                </button>
+              )}
+            </>
+          }
           search={
             <SearchInput
               value={query}
@@ -399,47 +437,58 @@ export function AdminContributions() {
             />
           }
         />
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500">From</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-luma-500"
-              aria-label="Date from"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500">To</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-luma-500"
-              aria-label="Date to"
-            />
-          </div>
-          <select
-            value={packageId}
-            onChange={(e) => setPackageId(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-luma-500"
-            aria-label="Filter by package"
-          >
-            <option value="">All packages</option>
-            {packages.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-          {(dateFrom || dateTo || packageId) && (
+        <FilterDrawer
+          open={mobileFiltersOpen}
+          onClose={() => setMobileFiltersOpen(false)}
+          title="Filter contributions"
+          footer={
             <button
-              onClick={() => { setDateFrom(''); setDateTo(''); setPackageId('') }}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              type="button"
+              onClick={() => setMobileFiltersOpen(false)}
+              className="w-full min-h-[44px] rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800"
             >
-              Clear filters
+              Show results
             </button>
-          )}
-        </div>
+          }
+        >
+          <fieldset>
+            <legend className="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</legend>
+            <div className="mt-2 flex flex-col gap-1">
+              {filterOptions.map((opt) => (
+                <button
+                  key={opt.value || 'all'}
+                  type="button"
+                  onClick={() => applyFilter(opt.value)}
+                  aria-pressed={filter === opt.value}
+                  className={`rounded-lg px-3 py-3 text-left text-sm font-medium min-h-[44px] ${
+                    filter === opt.value ? 'bg-luma-100 text-luma-800' : 'bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600" htmlFor="contrib-from-m">From</label>
+              <input id="contrib-from-m" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm min-h-[44px]" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600" htmlFor="contrib-to-m">To</label>
+              <input id="contrib-to-m" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm min-h-[44px]" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600" htmlFor="contrib-pkg-m">Package</label>
+            <select id="contrib-pkg-m" value={packageId} onChange={(e) => setPackageId(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm min-h-[44px]">
+              <option value="">All packages</option>
+              {packages.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </FilterDrawer>
       </div>
 
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -470,9 +519,7 @@ export function AdminContributions() {
               <div className="space-y-2">
                 <div className="flex items-start justify-between">
                   <div className="font-medium text-gray-900">{c.members?.full_name ?? 'Unknown'}</div>
-                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusStyles[c.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                    {c.status}
-                  </span>
+                  <StatusBadge status={c.status}>{c.status}</StatusBadge>
                 </div>
                 <div className="text-xs text-gray-500">{c.members?.phone ?? '—'} {c.members?.email ? `· ${c.members.email}` : ''}</div>
                 <div className="text-xs text-gray-500">{c.packages?.name ?? '—'} · {c.period}</div>

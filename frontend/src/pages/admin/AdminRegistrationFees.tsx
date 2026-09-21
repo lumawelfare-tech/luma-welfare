@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
+import { StatusBadge } from '../../components/StatusBadge'
 
 type RegistrationFee = {
   id: string
@@ -16,13 +17,6 @@ type RegistrationFee = {
   paid_at: string | null
   created_at: string
   members: { full_name: string | null; phone: string | null; email: string | null } | null
-}
-
-const statusStyles: Record<string, string> = {
-  unpaid: 'bg-gray-100 text-gray-600',
-  pending: 'bg-amber-100 text-amber-700',
-  paid: 'bg-emerald-100 text-emerald-700',
-  failed: 'bg-red-100 text-red-700',
 }
 
 export function AdminRegistrationFees() {
@@ -100,9 +94,7 @@ export function AdminRegistrationFees() {
       render: (row) => {
         const fee = row as unknown as RegistrationFee
         return (
-          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusStyles[fee.status] ?? 'bg-gray-100 text-gray-600'}`}>
-            {fee.status}
-          </span>
+          <StatusBadge status={fee.status}>{fee.status}</StatusBadge>
         )
       },
     },
@@ -178,9 +170,7 @@ export function AdminRegistrationFees() {
                 <div className="space-y-2">
                   <div className="flex items-start justify-between">
                     <div className="font-medium text-gray-900">{fee.members?.full_name ?? 'Unknown'}</div>
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusStyles[fee.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {fee.status}
-                    </span>
+                    <StatusBadge status={fee.status}>{fee.status}</StatusBadge>
                   </div>
                   <div className="text-sm font-medium text-gray-900">KSh {fee.amount.toLocaleString('en-KE')}</div>
                   <div className="text-xs text-gray-500">{fee.payment_method ?? '—'}</div>
