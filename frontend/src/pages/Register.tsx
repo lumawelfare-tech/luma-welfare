@@ -36,7 +36,15 @@ export function Register() {
     if (!form.fullName.trim()) next.fullName = 'Enter your full name.'
     if (!form.email.trim()) next.email = 'Enter your email.'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) next.email = 'Enter a valid email address.'
-    if (!form.phone.trim()) next.phone = 'Enter your phone number.'
+    const phoneDigits = form.phone.replace(/\D/g, '')
+    let phoneNorm = phoneDigits
+    if (phoneDigits.startsWith('254') && phoneDigits.length >= 12) phoneNorm = `0${phoneDigits.slice(3, 12)}`
+    else if (phoneDigits.length === 9 && /^[17]/.test(phoneDigits)) phoneNorm = `0${phoneDigits}`
+    if (!phoneNorm) next.phone = 'Enter your phone number.'
+    else if (!/^0[17]\d{8}$/.test(phoneNorm)) next.phone = 'Enter a valid Kenyan phone (e.g. 0712345678).'
+    const idDigits = form.idNumber.replace(/\D/g, '')
+    if (!idDigits) next.idNumber = 'Enter your National ID number.'
+    else if (!/^\d{7,8}$/.test(idDigits)) next.idNumber = 'National ID must be 7–8 digits.'
     if (form.password.length < 8) next.password = 'Password must be at least 8 characters.'
     else if (!/[A-Za-z]/.test(form.password) || !/[0-9]/.test(form.password)) {
       next.password = 'Password must contain at least one letter and one number.'
@@ -54,13 +62,19 @@ export function Register() {
     setError(null)
     if (!validate()) return
 
+    const phoneDigits = form.phone.replace(/\D/g, '')
+    let phone = phoneDigits
+    if (phoneDigits.startsWith('254') && phoneDigits.length >= 12) phone = `0${phoneDigits.slice(3, 12)}`
+    else if (phoneDigits.length === 9 && /^[17]/.test(phoneDigits)) phone = `0${phoneDigits}`
+    const idNumber = form.idNumber.replace(/\D/g, '')
+
     setBusy(true)
     try {
       await register({
         fullName: form.fullName.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
-        idNumber: form.idNumber.trim() || undefined,
+        phone,
+        idNumber,
         password: form.password,
         acceptedPrivacy: true,
         acceptedTerms: true,
@@ -142,14 +156,20 @@ export function Register() {
           {fieldErrors.phone && <p id="reg-phone-error" className="mt-1 text-xs text-red-700" role="alert">{fieldErrors.phone}</p>}
         </div>
         <div>
-          <label htmlFor="reg-id" className="mb-1.5 block text-sm font-medium text-gray-700">ID number (optional)</label>
+          <label htmlFor="reg-id" className="mb-1.5 block text-sm font-medium text-gray-700">National ID number</label>
           <input
             id="reg-id"
+            required
+            inputMode="numeric"
+            autoComplete="off"
             value={form.idNumber}
             onChange={(e) => set('idNumber', e.target.value)}
-            placeholder="National ID"
+            placeholder="7–8 digit National ID"
+            aria-invalid={!!fieldErrors.idNumber}
+            aria-describedby={fieldErrors.idNumber ? 'reg-id-error' : undefined}
             className={fieldClass}
           />
+          {fieldErrors.idNumber && <p id="reg-id-error" className="mt-1 text-xs text-red-700" role="alert">{fieldErrors.idNumber}</p>}
         </div>
         <div>
           <label htmlFor="reg-password" className="mb-1.5 block text-sm font-medium text-gray-700">Password</label>

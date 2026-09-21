@@ -4,6 +4,7 @@ import { sendEmail, buildEmailTemplate } from '../shared/email.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { withLogging } from '../shared/logging.ts'
 import { PRIVACY_POLICY_VERSION, TERMS_VERSION } from '../shared/legal-versions.ts'
+import { parseMemberProfilePatchBody, ValidationError } from '../shared/validate.ts'
 
 /**
  * Member Profile — Update profile, avatar, password, data export, deletion request
@@ -404,15 +405,63 @@ Deno.serve(withLogging('member-profile', async (req) => {
 
     // PATCH — update profile fields
     if (req.method === 'PATCH') {
-      const body = await req.json()
+      let raw: unknown
+      try {
+        raw = await req.json()
+      } catch {
+        return new Response(JSON.stringify({ message: 'Invalid JSON body.', code: 'VALIDATION' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      let patch
+      try {
+        patch = parseMemberProfilePatchBody(raw)
+      } catch (e) {
+        const message = e instanceof ValidationError ? e.message : 'Invalid profile data.'
+        return new Response(JSON.stringify({ message, code: 'VALIDATION' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: taken } = await adminClient
+        .from('members')
+        .select('id')
+        .eq('id_number', patch.idNumber)
+        .neq('id', user.id)
+        .maybeSingle()
+      if (taken) {
+        return new Response(JSON.stringify({
+          message: 'That ID number is already registered to another member.',
+          code: 'ID_NUMBER_TAKEN',
+        }), {
+          status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
 
       const { data, error } = await adminClient
         .from('members').update({
-          full_name: body.fullName, id_number: body.idNumber, phone: body.phone, alt_phone: body.altPhone,
-          date_of_birth: body.dateOfBirth, county: body.county, location: body.location,
-          occupation: body.occupation, photo_url: body.photoUrl || undefined,
+          full_name: patch.fullName,
+          id_number: patch.idNumber,
+          phone: patch.phone,
+          alt_phone: patch.altPhone,
+          date_of_birth: patch.dateOfBirth,
+          county: patch.county,
+          location: patch.location,
+          occupation: patch.occupation,
+          photo_url: patch.photoUrl || undefined,
         }).eq('id', user.id).select().single()
-      if (error) throw new Error(error.message)
+      if (error) {
+        if ((error as { code?: string }).code === '23505') {
+          return new Response(JSON.stringify({
+            message: 'That ID number is already registered to another member.',
+            code: 'ID_NUMBER_TAKEN',
+          }), {
+            status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        throw new Error(error.message)
+      }
 
       await logAudit(adminClient, { actor_id: user.id, action: 'updated_profile', resource: 'member', resource_id: user.id })
       return new Response(JSON.stringify({ member: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

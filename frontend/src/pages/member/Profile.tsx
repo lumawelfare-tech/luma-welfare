@@ -64,9 +64,32 @@ export function Profile() {
     e.preventDefault()
     setError(null)
     setSaved(false)
+
+    if (!form.fullName?.trim()) {
+      setError('Full name is required.')
+      return
+    }
+    const phoneDigits = (form.phone ?? '').replace(/\D/g, '')
+    let phone = phoneDigits
+    if (phoneDigits.startsWith('254') && phoneDigits.length >= 12) phone = `0${phoneDigits.slice(3, 12)}`
+    else if (phoneDigits.length === 9 && /^[17]/.test(phoneDigits)) phone = `0${phoneDigits}`
+    if (!/^0[17]\d{8}$/.test(phone)) {
+      setError('Enter a valid Kenyan phone number (e.g. 0712345678).')
+      return
+    }
+    const idNumber = (form.idNumber ?? '').replace(/\D/g, '')
+    if (!/^\d{7,8}$/.test(idNumber)) {
+      setError('National ID must be 7–8 digits.')
+      return
+    }
+
     setSaving(true)
     try {
-      await api('/member/profile', { method: 'PATCH', auth: true, body: form })
+      await api('/member/profile', {
+        method: 'PATCH',
+        auth: true,
+        body: { ...form, phone, idNumber },
+      })
       setSaved(true)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save your profile.')
@@ -196,8 +219,15 @@ export function Profile() {
             <input value={form.phone ?? ''} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" placeholder="07XXXXXXXX" autoComplete="tel" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">ID number</label>
-            <input value={form.idNumber ?? ''} onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
+            <label className="mb-1 block text-xs font-medium text-gray-600">National ID number</label>
+            <input
+              required
+              inputMode="numeric"
+              value={form.idNumber ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))}
+              placeholder="7–8 digit National ID"
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white"
+            />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Alternate phone</label>

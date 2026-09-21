@@ -53,7 +53,7 @@ type AuthState = {
     password: string
     fullName: string
     phone: string
-    idNumber?: string
+    idNumber: string
     acceptedPrivacy: true
     acceptedTerms: true
     privacyPolicyVersion: string
@@ -265,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string
     fullName: string
     phone: string
-    idNumber?: string
+    idNumber: string
     acceptedPrivacy: true
     acceptedTerms: true
     privacyPolicyVersion: string

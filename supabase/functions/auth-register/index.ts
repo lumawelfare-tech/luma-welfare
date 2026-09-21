@@ -54,6 +54,18 @@ Deno.serve(async (req) => {
     const adminClient = createAdminClient()
     const consentAt = new Date().toISOString()
 
+    const { data: existingId } = await adminClient
+      .from('members')
+      .select('id')
+      .eq('id_number', idNumber)
+      .maybeSingle()
+    if (existingId) {
+      return json(409, {
+        message: 'That ID number is already registered.',
+        code: 'ID_NUMBER_TAKEN',
+      })
+    }
+
     const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
       email,
       password,
@@ -87,6 +99,13 @@ Deno.serve(async (req) => {
 
     if (memberError) {
       await adminClient.auth.admin.deleteUser(userId)
+      const code = (memberError as { code?: string }).code
+      if (code === '23505') {
+        return json(409, {
+          message: 'That ID number or email is already registered.',
+          code: 'DUPLICATE',
+        })
+      }
       console.error('auth-register: member insert failed', memberError.code ?? 'DB')
       return json(500, { message: 'Could not create membership. Please try again.', code: 'DB_ERROR' })
     }

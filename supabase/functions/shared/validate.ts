@@ -14,7 +14,37 @@ export class ValidationError extends Error {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const KENYA_PHONE_RE = /^0[17]\d{8}$/
+/** Kenyan National ID: 7–8 digits (no letters). */
+const KENYA_NATIONAL_ID_RE = /^\d{7,8}$/
 const OTP_CODE_RE = /^\d{6}$/
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Normalize common Kenyan phone inputs to canonical `0[17]XXXXXXXX`. */
+export function normalizeKenyanPhone(raw: string): string {
+  const digits = String(raw ?? '').replace(/\D/g, '')
+  if (digits.startsWith('254') && digits.length >= 12) {
+    return `0${digits.slice(3, 12)}`
+  }
+  if (digits.length === 9 && /^[17]/.test(digits)) {
+    return `0${digits}`
+  }
+  if (digits.length === 10 && /^0[17]/.test(digits)) {
+    return digits
+  }
+  return String(raw ?? '').trim()
+}
+
+export function parseKenyanNationalId(raw: unknown, label = 'ID number'): string {
+  if (typeof raw !== 'string' || !raw.trim()) {
+    throw new ValidationError(`${label} is required.`)
+  }
+  const digits = raw.replace(/\D/g, '')
+  if (!KENYA_NATIONAL_ID_RE.test(digits)) {
+    throw new ValidationError('Enter a valid Kenyan National ID (7–8 digits).')
+  }
+  return digits
+}
 
 function asRecord(input: unknown): Record<string, unknown> {
   if (input == null || typeof input !== 'object' || Array.isArray(input)) {
@@ -54,7 +84,7 @@ export type RegisterInput = {
   password: string
   fullName: string
   phone: string
-  idNumber: string | null
+  idNumber: string
   acceptedPrivacy: true
   acceptedTerms: true
   privacyPolicyVersion: string
@@ -66,8 +96,8 @@ export function parseRegisterBody(input: unknown): RegisterInput {
   const email = requireString(body, 'email', 'Email').toLowerCase()
   const password = typeof body.password === 'string' ? body.password : ''
   const fullName = requireString(body, 'fullName', 'Full name')
-  const phone = requireString(body, 'phone', 'Phone')
-  const idRaw = body.idNumber
+  const phone = normalizeKenyanPhone(requireString(body, 'phone', 'Phone'))
+  const idNumber = parseKenyanNationalId(body.idNumber)
 
   if (!EMAIL_RE.test(email)) {
     throw new ValidationError('Enter a valid email address.')
@@ -85,7 +115,7 @@ export function parseRegisterBody(input: unknown): RegisterInput {
     throw new ValidationError('Full name is too long.')
   }
   if (!KENYA_PHONE_RE.test(phone)) {
-    throw new ValidationError('Enter a valid Kenyan phone number.')
+    throw new ValidationError('Enter a valid Kenyan phone number (e.g. 0712345678).')
   }
   if (body.acceptedPrivacy !== true) {
     throw new ValidationError('You must accept the Privacy Policy to create an account.')
@@ -98,13 +128,6 @@ export function parseRegisterBody(input: unknown): RegisterInput {
   if (privacyPolicyVersion.length > 64 || termsVersion.length > 64) {
     throw new ValidationError('Invalid legal document version.')
   }
-  let idNumber: string | null = null
-  if (idRaw != null && idRaw !== '') {
-    if (typeof idRaw !== 'string') {
-      throw new ValidationError('ID number must be a string.')
-    }
-    idNumber = idRaw.trim().slice(0, 32) || null
-  }
 
   return {
     email,
@@ -116,6 +139,84 @@ export function parseRegisterBody(input: unknown): RegisterInput {
     acceptedTerms: true,
     privacyPolicyVersion,
     termsVersion,
+  }
+}
+
+export type RevealMemberIdInput = { memberId: string }
+
+/** Parse reveal-member-id body and/or query (pure TS — no Zod in Edge). */
+export function parseRevealMemberIdInput(
+  body: unknown,
+  memberIdFromQuery: string | null | undefined,
+): RevealMemberIdInput {
+  const fromQuery = typeof memberIdFromQuery === 'string' ? memberIdFromQuery.trim() : ''
+  if (fromQuery && UUID_RE.test(fromQuery)) {
+    return { memberId: fromQuery }
+  }
+  if (body && typeof body === 'object' && !Array.isArray(body)) {
+    const rec = body as Record<string, unknown>
+    const id = rec.memberId ?? rec.member_id
+    if (typeof id === 'string' && UUID_RE.test(id.trim())) {
+      return { memberId: id.trim() }
+    }
+  }
+  throw new ValidationError('Valid member_id is required.')
+}
+
+export type MemberProfilePatchInput = {
+  fullName: string
+  phone: string
+  idNumber: string
+  altPhone: string | null
+  dateOfBirth?: string | null
+  county?: string | null
+  location?: string | null
+  occupation?: string | null
+  photoUrl?: string | null
+}
+
+export function parseMemberProfilePatchBody(input: unknown): MemberProfilePatchInput {
+  const body = asRecord(input)
+  const fullName = requireString(body, 'fullName', 'Full name')
+  if (fullName.length > 120) {
+    throw new ValidationError('Full name is too long.')
+  }
+  const phone = normalizeKenyanPhone(requireString(body, 'phone', 'Phone'))
+  if (!KENYA_PHONE_RE.test(phone)) {
+    throw new ValidationError('Enter a valid Kenyan phone number (e.g. 0712345678).')
+  }
+  const idNumber = parseKenyanNationalId(body.idNumber)
+
+  let altPhone: string | null = null
+  const altRaw = body.altPhone
+  if (altRaw != null && altRaw !== '') {
+    if (typeof altRaw !== 'string') {
+      throw new ValidationError('Alternate phone must be a string.')
+    }
+    const normalized = normalizeKenyanPhone(altRaw)
+    if (normalized && !KENYA_PHONE_RE.test(normalized)) {
+      throw new ValidationError('Enter a valid alternate Kenyan phone number.')
+    }
+    altPhone = normalized || null
+  }
+
+  const opt = (key: string): string | null => {
+    const v = body[key]
+    if (v == null || v === '') return null
+    if (typeof v !== 'string') throw new ValidationError(`${key} must be a string.`)
+    return v.trim().slice(0, 200) || null
+  }
+
+  return {
+    fullName,
+    phone,
+    idNumber,
+    altPhone,
+    dateOfBirth: opt('dateOfBirth'),
+    county: opt('county'),
+    location: opt('location'),
+    occupation: opt('occupation'),
+    photoUrl: opt('photoUrl'),
   }
 }
 
