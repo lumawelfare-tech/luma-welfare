@@ -33,11 +33,13 @@ type Member = {
   email: string | null
   id_number_masked?: string | null
   profile_incomplete?: boolean
+  is_anonymized?: boolean
+  anonymized_at?: string | null
   status: string
   joined_at: string | null
 }
 
-const MEMBER_STATUS_FILTERS = [
+const BASE_MEMBER_STATUS_FILTERS = [
   { value: '', label: 'All' },
   { value: 'pending_approval', label: 'Pending' },
   { value: 'active', label: 'Active' },
@@ -45,15 +47,25 @@ const MEMBER_STATUS_FILTERS = [
   { value: 'closed', label: 'Closed' },
 ]
 
-const ALLOWED_MEMBER_STATUS = new Set<string>(MEMBER_STATUS_FILTERS.map((f) => f.value))
+const ANONYMIZED_FILTER = { value: 'anonymized', label: 'Anonymized' }
+
+const ALLOWED_MEMBER_STATUS = new Set<string>([
+  ...BASE_MEMBER_STATUS_FILTERS.map((f) => f.value),
+  ANONYMIZED_FILTER.value,
+])
 
 export function AdminMembers() {
   useHead('Members', undefined, { noindex: true })
   const { addToast } = useToast()
   const { isSuperadmin } = useAuth()
+  const memberStatusFilters = isSuperadmin
+    ? [...BASE_MEMBER_STATUS_FILTERS, ANONYMIZED_FILTER]
+    : BASE_MEMBER_STATUS_FILTERS
   const [searchParams, setSearchParams] = useSearchParams()
   const statusFromUrl = searchParams.get('status') ?? ''
-  const initialFilter = ALLOWED_MEMBER_STATUS.has(statusFromUrl) ? statusFromUrl : ''
+  const initialFilter = ALLOWED_MEMBER_STATUS.has(statusFromUrl)
+    ? (statusFromUrl === 'anonymized' && !isSuperadmin ? '' : statusFromUrl)
+    : ''
   const [members, setMembers] = useState<Member[]>([])
   const [filter, setFilter] = useState(initialFilter)
   const [query, setQuery] = useState('')
@@ -257,18 +269,33 @@ export function AdminMembers() {
       const hardIds = new Set((d.results ?? []).filter((r) => r.success && r.path === 'hard_delete').map((r) => r.member_id))
       const anonIds = new Set((d.results ?? []).filter((r) => r.success && r.path === 'anonymize').map((r) => r.member_id))
       if (ok > 0) {
-        const anon = anonIds.size > 0
-        addToast(
-          'success',
-          ok === 1
-            ? anon
-              ? 'Personal data erased; financial records kept anonymously.'
-              : 'Member permanently deleted.'
-            : `${ok} member${ok === 1 ? '' : 's'} purged.`,
-        )
+        const anonCount = anonIds.size
+        const hardCount = hardIds.size
+        if (anonCount > 0 && hardCount === 0) {
+          addToast(
+            'success',
+            anonCount === 1
+              ? 'Anonymized 1 member. Personal data erased, financial records kept.'
+              : `Anonymized ${anonCount} members. Personal data erased, financial records kept.`,
+          )
+        } else if (hardCount > 0 && anonCount === 0) {
+          addToast(
+            'success',
+            hardCount === 1 ? 'Deleted 1 member.' : `Deleted ${hardCount} members.`,
+          )
+        } else {
+          addToast(
+            'success',
+            `Deleted ${hardCount} member${hardCount === 1 ? '' : 's'}; anonymized ${anonCount} (financial records kept).`,
+          )
+        }
+        // Default list hides anonymized; remove both hard-deleted and anonymized rows immediately.
+        // When viewing the Anonymized filter, keep anonymized shells visible with badge.
+        const viewingAnonymized = filter === 'anonymized'
         setMembers((prev) =>
           prev
             .filter((m) => !hardIds.has(m.id))
+            .filter((m) => viewingAnonymized || !anonIds.has(m.id))
             .map((m) =>
               anonIds.has(m.id)
                 ? {
@@ -277,7 +304,10 @@ export function AdminMembers() {
                     email: null,
                     id_number_masked: '—',
                     phone: '0700000000',
-                    profile_incomplete: true,
+                    profile_incomplete: false,
+                    is_anonymized: true,
+                    anonymized_at: new Date().toISOString(),
+                    status: 'closed',
                   }
                 : m,
             ),
@@ -285,9 +315,13 @@ export function AdminMembers() {
         setSelectedIds((prev) => {
           const next = new Set(prev)
           for (const id of hardIds) next.delete(id)
+          if (!viewingAnonymized) {
+            for (const id of anonIds) next.delete(id)
+          }
           return next
         })
-        setTotalCount((c) => Math.max(0, c - hardIds.size))
+        const removedFromList = hardCount + (viewingAnonymized ? 0 : anonCount)
+        setTotalCount((c) => Math.max(0, c - removedFromList))
       }
       if (fail > 0) {
         const firstErr = (d.results ?? []).find((r) => !r.success)?.error
@@ -384,11 +418,18 @@ export function AdminMembers() {
         <button type="button" onClick={() => viewMember(m)} className="min-h-[44px] text-left hover:underline">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-gray-900">{m.full_name}</span>
-            {m.profile_incomplete && (
+            {m.is_anonymized ? (
+              <span
+                className="max-w-[14rem] rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-slate-200/80"
+                title="Anonymized: personal data erased, financial records retained"
+              >
+                Anonymized: personal data erased, financial records retained
+              </span>
+            ) : m.profile_incomplete ? (
               <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200/80">
                 Incomplete profile
               </span>
-            )}
+            ) : null}
           </div>
           {m.membership_number && <div className="text-xs text-gray-400">#{m.membership_number}</div>}
         </button>
@@ -414,7 +455,11 @@ export function AdminMembers() {
       header: 'ID No.',
       sortable: false,
       render: (m) => (
-        <IdRevealCell memberId={m.id} masked={m.id_number_masked ?? '—'} />
+        m.is_anonymized ? (
+          <span className="text-sm text-gray-400">—</span>
+        ) : (
+          <IdRevealCell memberId={m.id} masked={m.id_number_masked ?? '—'} />
+        )
       ),
     },
     {
@@ -435,7 +480,9 @@ export function AdminMembers() {
       header: 'Status',
       sortable: true,
       render: (m) => (
-        <StatusBadge status={m.status}>{m.status.replace(/_/g, ' ')}</StatusBadge>
+        <StatusBadge status={m.is_anonymized ? 'closed' : m.status}>
+          {m.is_anonymized ? 'anonymized' : m.status.replace(/_/g, ' ')}
+        </StatusBadge>
       ),
     },
     {
@@ -454,6 +501,9 @@ export function AdminMembers() {
       className: 'sticky right-0 z-[1] min-w-[11rem] bg-white text-right shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.08)]',
       hideOnMobile: true,
       render: (m) => (
+        m.is_anonymized ? (
+          <span className="text-xs text-gray-400">No actions</span>
+        ) : (
         <div className="flex min-h-[44px] items-center justify-end gap-1.5">
           {m.status === 'pending_approval' && (
             <button
@@ -511,6 +561,7 @@ export function AdminMembers() {
             <span className="text-xs text-gray-400">—</span>
           )}
         </div>
+        )
       ),
     },
   ]
@@ -555,7 +606,7 @@ export function AdminMembers() {
       {/* Filters */}
       <div className="mt-6">
         <FilterBar
-          options={MEMBER_STATUS_FILTERS}
+          options={memberStatusFilters}
           value={filter}
           onChange={applyFilter}
           aria-label="Filter members by status"
@@ -586,7 +637,7 @@ export function AdminMembers() {
           <fieldset>
             <legend className="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</legend>
             <div className="mt-2 flex flex-col gap-1">
-              {MEMBER_STATUS_FILTERS.map((opt) => (
+              {memberStatusFilters.map((opt) => (
                 <button
                   key={opt.value || 'all'}
                   type="button"
@@ -640,11 +691,15 @@ export function AdminMembers() {
                     <button type="button" onClick={() => viewMember(m)} className="min-h-[44px] text-left">
                       <div className="font-medium text-gray-900">{m.full_name}</div>
                       {m.membership_number && <div className="text-xs text-gray-400">#{m.membership_number}</div>}
-                      {m.profile_incomplete && (
+                      {m.is_anonymized ? (
+                        <span className="mt-1 inline-block max-w-[16rem] rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-700">
+                          Anonymized: personal data erased, financial records retained
+                        </span>
+                      ) : m.profile_incomplete ? (
                         <span className="mt-1 inline-block rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-800">
                           Incomplete profile
                         </span>
-                      )}
+                      ) : null}
                     </button>
                     <StatusBadge status={m.status}>{m.status.replace(/_/g, ' ')}</StatusBadge>
                   </div>
@@ -659,7 +714,11 @@ export function AdminMembers() {
                     </div>
                     <div>
                       <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">ID No.</div>
-                      <IdRevealCell memberId={m.id} masked={m.id_number_masked ?? '—'} />
+                      {m.is_anonymized ? (
+                        <span className="text-gray-400">—</span>
+                      ) : (
+                        <IdRevealCell memberId={m.id} masked={m.id_number_masked ?? '—'} />
+                      )}
                     </div>
                     <div>
                       <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Email</div>
@@ -667,28 +726,34 @@ export function AdminMembers() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 pt-1">
-                    {m.status === 'pending_approval' && (
-                      <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'active')} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Approve</button>
-                    )}
-                    {m.status === 'active' && (
-                      <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'suspended')} className="min-h-[44px] rounded-md border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600">Suspend</button>
-                    )}
-                    {m.status === 'suspended' && (
-                      <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'active')} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Reinstate</button>
-                    )}
-                    {m.status !== 'closed' && (
-                      <button type="button" disabled={busyId === m.id} onClick={() => { setCloseTarget(m); setConfirmText('') }} className="min-h-[44px] rounded-md border border-amber-200 px-3 py-2 text-xs font-medium text-amber-800">Close</button>
-                    )}
-                    {isSuperadmin && m.status === 'closed' && (
-                      <button
-                        type="button"
-                        disabled={busyId === m.id || deleteBusy}
-                        onClick={() => { setPurgeTarget(m); setConfirmText('') }}
-                        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-600"
-                        aria-label={`Permanently delete ${m.full_name}`}
-                      >
-                        <Icon name="trash" className="h-4 w-4" /> Delete permanently
-                      </button>
+                    {m.is_anonymized ? (
+                      <span className="text-xs text-gray-400">No actions</span>
+                    ) : (
+                      <>
+                        {m.status === 'pending_approval' && (
+                          <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'active')} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Approve</button>
+                        )}
+                        {m.status === 'active' && (
+                          <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'suspended')} className="min-h-[44px] rounded-md border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600">Suspend</button>
+                        )}
+                        {m.status === 'suspended' && (
+                          <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'active')} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Reinstate</button>
+                        )}
+                        {m.status !== 'closed' && (
+                          <button type="button" disabled={busyId === m.id} onClick={() => { setCloseTarget(m); setConfirmText('') }} className="min-h-[44px] rounded-md border border-amber-200 px-3 py-2 text-xs font-medium text-amber-800">Close</button>
+                        )}
+                        {isSuperadmin && m.status === 'closed' && (
+                          <button
+                            type="button"
+                            disabled={busyId === m.id || deleteBusy}
+                            onClick={() => { setPurgeTarget(m); setConfirmText('') }}
+                            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-600"
+                            aria-label={`Permanently delete ${m.full_name}`}
+                          >
+                            <Icon name="trash" className="h-4 w-4" /> Delete permanently
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

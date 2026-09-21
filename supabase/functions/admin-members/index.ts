@@ -124,6 +124,25 @@ Deno.serve(async (req) => {
         })
       }
 
+      const { data: existing, error: loadErr } = await adminClient
+        .from('members')
+        .select('id, anonymized_at')
+        .eq('id', resourceId)
+        .maybeSingle()
+      if (loadErr || !existing) {
+        return new Response(JSON.stringify({ message: 'Member not found', code: 'NOT_FOUND' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      if (existing.anonymized_at) {
+        return new Response(JSON.stringify({
+          message: 'Anonymized members cannot be approved, suspended, or closed.',
+          code: 'ANONYMIZED_IMMUTABLE',
+        }), {
+          status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       const now = new Date().toISOString()
       const { data, error } = await adminClient
         .from('members')
@@ -240,6 +259,16 @@ Deno.serve(async (req) => {
           .from('admins').select('id').eq('id', id).maybeSingle()
         if (targetAdmin) {
           results.push({ id, success: false, error: 'Cannot modify administrator accounts.' })
+          continue
+        }
+
+        const { data: targetMember } = await adminClient
+          .from('members')
+          .select('anonymized_at')
+          .eq('id', id)
+          .maybeSingle()
+        if (targetMember?.anonymized_at) {
+          results.push({ id, success: false, error: 'Anonymized member cannot be updated.' })
           continue
         }
 

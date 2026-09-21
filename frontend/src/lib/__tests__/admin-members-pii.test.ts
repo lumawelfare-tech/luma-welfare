@@ -46,6 +46,19 @@ describe('prepareMemberListRow', () => {
     expect(row.id_number_masked).toBe('—')
     expect(row.profile_incomplete).toBe(true)
   })
+
+  it('marks anonymized shells without incomplete-profile badge', () => {
+    const row = prepareMemberListRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      full_name: 'Deleted member',
+      phone: '0700000000',
+      id_number: null,
+      anonymized_at: '2026-09-21T17:00:00Z',
+    })
+    expect(row.is_anonymized).toBe(true)
+    expect(row.profile_incomplete).toBe(false)
+    expect(row.id_number_masked).toBe('—')
+  })
 })
 
 describe('reveal-member-id contracts', () => {

@@ -60,9 +60,12 @@ export function maskMemberListFields<T extends Record<string, unknown>>(row: T):
 
 /**
  * Admin members list row: keep full phone for admin ops; never send full id_number.
+ * Anonymized shells are flagged explicitly (not as "incomplete profile").
  */
 export function prepareMemberListRow(row: Record<string, unknown>): Record<string, unknown> {
   const idRaw = typeof row.id_number === 'string' ? row.id_number.trim() : ''
+  const anonymizedAt = row.anonymized_at ?? null
+  const isAnonymized = anonymizedAt != null && anonymizedAt !== ''
   const {
     id_number: _omitId,
     alt_phone: _omitAlt,
@@ -70,7 +73,9 @@ export function prepareMemberListRow(row: Record<string, unknown>): Record<strin
   } = row
   return {
     ...rest,
-    id_number_masked: maskIdNumberLast4(idRaw || null),
-    profile_incomplete: !idRaw,
+    anonymized_at: anonymizedAt,
+    id_number_masked: isAnonymized ? '—' : maskIdNumberLast4(idRaw || null),
+    profile_incomplete: isAnonymized ? false : !idRaw,
+    is_anonymized: isAnonymized,
   }
 }
