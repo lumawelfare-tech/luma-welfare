@@ -192,6 +192,9 @@ jobs:
 
       - name: Run qualification engine tests
         run: npm run test:qualify
+        env:
+          # Date arithmetic in qualify.ts is UTC; pin TZ so CI matches everywhere.
+          TZ: UTC
 
       - name: Run edge function integration tests
         run: |

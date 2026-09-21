@@ -43,12 +43,21 @@ function bool(ruleMap: RuleMap, key: string, fallback: boolean): boolean {
   return Boolean(v)
 }
 
+/** Calendar months between two instants using UTC components (CI/local TZ safe). */
 function monthsBetween(start: Date, end: Date): number {
   return Math.max(
     0,
-    (end.getFullYear() - start.getFullYear()) * 12 +
-      (end.getMonth() - start.getMonth()),
+    (end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+      (end.getUTCMonth() - start.getUTCMonth()),
   )
+}
+
+/** Add calendar months in UTC and return YYYY-MM-DD. */
+function addMonthsUtcIsoDate(start: Date, months: number): string {
+  const d = new Date(
+    Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + months, start.getUTCDate()),
+  )
+  return d.toISOString().slice(0, 10)
 }
 
 export function evaluateQualification(
@@ -111,13 +120,7 @@ export function evaluateQualification(
 
   const eligibleFrom =
     !waitingPeriodIsNone && startedAt
-      ? new Date(
-          startedAt.getFullYear(),
-          startedAt.getMonth() + waitingPeriod,
-          startedAt.getDate(),
-        )
-          .toISOString()
-          .slice(0, 10)
+      ? addMonthsUtcIsoDate(startedAt, waitingPeriod)
       : startedAt?.toISOString().slice(0, 10) ?? null
 
   return {
