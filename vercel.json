@@ -4,7 +4,7 @@
   "installCommand": "npm ci",
   "rewrites": [
     {
-      "source": "/((?!assets/|api/).*)",
+      "source": "/((?!assets/|api/|brand/|icons/|about(?:/|$)|packages(?:/|$)|how-it-works(?:/|$)|faq(?:/|$)|privacy(?:/|$)|terms(?:/|$)|contact(?:/|$)|news(?:/|$)|gallery(?:/|$)|media(?:/|$)|robots\\.txt$|sitemap\\.xml$|manifest\\.json$|sw\\.js$|ld-[^/]+\\.json$|favicon\\.png$|luma[^/]*\\.jpeg$).*)",
       "destination": "/index.html"
     }
   ],

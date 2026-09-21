@@ -1,7 +1,7 @@
 {
   "rewrites": [
     {
-      "source": "/((?!assets/|api/|brand/|icons/|robots\\.txt$|sitemap\\.xml$|manifest\\.json$|sw\\.js$|ld-[^/]+\\.json$|favicon\\.png$|luma[^/]*\\.jpeg$).*)",
+      "source": "/((?!assets/|api/|brand/|icons/|about(?:/|$)|packages(?:/|$)|how-it-works(?:/|$)|faq(?:/|$)|privacy(?:/|$)|terms(?:/|$)|contact(?:/|$)|news(?:/|$)|gallery(?:/|$)|media(?:/|$)|robots\\.txt$|sitemap\\.xml$|manifest\\.json$|sw\\.js$|ld-[^/]+\\.json$|favicon\\.png$|luma[^/]*\\.jpeg$).*)",
       "destination": "/index.html"
     }
   ],

@@ -5,12 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "prebuild": "npx tsx ../scripts/generate-og-image.ts && npx tsx ../scripts/generate-sitemap.ts",
+    "build": "tsc -b && vite build && npx tsx ../scripts/prerender-public.ts",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "seo:og": "npx tsx ../scripts/generate-og-image.ts",
+    "seo:sitemap": "npx tsx ../scripts/generate-sitemap.ts",
+    "seo:prerender": "npx tsx ../scripts/prerender-public.ts"
   },
   "dependencies": {
     "@sentry/react": "^10.71.0",

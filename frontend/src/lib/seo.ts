@@ -1,9 +1,21 @@
 import { useEffect } from 'react'
+import { resolveSiteUrl } from './public-routes'
 
 export const SITE_NAME = 'Luma Welfare'
-export const BASE_URL = 'https://luma-welfare.vercel.app'
-/** OG/Twitter share image (1200×630 preferred when available). */
-export const DEFAULT_IMAGE = `${BASE_URL}/brand/luma-logo.jpeg`
+
+/** Production site origin — override with VITE_SITE_URL at build time. */
+export const BASE_URL = resolveSiteUrl({
+  VITE_SITE_URL: import.meta.env.VITE_SITE_URL as string | undefined,
+  SITE_URL: import.meta.env.SITE_URL as string | undefined,
+  VITE_PUBLIC_SITE_URL: import.meta.env.VITE_PUBLIC_SITE_URL as string | undefined,
+})
+
+/**
+ * Dedicated 1200×630 Open Graph image (replaceable asset under public/brand/).
+ * Falls back path is generated at build by scripts/generate-og-image.ts.
+ */
+export const DEFAULT_IMAGE = `${BASE_URL}/brand/og-default.png`
+export const DEFAULT_IMAGE_FALLBACK = `${BASE_URL}/brand/luma-logo.jpeg`
 
 /**
  * Build document title without duplicating the site name.
