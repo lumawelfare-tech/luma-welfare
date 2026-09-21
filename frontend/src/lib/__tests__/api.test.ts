@@ -220,6 +220,15 @@ describe('API Path Routing', () => {
     expect(url).toContain('resource_id=some-uuid-123')
   })
 
+  it('maps member push-subscriptions to member-push-subscriptions function', async () => {
+    const { api } = await import('../api')
+    await api('/member/push-subscriptions', { auth: true })
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('/functions/v1/member-push-subscriptions'),
+      expect.anything(),
+    )
+  })
+
   it('throws on unknown paths', async () => {
     const { api } = await import('../api')
     await expect(api('/nonexistent/path')).rejects.toThrow('Unknown API path')

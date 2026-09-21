@@ -478,7 +478,9 @@ async function networkOnly(request) {
 // ============================================================================
 
 /**
- * Check if pathname is an API call
+ * Check if pathname is an API / dynamic data request.
+ * Edge Functions are hosted on *.supabase.co (full URL), not same-origin /api/*.
+ * Same-origin `/api/` here is only Vercel cron handlers under /api/cron/*.
  */
 function isApiCall(pathname) {
   return API_PATHS.some((api) => pathname.startsWith(api)) ||

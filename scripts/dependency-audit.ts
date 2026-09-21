@@ -102,7 +102,7 @@ async function main() {
 
   const results: Array<{ name: string; audit: AuditOutput | null }> = []
 
-  // Audit each workspace (Supabase-only — no Hono backend package)
+  // Audit each workspace (Supabase Edge + frontend only)
   for (const [name, dir] of [
     ['Root', projectRoot],
     ['Frontend', frontendDir],

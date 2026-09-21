@@ -249,6 +249,9 @@ jobs:
       - name: Scan client bundle for leaked secrets
         run: npm run scan:bundle
 
+      - name: Guard against legacy non-Supabase backend URLs
+        run: npm run guard:backend
+
       - name: Verify build output
         run: |
           echo "=== Build output ==="
@@ -365,7 +368,9 @@ jobs:
             "auth-verify-email"
             "member-dashboard"
             "member-profile"
+            "member-push-subscriptions"
             "public-data"
+            "contact"
           )
 
           MISSING=0

@@ -10,16 +10,13 @@ manage members, verify payments, review claims, and run payouts.
 ```
 React (Vite) on Vercel
     ↓
-Supabase Auth
+Supabase Auth + Edge Functions (Deno)
     ↓
-Supabase Edge Functions (Deno)
-    ↓
-Postgres + RLS + RPC
-    ↓
-Supabase Storage
+Postgres + RLS + RPC + Storage
 ```
 
-There is **no Hono / Node API server**. All application APIs are Supabase Edge Functions.
+There is **no Hono / Node API server**. All application APIs are Supabase Edge
+Functions. Full detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Stack
 
@@ -174,6 +171,7 @@ npm run test:qualify      # qualification engine unit tests
 npm run test:e2e          # Playwright E2E tests
 npm run verify:deploy     # smoke-test deployed Edge Functions
 npm run deploy:functions  # deploy all Edge Functions
+npm run guard:backend     # fail if frontend references a non-Supabase app backend
 npm run admin:bootstrap   # first admin (local/ops only)
 npm run audit:security    # dependency vulnerability audit
 npm run dev               # frontend only

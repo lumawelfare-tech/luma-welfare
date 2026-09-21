@@ -106,17 +106,20 @@ test.describe('Edge Functions — Auth Enforcement', () => {
 // ============================================================================
 
 test.describe('Public API — Data Endpoints', () => {
-  test('public data endpoint returns valid JSON', async ({ request }) => {
-    // The public-data endpoint is called from the frontend
-    // We test it through the SPA which loads the data
-    const page = await request.page?.()
+  test.skip(!SUPABASE_URL || !SUPABASE_ANON_KEY, 'Set SUPABASE_URL and publishable key to hit public-data')
 
-    // Instead, test through the page itself
-    const response = await request.get(`${BASE}/api/public-data`, {
-      headers: { 'Content-Type': 'application/json' },
+  test('public-data packages returns valid JSON', async ({ request }) => {
+    const response = await request.get(`${SUPABASE_URL}/functions/v1/public-data?resource=packages`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      failOnStatusCode: false,
     })
-
-    // May return 404 if no /api route — that's fine, we test through the SPA
+    expect(response.ok()).toBeTruthy()
+    const body = await response.json()
+    expect(Array.isArray(body.packages)).toBeTruthy()
   })
 })
 
