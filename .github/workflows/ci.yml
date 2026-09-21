@@ -105,7 +105,7 @@ jobs:
 
       - name: Upload audit reports
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: security-audit-reports
           path: |
@@ -202,7 +202,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: vitest-coverage
           path: frontend/coverage/
@@ -273,7 +273,7 @@ jobs:
           echo "✅ Build successful"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-build
           path: frontend/dist/
@@ -335,7 +335,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ github.run_id }}
           path: playwright-report/
