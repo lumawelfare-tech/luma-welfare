@@ -10,6 +10,8 @@ type ConfirmDialogProps = {
   cancelLabel?: string
   variant?: 'danger' | 'warning' | 'primary'
   loading?: boolean
+  /** When true, Confirm stays disabled (e.g. typed confirmation not met). */
+  confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -43,6 +45,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   variant = 'danger',
   loading = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -112,7 +115,7 @@ export function ConfirmDialog({
               <button
                 type="button"
                 onClick={onConfirm}
-                disabled={loading}
+                disabled={loading || confirmDisabled}
                 className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${v.confirmBg}`}
               >
                 {loading ? 'Processing…' : confirmLabel}

@@ -43,6 +43,7 @@ type AuthState = {
   member: Member | null
   isAdmin: boolean
   adminRole: string | null
+  isSuperadmin: boolean
   registrationFeePaid: boolean
   loading: boolean
   twoFaVerified: boolean
@@ -87,17 +88,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [member, setMember] = useState<Member | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRole, setAdminRole] = useState<string | null>(null)
+  const [isSuperadmin, setIsSuperadmin] = useState(false)
   const [registrationFeePaid, setRegistrationFeePaid] = useState(false)
   const [twoFaVerified, setTwoFaVerified] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // Fetch member profile and admin status from the server
-  async function loadProfile(): Promise<{ member: Member | null; isAdmin: boolean; adminRole: string | null; registrationFeePaid: boolean }> {
+  async function loadProfile(): Promise<{
+    member: Member | null
+    isAdmin: boolean
+    adminRole: string | null
+    isSuperadmin: boolean
+    registrationFeePaid: boolean
+  }> {
     try {
-      const data = await api<{ member: Member; isAdmin?: boolean; adminRole?: string | null; registrationFeePaid?: boolean }>('/auth/me', { auth: true })
-      return { member: data.member, isAdmin: data.isAdmin === true, adminRole: data.adminRole ?? null, registrationFeePaid: data.registrationFeePaid === true }
+      const data = await api<{
+        member: Member
+        isAdmin?: boolean
+        adminRole?: string | null
+        isSuperadmin?: boolean
+        registrationFeePaid?: boolean
+      }>('/auth/me', { auth: true })
+      const role = data.adminRole ?? null
+      const superFlag = data.isSuperadmin === true || role === 'superadmin'
+      return {
+        member: data.member,
+        isAdmin: data.isAdmin === true,
+        adminRole: role,
+        isSuperadmin: superFlag,
+        registrationFeePaid: data.registrationFeePaid === true,
+      }
     } catch {
-      return { member: null, isAdmin: false, adminRole: null, registrationFeePaid: false }
+      return { member: null, isAdmin: false, adminRole: null, isSuperadmin: false, registrationFeePaid: false }
     }
   }
 
@@ -119,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMember(profile.member)
         setIsAdmin(profile.isAdmin)
         setAdminRole(profile.adminRole)
+        setIsSuperadmin(profile.isSuperadmin)
         setRegistrationFeePaid(profile.registrationFeePaid)
         if (profile.member?.id) {
           setSentryUser({
@@ -139,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMember(null)
         setIsAdmin(false)
         setAdminRole(null)
+        setIsSuperadmin(false)
         clearSession()
         clearSentryUser()
         return
@@ -157,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setMember(null)
             setIsAdmin(false)
             setAdminRole(null)
+            setIsSuperadmin(false)
             setRegistrationFeePaid(false)
             clearSession()
             supabase.auth.signOut()
@@ -171,6 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMember(profile.member)
         setIsAdmin(profile.isAdmin)
         setAdminRole(profile.adminRole)
+        setIsSuperadmin(profile.isSuperadmin)
         setRegistrationFeePaid(profile.registrationFeePaid)
         if (profile.member?.id) {
           setSentryUser({
@@ -217,6 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMember(me.member)
     setIsAdmin(me.isAdmin)
     setAdminRole(me.adminRole)
+    setIsSuperadmin(me.isSuperadmin)
     setRegistrationFeePaid(me.registrationFeePaid)
 
     // Suspended/closed members may not use the portal (admins without member rows still allowed)
@@ -226,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMember(null)
       setIsAdmin(false)
       setAdminRole(null)
+      setIsSuperadmin(false)
       setRegistrationFeePaid(false)
       throw new ApiError(403, 'Your account is suspended or closed. Contact Luma Welfare support.', 'ACCOUNT_INACTIVE')
     }
@@ -279,6 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMember(profile.member)
     setIsAdmin(profile.isAdmin)
     setAdminRole(profile.adminRole)
+    setIsSuperadmin(profile.isSuperadmin)
     setRegistrationFeePaid(profile.registrationFeePaid)
   }
 
@@ -289,11 +318,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMember(null)
     setIsAdmin(false)
     setAdminRole(null)
+    setIsSuperadmin(false)
     setRegistrationFeePaid(false)
     setTwoFaVerified(false)
   }
   return (
-    <AuthContext.Provider value={{ member, isAdmin, adminRole, registrationFeePaid, twoFaVerified, loading, login, signInWithGoogle, register, logout, setTwoFaVerified, refreshMember }}>
+    <AuthContext.Provider value={{ member, isAdmin, adminRole, isSuperadmin, registrationFeePaid, twoFaVerified, loading, login, signInWithGoogle, register, logout, setTwoFaVerified, refreshMember }}>
       {children}
     </AuthContext.Provider>
   )

@@ -2,10 +2,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
+import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { displayEmail, formatKenyanPhone, toTelHref } from '../../lib/pii'
 import { IdRevealCell } from '../../components/IdRevealCell'
+import { Icon } from '../../components/Icon'
 import { BulkActionBar } from '../../components/BulkActionBar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { FilterBar } from '../../components/FilterBar'
@@ -14,6 +16,14 @@ import { SearchInput } from '../../components/SearchInput'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { exportMemberRecordsCSV, exportMemberRecordsExcel, exportMemberRecordsPDF, type MemberRecord } from '../../lib/exports'
+
+/** Typed confirmation matches member full name (case-insensitive) or the word DELETE. */
+export function matchesDeleteConfirmation(typed: string, fullName: string): boolean {
+  const t = typed.trim()
+  if (!t) return false
+  if (t.toUpperCase() === 'DELETE') return true
+  return t.localeCompare(fullName.trim(), undefined, { sensitivity: 'accent' }) === 0
+}
 
 type Member = {
   id: string
@@ -40,6 +50,7 @@ const ALLOWED_MEMBER_STATUS = new Set<string>(MEMBER_STATUS_FILTERS.map((f) => f
 export function AdminMembers() {
   useHead('Members', undefined, { noindex: true })
   const { addToast } = useToast()
+  const { isSuperadmin } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const statusFromUrl = searchParams.get('status') ?? ''
   const initialFilter = ALLOWED_MEMBER_STATUS.has(statusFromUrl) ? statusFromUrl : ''
@@ -59,8 +70,11 @@ export function AdminMembers() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
 
-  // Delete dialog
-  const [deleteTarget, setDeleteTarget] = useState<Member | null>(null)
+  // Soft-close dialog (non-closed → closed)
+  const [closeTarget, setCloseTarget] = useState<Member | null>(null)
+  // Permanent purge dialog (closed + superadmin)
+  const [purgeTarget, setPurgeTarget] = useState<Member | null>(null)
+  const [bulkPurgeOpen, setBulkPurgeOpen] = useState(false)
   const [confirmText, setConfirmText] = useState('')
   const [deleteBusy, setDeleteBusy] = useState(false)
 
@@ -209,17 +223,81 @@ export function AdminMembers() {
     }
   }
 
-  async function deleteMember() {
-    if (!deleteTarget || confirmText !== 'DELETE') return
+  async function softCloseMember() {
+    if (!closeTarget) return
     setDeleteBusy(true)
     try {
-      await api(`/admin/members/${deleteTarget.id}`, { method: 'DELETE', auth: true })
-      addToast('success', `Member "${deleteTarget.full_name}" has been deactivated.`)
-      setDeleteTarget(null)
+      await api(`/admin/members/${closeTarget.id}`, { method: 'DELETE', auth: true })
+      addToast('success', `Member "${closeTarget.full_name}" has been closed.`)
+      setCloseTarget(null)
       setConfirmText('')
       await load()
     } catch (e) {
-      addToast('error', e instanceof ApiError ? e.message : 'Could not delete the member.')
+      addToast('error', e instanceof ApiError ? e.message : 'Could not close the member.')
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+
+  async function purgeMembers(ids: string[], expectedName?: string) {
+    if (ids.length === 1 && expectedName && !matchesDeleteConfirmation(confirmText, expectedName)) return
+    if (ids.length > 1 && confirmText.trim().toUpperCase() !== 'DELETE') return
+    setDeleteBusy(true)
+    try {
+      const d = await api<{
+        results: { member_id: string; success: boolean; path?: string; error?: string }[]
+        summary: { total: number; success: number; failed: number }
+      }>('/admin/delete-member', {
+        method: 'POST',
+        auth: true,
+        body: ids.length === 1 ? { memberId: ids[0] } : { memberIds: ids },
+      })
+      const ok = d.summary?.success ?? 0
+      const fail = d.summary?.failed ?? 0
+      const hardIds = new Set((d.results ?? []).filter((r) => r.success && r.path === 'hard_delete').map((r) => r.member_id))
+      const anonIds = new Set((d.results ?? []).filter((r) => r.success && r.path === 'anonymize').map((r) => r.member_id))
+      if (ok > 0) {
+        const anon = anonIds.size > 0
+        addToast(
+          'success',
+          ok === 1
+            ? anon
+              ? 'Personal data erased; financial records kept anonymously.'
+              : 'Member permanently deleted.'
+            : `${ok} member${ok === 1 ? '' : 's'} purged.`,
+        )
+        setMembers((prev) =>
+          prev
+            .filter((m) => !hardIds.has(m.id))
+            .map((m) =>
+              anonIds.has(m.id)
+                ? {
+                    ...m,
+                    full_name: 'Deleted member',
+                    email: null,
+                    id_number_masked: '—',
+                    phone: '0700000000',
+                    profile_incomplete: true,
+                  }
+                : m,
+            ),
+        )
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          for (const id of hardIds) next.delete(id)
+          return next
+        })
+        setTotalCount((c) => Math.max(0, c - hardIds.size))
+      }
+      if (fail > 0) {
+        const firstErr = (d.results ?? []).find((r) => !r.success)?.error
+        addToast('error', firstErr ?? `${fail} delete${fail === 1 ? '' : 's'} failed.`)
+      }
+      setPurgeTarget(null)
+      setBulkPurgeOpen(false)
+      setConfirmText('')
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Permanent delete failed.')
     } finally {
       setDeleteBusy(false)
     }
@@ -373,10 +451,10 @@ export function AdminMembers() {
     {
       key: 'actions',
       header: 'Actions',
-      className: 'text-right',
+      className: 'sticky right-0 z-[1] min-w-[11rem] bg-white text-right shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.08)]',
       hideOnMobile: true,
       render: (m) => (
-        <div className="flex items-center justify-end gap-1.5">
+        <div className="flex min-h-[44px] items-center justify-end gap-1.5">
           {m.status === 'pending_approval' && (
             <button
               type="button"
@@ -411,11 +489,26 @@ export function AdminMembers() {
             <button
               type="button"
               disabled={busyId === m.id}
-              onClick={() => { setDeleteTarget(m); setConfirmText('') }}
-              className="min-h-[44px] rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+              onClick={() => { setCloseTarget(m); setConfirmText('') }}
+              className="min-h-[44px] rounded-md border border-amber-200 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50 transition-colors"
             >
-              Delete
+              Close
             </button>
+          )}
+          {isSuperadmin && m.status === 'closed' && (
+            <button
+              type="button"
+              disabled={busyId === m.id || deleteBusy}
+              onClick={() => { setPurgeTarget(m); setConfirmText('') }}
+              className="touch-target inline-flex h-11 w-11 flex-none items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+              aria-label={`Permanently delete ${m.full_name}`}
+              title="Permanently delete"
+            >
+              <Icon name="trash" className="h-4 w-4" />
+            </button>
+          )}
+          {m.status === 'closed' && !isSuperadmin && (
+            <span className="text-xs text-gray-400">—</span>
           )}
         </div>
       ),
@@ -584,7 +677,18 @@ export function AdminMembers() {
                       <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'active')} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Reinstate</button>
                     )}
                     {m.status !== 'closed' && (
-                      <button type="button" disabled={busyId === m.id} onClick={() => { setDeleteTarget(m); setConfirmText('') }} className="min-h-[44px] rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-600">Delete</button>
+                      <button type="button" disabled={busyId === m.id} onClick={() => { setCloseTarget(m); setConfirmText('') }} className="min-h-[44px] rounded-md border border-amber-200 px-3 py-2 text-xs font-medium text-amber-800">Close</button>
+                    )}
+                    {isSuperadmin && m.status === 'closed' && (
+                      <button
+                        type="button"
+                        disabled={busyId === m.id || deleteBusy}
+                        onClick={() => { setPurgeTarget(m); setConfirmText('') }}
+                        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-600"
+                        aria-label={`Permanently delete ${m.full_name}`}
+                      >
+                        <Icon name="trash" className="h-4 w-4" /> Delete permanently
+                      </button>
                     )}
                   </div>
                 </div>
@@ -627,6 +731,22 @@ export function AdminMembers() {
           { label: 'Approve', variant: 'primary', onClick: () => setBulkAction('active'), loading: bulkLoading },
           { label: 'Suspend', variant: 'warning', onClick: () => setBulkAction('suspended'), loading: bulkLoading },
           { label: 'Close', variant: 'danger', onClick: () => setBulkAction('closed'), loading: bulkLoading },
+          ...(isSuperadmin
+            ? [{
+                label: 'Delete permanently',
+                variant: 'danger' as const,
+                onClick: () => {
+                  const closed = members.filter((m) => selectedIds.has(m.id) && m.status === 'closed')
+                  if (closed.length === 0) {
+                    addToast('warning', 'Select at least one closed member to permanently delete.')
+                    return
+                  }
+                  setConfirmText('')
+                  setBulkPurgeOpen(true)
+                },
+                loading: deleteBusy,
+              }]
+            : []),
         ]}
       />
 
@@ -642,35 +762,94 @@ export function AdminMembers() {
         onCancel={() => setBulkAction(null)}
       />
 
-      {/* Delete Confirmation Dialog */}
+      {/* Soft-close confirmation */}
       <ConfirmDialog
-        open={deleteTarget !== null}
-        title="Delete Member"
-        variant="danger"
-        confirmLabel="Deactivate Member"
+        open={closeTarget !== null}
+        title="Close Member"
+        variant="warning"
+        confirmLabel="Close account"
         loading={deleteBusy}
-        onConfirm={deleteMember}
-        onCancel={() => { setDeleteTarget(null); setConfirmText('') }}
+        onConfirm={softCloseMember}
+        onCancel={() => { setCloseTarget(null); setConfirmText('') }}
         message={
           <>
-            <div className="rounded-lg bg-gray-50 px-4 py-3 mb-3">
-              <p className="text-sm font-medium text-gray-900">{deleteTarget?.full_name}</p>
-              <p className="text-xs text-gray-500">{deleteTarget?.email ?? deleteTarget?.phone}</p>
-              <p className="text-xs text-gray-400">Status: {deleteTarget?.status}</p>
+            <p className="text-sm font-medium text-gray-900">{closeTarget?.full_name}</p>
+            <p className="mt-2">This closes the account. The member can no longer sign in. Historical records are kept. This is not a permanent purge.</p>
+          </>
+        }
+      />
+
+      {/* Permanent purge — single */}
+      <ConfirmDialog
+        open={purgeTarget !== null}
+        title="Permanently delete member"
+        variant="danger"
+        confirmLabel="Delete permanently"
+        loading={deleteBusy}
+        confirmDisabled={!purgeTarget || !matchesDeleteConfirmation(confirmText, purgeTarget.full_name)}
+        onConfirm={() => purgeTarget && void purgeMembers([purgeTarget.id], purgeTarget.full_name)}
+        onCancel={() => { setPurgeTarget(null); setConfirmText('') }}
+        message={
+          <>
+            <div className="mb-3 rounded-lg bg-gray-50 px-4 py-3">
+              <p className="text-sm font-medium text-gray-900">{purgeTarget?.full_name}</p>
+              <p className="text-xs text-gray-500">{displayEmail(purgeTarget?.email)}</p>
+              <p className="text-xs text-gray-400">Status: closed</p>
             </div>
-            <p>This will <strong>deactivate</strong> the member account. All historical records will be preserved. The member will no longer be able to access their account.</p>
+            <p>This is <strong>permanent</strong> and cannot be undone.</p>
+            <p className="mt-2 text-sm">If this member has contributions, claims, payments, or fees, personal details will be erased and financial rows kept under an anonymous placeholder so reports stay correct. Otherwise the account is fully removed.</p>
+            <div className="mt-3">
+              <label className="text-sm font-medium text-gray-700">
+                Type the member&apos;s full name or <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
+              </label>
+              <input
+                aria-label="Type member name or DELETE to confirm permanent deletion"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder='Full name or "DELETE"'
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && purgeTarget && matchesDeleteConfirmation(confirmText, purgeTarget.full_name)) {
+                    void purgeMembers([purgeTarget.id], purgeTarget.full_name)
+                  }
+                }}
+              />
+            </div>
+          </>
+        }
+      />
+
+      {/* Permanent purge — bulk closed */}
+      <ConfirmDialog
+        open={bulkPurgeOpen}
+        title="Permanently delete closed members"
+        variant="danger"
+        confirmLabel="Delete permanently"
+        loading={deleteBusy}
+        confirmDisabled={confirmText.trim().toUpperCase() !== 'DELETE'}
+        onConfirm={() => {
+          const ids = members.filter((m) => selectedIds.has(m.id) && m.status === 'closed').map((m) => m.id)
+          void purgeMembers(ids)
+        }}
+        onCancel={() => { setBulkPurgeOpen(false); setConfirmText('') }}
+        message={
+          <>
+            <p>
+              Permanently delete{' '}
+              <strong>{members.filter((m) => selectedIds.has(m.id) && m.status === 'closed').length}</strong>
+              {' '}closed member{members.filter((m) => selectedIds.has(m.id) && m.status === 'closed').length === 1 ? '' : 's'}.
+              This cannot be undone. Members with financial history will be anonymized; others are removed.
+            </p>
             <div className="mt-3">
               <label className="text-sm font-medium text-gray-700">
                 Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
               </label>
               <input
-                aria-label="Type member name to confirm deletion"
+                aria-label="Type DELETE to confirm bulk permanent deletion"
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
-                placeholder='Type "DELETE" to confirm'
+                placeholder='Type "DELETE"'
                 className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && confirmText === 'DELETE' && deleteMember()}
               />
             </div>
           </>
