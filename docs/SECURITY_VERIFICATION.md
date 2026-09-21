@@ -42,7 +42,7 @@ Branch protection checklist: `docs/BRANCH_PROTECTION.md`.
 
 | Package | Severity | Status |
 |---------|----------|--------|
-| `xlsx` | high | **No fix upstream** — used for admin Excel exports only; keep pinned; prefer CSV/PDF for sensitive dumps where possible |
+| ~~`xlsx`~~ | ~~high~~ | **Removed** — admin Excel exports use SpreadsheetML (`.xls`) without the SheetJS package |
 | `@vercel/node` transitive (`ajv`, `undici`, `path-to-regexp`) | high/moderate | **Not safely fixable** without breaking Vercel Node runtime (`npm audit fix --force` downgrades to v3) |
 
 ## Manual actions

@@ -1,7 +1,8 @@
-import { sanitizeExportCell as sanitizeCell } from './sanitize'
+import { sanitizeExportCell as sanitizeCell, sanitizeSpreadsheetCell, escapeXml } from './sanitize'
 
 // ─── CSV Helpers ────────────────────────────────────────────
-// PDF and Excel imports are lazy-loaded to reduce initial bundle size
+// PDF imports are lazy-loaded to reduce initial bundle size
+// Excel uses SpreadsheetML (no vulnerable `xlsx` package)
 
 function downloadCSV(filename: string, headers: string[], rows: (string | number | null | undefined)[][]) {
   const csv = [
@@ -218,31 +219,51 @@ export async function exportTransactionsPDF(data: { member_name: string; package
   downloadPDF(doc, 'recent_transactions.pdf')
 }
 
-// ─── Excel Helper (lazy-loaded) ─────────────────────────────
+// ─── Excel Helper (SpreadsheetML — no third-party xlsx) ─────
 
-async function downloadExcel(filename: string, sheetName: string, headers: string[], rows: (string | number | null | undefined)[][], opts?: { filterSummary?: string }) {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-
-  const wsData: (string | number | null | undefined)[][] = []
-  if (opts?.filterSummary) {
-    wsData.push([opts.filterSummary])
-    wsData.push([`Generated: ${new Date().toLocaleString('en-KE')}`])
-    wsData.push([])
+function cellXml(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === '') {
+    return '<Cell><Data ss:Type="String"></Data></Cell>'
   }
-  wsData.push(headers)
-  for (const row of rows) wsData.push(row)
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `<Cell><Data ss:Type="Number">${value}</Data></Cell>`
+  }
+  return `<Cell><Data ss:Type="String">${sanitizeSpreadsheetCell(value)}</Data></Cell>`
+}
 
-  const ws = XLSX.utils.aoa_to_sheet(wsData)
-
+function downloadExcel(
+  filename: string,
+  sheetName: string,
+  headers: string[],
+  rows: (string | number | null | undefined)[][],
+  opts?: { filterSummary?: string },
+) {
+  const tableRows: string[] = []
   if (opts?.filterSummary) {
-    ws['!cols'] = headers.map(() => ({ wch: 18 }))
-  } else {
-    ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }))
+    tableRows.push(`<Row>${cellXml(opts.filterSummary)}</Row>`)
+    tableRows.push(`<Row>${cellXml(`Generated: ${new Date().toLocaleString('en-KE')}`)}</Row>`)
+    tableRows.push('<Row></Row>')
+  }
+  tableRows.push(`<Row>${headers.map((h) => cellXml(h)).join('')}</Row>`)
+  for (const row of rows) {
+    tableRows.push(`<Row>${row.map((v) => cellXml(v)).join('')}</Row>`)
   }
 
-  XLSX.utils.book_append_sheet(wb, ws, sheetName)
-  XLSX.writeFile(wb, filename)
+  const safeSheet = escapeXml(sheetName.replace(/[\\/*?[\]:]/g, '_').slice(0, 31) || 'Sheet1')
+  const xml =
+    `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<?mso-application progid="Excel.Sheet"?>` +
+    `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">` +
+    `<Worksheet ss:Name="${safeSheet}"><Table>${tableRows.join('')}</Table></Worksheet>` +
+    `</Workbook>`
+
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename.endsWith('.xlsx') ? filename.replace(/\.xlsx$/i, '.xls') : filename
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── Exports: Contribution Records (Admin page) ─────────────
@@ -283,7 +304,7 @@ export function exportContributionRecordsCSV(records: ContributionRecord[]) {
 
 export async function exportContributionRecordsExcel(records: ContributionRecord[], filterSummary?: string) {
   const today = new Date().toISOString().slice(0, 10)
-  await downloadExcel(
+  downloadExcel(
     `luma-welfare-contributions-${today}.xlsx`,
     'Contributions',
     ['Member Full Name', 'Phone Number', 'Email', 'Member ID', 'Package', 'Period', 'Amount', 'Status', 'Receipt Number', 'Reference Number', 'Created At'],
@@ -381,7 +402,7 @@ export function exportSubscriptionsCSV(records: SubscriptionRecord[]) {
 
 export async function exportSubscriptionsExcel(records: SubscriptionRecord[], filterSummary?: string) {
   const today = new Date().toISOString().slice(0, 10)
-  await downloadExcel(
+  downloadExcel(
     `luma-welfare-subscriptions-${today}.xlsx`,
     'Subscriptions',
     ['Member Full Name', 'Phone Number', 'Email', 'Package', 'Status', 'Start Date', 'Next Due', 'Amount', 'Created At'],
@@ -468,7 +489,7 @@ export function exportMemberRecordsCSV(records: MemberRecord[]) {
 
 export async function exportMemberRecordsExcel(records: MemberRecord[], filterSummary?: string) {
   const today = new Date().toISOString().slice(0, 10)
-  await downloadExcel(
+  downloadExcel(
     `luma-welfare-members-${today}.xlsx`,
     'Members',
     ['Member Full Name', 'Phone Number', 'Email', 'Membership Number', 'Status', 'Joined At'],
@@ -562,7 +583,7 @@ export function exportClaimRecordsCSV(records: ClaimRecord[]) {
 
 export async function exportClaimRecordsExcel(records: ClaimRecord[], filterSummary?: string) {
   const today = new Date().toISOString().slice(0, 10)
-  await downloadExcel(
+  downloadExcel(
     `luma-welfare-claims-${today}.xlsx`,
     'Claims',
     ['Member Full Name', 'Phone Number', 'Email', 'Claim Number', 'Claim Type', 'Package', 'Amount Requested', 'Approved Amount', 'Status', 'Submitted At', 'Decided At', 'Created At'],

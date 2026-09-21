@@ -73,7 +73,7 @@ async function getPreferences(
   try {
     const { data, error } = await adminClient
       .from('notification_preferences')
-      .select('email_enabled, sms_enabled, in_app_enabled')
+      .select('email_enabled, sms_enabled, in_app_enabled, push_enabled')
       .eq('member_id', memberId)
       .single()
 
@@ -83,7 +83,12 @@ async function getPreferences(
     }
 
     return data
-      ? { email_enabled: data.email_enabled, sms_enabled: data.sms_enabled, in_app_enabled: data.in_app_enabled }
+      ? {
+          email_enabled: data.email_enabled ?? DEFAULT_PREFS.email_enabled,
+          sms_enabled: data.sms_enabled ?? DEFAULT_PREFS.sms_enabled,
+          in_app_enabled: data.in_app_enabled ?? DEFAULT_PREFS.in_app_enabled,
+          push_enabled: data.push_enabled ?? DEFAULT_PREFS.push_enabled,
+        }
       : DEFAULT_PREFS
   } catch {
     return DEFAULT_PREFS
