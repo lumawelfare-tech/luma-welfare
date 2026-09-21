@@ -1,6 +1,8 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { evaluateQualification } from '../shared/qualify.ts'
+import { buildIlikeOrFilter } from '../shared/search.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -25,6 +27,8 @@ Deno.serve(async (req) => {
     // POST /admin-subscriptions/:id/evaluate — run qualification engine and persist
     if (req.method === 'POST' && subId && action === 'evaluate') {
       requirePermission(session, 'members', 'read')
+      const rl = await rateLimitAsync(req, 'admin-subscriptions-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
 
       const { data: sub, error: subError } = await adminClient
         .from('subscriptions')
@@ -102,8 +106,11 @@ Deno.serve(async (req) => {
       if (dateFrom) query = query.gte('created_at', dateFrom)
       if (dateTo) query = query.lt('created_at', new Date(new Date(dateTo).getTime() + 86400000).toISOString())
       if (q && q.trim()) {
-        const search = q.trim()
-        query = query.or(`members.full_name.ilike.%${search}%,members.phone.ilike.%${search}%,members.membership_number.ilike.%${search}%,packages.name.ilike.%${search}%`)
+        const orFilter = buildIlikeOrFilter(
+          ['members.full_name', 'members.phone', 'members.membership_number', 'packages.name'],
+          q,
+        )
+        if (orFilter) query = query.or(orFilter)
       }
       query = query.range((page - 1) * perPage, page * perPage - 1)
       const { data, error, count } = await query
@@ -114,6 +121,8 @@ Deno.serve(async (req) => {
     // PATCH /admin-subscriptions/:id — approve/reject/pause/cancel
     if (req.method === 'PATCH' && subId) {
       requirePermission(session, 'members', 'approve')
+      const rl = await rateLimitAsync(req, 'admin-subscriptions-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
       const body = await req.json()
       const { status: subStatus, reason } = body
       if (!['active', 'paused', 'cancelled', 'rejected'].includes(subStatus)) {

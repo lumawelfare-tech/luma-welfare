@@ -12,6 +12,8 @@
 
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
+import { buildIlikeOrFilter } from '../shared/search.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -27,6 +29,11 @@ Deno.serve(async (req) => {
       return adminSessionDeniedResponse(loaded)
     }
     const session = loaded.session
+
+    if (req.method !== 'GET') {
+      const rl = await rateLimitAsync(req, 'admin-reconciliation-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
+    }
 
     const url = new URL(req.url)
     const action = url.searchParams.get('action') ?? 'summary'
@@ -162,7 +169,8 @@ Deno.serve(async (req) => {
 
       if (status) query = query.eq('status', status)
       if (q) {
-        query = query.or(`mpesa_receipt.ilike.%${q}%,checkout_request_id.ilike.%${q}%,phone.ilike.%${q}%`)
+        const orFilter = buildIlikeOrFilter(['mpesa_receipt', 'checkout_request_id', 'phone'], q)
+        if (orFilter) query = query.or(orFilter)
       }
 
       const offset = (page - 1) * perPage

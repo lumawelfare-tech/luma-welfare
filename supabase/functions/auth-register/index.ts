@@ -1,8 +1,8 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createAdminClient, logAudit } from '../shared/supabase.ts'
 import { sendEmail, buildOtpEmail } from '../shared/email.ts'
-import { rateLimit } from '../shared/rate-limit.ts'
-import { generateOtp, hashOtp, OTP_TTL_MINUTES } from '../shared/otp.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
+import { generateOtp, hashOtp, OTP_TTL_MINUTES, OtpConfigError } from '../shared/otp.ts'
 
 /**
  * auth-register — creates the Supabase Auth user, a member record in
@@ -26,8 +26,8 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
-  // Rate limit: 5 registration attempts per minute per IP
-  const limit = rateLimit(req, 'register', { windowMs: 60_000, max: 5 })
+  // Rate limit: 5 registration attempts per window per trusted subject
+  const limit = await rateLimitAsync(req, 'register', { windowMs: 300_000, max: 5 })
   if (!limit.ok) return limit.response!
 
   if (req.method !== 'POST') {
@@ -171,7 +171,11 @@ Deno.serve(async (req) => {
       email: email.toLowerCase(),
       emailSent,
     })
-  } catch (_err) {
+  } catch (err) {
+    if (err instanceof OtpConfigError) {
+      console.error('auth-register: OTP configuration error')
+      return json(503, { message: 'Verification is temporarily unavailable.', code: 'OTP_CONFIG' })
+    }
     return json(500, { message: 'Internal server error', code: 'INTERNAL' })
   }
 })

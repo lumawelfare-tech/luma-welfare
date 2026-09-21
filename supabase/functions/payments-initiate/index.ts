@@ -21,6 +21,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
 import { assertMemberActive } from '../shared/member-status.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 const DARADA_BASE: Record<string, string> = {
   sandbox: 'https://sandbox.safaricom.co.ke',
@@ -110,6 +111,9 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    const rl = await rateLimitAsync(req, 'payments-initiate', { userId: user.id })
+    if (!rl.ok) return rl.response!
 
     const adminClient = createAdminClient()
     const inactive = await assertMemberActive(adminClient, user.id)

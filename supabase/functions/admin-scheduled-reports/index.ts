@@ -1,5 +1,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
+import { buildIlikeOrFilter } from '../shared/search.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 /**
  * Admin Scheduled Reports
@@ -284,6 +286,14 @@ Deno.serve(async (req) => {
     }
     const session = loaded.session
 
+    if (req.method !== 'GET') {
+      const rl = await rateLimitAsync(req, 'admin-scheduled-reports-mutation', {
+        userId: session.id,
+        adminClient,
+      })
+      if (!rl.ok) return rl.response!
+    }
+
     requirePermission(session, 'members', 'read')
 
     const url = new URL(req.url)
@@ -314,7 +324,8 @@ Deno.serve(async (req) => {
       let query = adminClient.from('report_history').select('*', { count: 'exact' })
 
       if (search) {
-        query = query.or(`schedule_name.ilike.%${search}%,filename.ilike.%${search}%`)
+        const orFilter = buildIlikeOrFilter(['schedule_name', 'filename'], search)
+        if (orFilter) query = query.or(orFilter)
       }
       if (typeFilter) query = query.eq('report_type', typeFilter)
       if (statusFilter) query = query.eq('status', statusFilter)

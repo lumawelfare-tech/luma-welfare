@@ -19,6 +19,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { assertSafeWebhookUrl, safeWebhookFetch } from '../../../supabase/functions/shared/webhook-url'
 
 // ── Configuration ──────────────────────────────────────────────────────────
 
@@ -492,6 +493,13 @@ async function sendWebhookAlerts(
   let sent = 0
   for (const webhook of webhooks) {
     try {
+      try {
+        assertSafeWebhookUrl(webhook.url)
+      } catch {
+        console.error(`[HEALTH-CHECK] Skipping webhook ${webhook.name}: URL not allowed`)
+        continue
+      }
+
       let payload: Record<string, unknown>
       switch (webhook.type) {
         case 'slack': payload = buildSlackPayload(overall, results); break
@@ -499,7 +507,7 @@ async function sendWebhookAlerts(
         default: payload = buildCustomPayload(overall, results); break
       }
 
-      const resp = await fetch(webhook.url, {
+      const resp = await safeWebhookFetch(webhook.url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

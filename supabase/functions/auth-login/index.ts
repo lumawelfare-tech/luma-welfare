@@ -1,6 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createUserClient, createAdminClient } from '../shared/supabase.ts'
-import { rateLimit, addRateLimitHeaders } from '../shared/rate-limit.ts'
+import { rateLimitAsync, addRateLimitHeaders } from '../shared/rate-limit.ts'
 
 /**
  * Auth Login — authenticate user and check 2FA status
@@ -17,8 +17,8 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
-  // Rate limit: 10 login attempts per minute per IP
-  const limit = rateLimit(req, 'login', { windowMs: 60_000, max: 10 })
+  // Rate limit: 10 login attempts per minute per trusted subject
+  const limit = await rateLimitAsync(req, 'login', { windowMs: 60_000, max: 10 })
   if (!limit.ok) return limit.response!
 
   if (req.method !== 'POST') {

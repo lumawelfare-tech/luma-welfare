@@ -10,6 +10,9 @@
  *  - Comparison is constant-time to avoid timing oracles.
  *  - TTL, attempt caps and resend limits are enforced server-side by the
  *    auth-verify-email Edge Function using these constants.
+ *  - OTP_HASH_SECRET is required in production (fail closed).
+ *  - Local-only fallback requires OTP_ALLOW_LOCAL_DEV_FALLBACK=true AND a
+ *    local Supabase URL. Never derives from the service-role key.
  */
 
 export const OTP_TTL_MINUTES = 10
@@ -17,7 +20,18 @@ export const OTP_MAX_ATTEMPTS = 5
 export const RESEND_COOLDOWN_SECONDS = 60
 export const RESEND_HOURLY_LIMIT = 3
 
+/** Documented local-only HMAC pepper — never used unless local-dev gate passes. */
+export const LOCAL_DEV_OTP_PEPPER = 'luma-local-dev-otp-pepper'
+
 const CODE_SPACE = 1_000_000
+
+export class OtpConfigError extends Error {
+  readonly code = 'OTP_CONFIG'
+  constructor(message = 'OTP hashing is not configured.') {
+    super(message)
+    this.name = 'OtpConfigError'
+  }
+}
 
 /**
  * Generate a cryptographically random 6-digit code (000000–999999).
@@ -43,21 +57,42 @@ function toHex(buffer: ArrayBuffer): string {
   return hex
 }
 
+/** True only for explicit local-dev gate + local Supabase URL. */
+export function isOtpLocalDevFallbackAllowed(
+  env: { get(name: string): string | undefined } = Deno.env,
+): boolean {
+  if (env.get('OTP_ALLOW_LOCAL_DEV_FALLBACK') !== 'true') return false
+  const url = (env.get('SUPABASE_URL') ?? '').toLowerCase()
+  return (
+    url.includes('127.0.0.1') ||
+    url.includes('localhost') ||
+    url.includes('0.0.0.0')
+  )
+}
+
 /**
- * Resolve the HMAC secret. Prefers the dedicated OTP_HASH_SECRET; falls back
- * to a key derived from the service role key so the flow works without extra
- * configuration. Never exposed to clients — this module is server-side only.
+ * Resolve the HMAC secret. Production requires OTP_HASH_SECRET.
+ * Never uses the service-role key or other credentials as the pepper.
  */
-async function getHmacKey(): Promise<CryptoKey> {
-  let secret = Deno.env.get('OTP_HASH_SECRET')
-  if (!secret) {
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? 'luma-local-dev'
-    const digest = await crypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(`luma-otp-pepper:${serviceKey}`),
-    )
-    secret = toHex(digest)
+export function resolveOtpHmacSecret(
+  env: { get(name: string): string | undefined } = Deno.env,
+): string {
+  const secret = env.get('OTP_HASH_SECRET')?.trim()
+  if (secret) return secret
+
+  if (isOtpLocalDevFallbackAllowed(env)) {
+    return LOCAL_DEV_OTP_PEPPER
   }
+
+  throw new OtpConfigError(
+    'OTP_HASH_SECRET is required. Set it in Edge Function secrets.',
+  )
+}
+
+async function getHmacKey(
+  env: { get(name: string): string | undefined } = Deno.env,
+): Promise<CryptoKey> {
+  const secret = resolveOtpHmacSecret(env)
   return crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -68,8 +103,12 @@ async function getHmacKey(): Promise<CryptoKey> {
 }
 
 /** HMAC-SHA256 hash of the code bound to the user id. */
-export async function hashOtp(userId: string, code: string): Promise<string> {
-  const key = await getHmacKey()
+export async function hashOtp(
+  userId: string,
+  code: string,
+  env?: { get(name: string): string | undefined },
+): Promise<string> {
+  const key = await getHmacKey(env)
   const signature = await crypto.subtle.sign(
     'HMAC',
     key,
@@ -86,8 +125,9 @@ export async function otpMatches(
   userId: string,
   code: string,
   storedHash: string | null,
+  env?: { get(name: string): string | undefined },
 ): Promise<boolean> {
-  const computed = await hashOtp(userId, code)
+  const computed = await hashOtp(userId, code, env)
   if (!storedHash || storedHash.length !== computed.length) return false
   let diff = 0
   for (let i = 0; i < computed.length; i++) {

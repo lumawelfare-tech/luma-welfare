@@ -1,5 +1,8 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
+import { assertSafeWebhookUrl, safeWebhookFetch, UnsafeWebhookUrlError } from '../shared/webhook-url.ts'
+import { buildIlikeOrFilter } from '../shared/search.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 // ── Webhook Payload Builders ───────────────────────────────────────────────
 
@@ -106,15 +109,17 @@ Deno.serve(async (req) => {
       requirePermission(session, 'audit_logs', 'read')
       const pageParam = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1)
       const perPage = Math.min(200, Math.max(1, parseInt(url.searchParams.get('per_page') ?? '50', 10) || 50))
-      const q = url.searchParams.get('q')?.trim()
+      const q = url.searchParams.get('q')
       const actionFilter = url.searchParams.get('action')?.trim()
       const from = (pageParam - 1) * perPage
       const to = from + perPage - 1
       let query = adminClient.from('audit_logs').select('*', { count: 'exact' })
       if (actionFilter) query = query.eq('action', actionFilter)
-      if (q) {
-        query = query.or(`action.ilike.%${q}%,resource.ilike.%${q}%,actor_role.ilike.%${q}%,resource_id.ilike.%${q}%`)
-      }
+      const orFilter = buildIlikeOrFilter(
+        ['action', 'resource', 'actor_role', 'resource_id'],
+        q,
+      )
+      if (orFilter) query = query.or(orFilter)
       query = query.order('created_at', { ascending: false }).range(from, to)
       const { data, error, count } = await query
       if (error) throw new Error(error.message)
@@ -143,8 +148,14 @@ Deno.serve(async (req) => {
 
     // PATCH /admin-settings — update settings
     // When called as /admin/settings (no resource_id), treat as settings update
-    if (req.method === 'PATCH' && (!resource || resource === 'settings' || resourceParam === 'settings')) {
+    if (
+      req.method === 'PATCH' &&
+      action !== 'update-webhook' &&
+      (!resource || resource === 'settings' || resourceParam === 'settings')
+    ) {
       requirePermission(session, 'members', 'update')
+      const rl = await rateLimitAsync(req, 'admin-settings-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
       const body = await req.json()
       if (!body || typeof body.key !== 'string') {
         return new Response(JSON.stringify({ message: 'Send { key, value }' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -170,13 +181,22 @@ Deno.serve(async (req) => {
     // POST /admin-settings?action=create-webhook
     if (req.method === 'POST' && action === 'create-webhook') {
       requirePermission(session, 'members', 'update')
+      const rl = await rateLimitAsync(req, 'admin-settings-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
       const body = await req.json()
       if (!body?.name || !body?.url || !body?.type) {
         return new Response(JSON.stringify({ message: 'Send { name, url, type, events? }' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
+      let safeUrl: URL
+      try {
+        safeUrl = assertSafeWebhookUrl(body.url)
+      } catch (err) {
+        const message = err instanceof UnsafeWebhookUrlError ? err.message : 'Webhook URL is not allowed.'
+        return new Response(JSON.stringify({ message, code: 'UNSAFE_WEBHOOK_URL' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
       const { data, error } = await adminClient.from('system_webhooks').insert({
         name: body.name,
-        url: body.url,
+        url: safeUrl.toString(),
         type: body.type,
         events: body.events ?? ['health.unhealthy', 'health.degraded'],
         enabled: body.enabled ?? true,
@@ -189,6 +209,8 @@ Deno.serve(async (req) => {
     // PATCH /admin-settings?action=update-webhook&id={id}
     if (req.method === 'PATCH' && action === 'update-webhook') {
       requirePermission(session, 'members', 'update')
+      const rl = await rateLimitAsync(req, 'admin-settings-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
       const webhookId = url.searchParams.get('id')
       if (!webhookId) {
         return new Response(JSON.stringify({ message: 'Missing webhook id' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -196,7 +218,14 @@ Deno.serve(async (req) => {
       const body = await req.json()
       const updates: Record<string, unknown> = {}
       if (body.name !== undefined) updates.name = body.name
-      if (body.url !== undefined) updates.url = body.url
+      if (body.url !== undefined) {
+        try {
+          updates.url = assertSafeWebhookUrl(body.url).toString()
+        } catch (err) {
+          const message = err instanceof UnsafeWebhookUrlError ? err.message : 'Webhook URL is not allowed.'
+          return new Response(JSON.stringify({ message, code: 'UNSAFE_WEBHOOK_URL' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+      }
       if (body.type !== undefined) updates.type = body.type
       if (body.events !== undefined) updates.events = body.events
       if (body.enabled !== undefined) updates.enabled = body.enabled
@@ -210,6 +239,8 @@ Deno.serve(async (req) => {
     // DELETE /admin-settings?action=delete-webhook&id={id}
     if (req.method === 'DELETE' && action === 'delete-webhook') {
       requirePermission(session, 'members', 'update')
+      const rl = await rateLimitAsync(req, 'admin-settings-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
       const webhookId = url.searchParams.get('id')
       if (!webhookId) {
         return new Response(JSON.stringify({ message: 'Missing webhook id' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -223,6 +254,8 @@ Deno.serve(async (req) => {
     // POST /admin-settings?action=test-webhook&id={id}
     if (req.method === 'POST' && action === 'test-webhook') {
       requirePermission(session, 'members', 'update')
+      const rl = await rateLimitAsync(req, 'admin-webhook-test', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
       const webhookId = url.searchParams.get('id')
       if (!webhookId) {
         return new Response(JSON.stringify({ message: 'Missing webhook id' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -231,24 +264,30 @@ Deno.serve(async (req) => {
       if (fetchError || !webhook) {
         return new Response(JSON.stringify({ message: 'Webhook not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
+      try {
+        assertSafeWebhookUrl(webhook.url)
+      } catch {
+        return new Response(JSON.stringify({ message: 'Webhook URL is not allowed.', code: 'UNSAFE_WEBHOOK_URL' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
       // Send test payload
       const testPayload = buildWebhookPayload('test', webhook.type, {
         message: 'Test alert from Luma Welfare',
         timestamp: new Date().toISOString(),
       })
       try {
-        const resp = await fetch(webhook.url, {
+        const resp = await safeWebhookFetch(webhook.url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(testPayload),
         })
         await adminClient.from('system_webhooks').update({ last_sent: new Date().toISOString(), last_status: resp.status, updated_at: new Date().toISOString() }).eq('id', webhookId)
-        return new Response(JSON.stringify({ message: resp.ok ? 'Test sent successfully' : `Test failed: HTTP ${resp.status}`, status: resp.status }), {
+        return new Response(JSON.stringify({ message: resp.ok ? 'Test sent successfully' : 'Webhook delivery failed.', status: resp.status }), {
           status: resp.ok ? 200 : 502,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       } catch (err) {
-        return new Response(JSON.stringify({ message: `Test failed: ${err instanceof Error ? err.message : 'Network error'}` }), {
+        console.error('admin-settings test-webhook delivery failed:', err instanceof Error ? err.name : 'unknown')
+        return new Response(JSON.stringify({ message: 'Webhook delivery failed.' }), {
           status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }

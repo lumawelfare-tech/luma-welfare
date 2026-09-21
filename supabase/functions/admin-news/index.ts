@@ -1,5 +1,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
+import { buildIlikeOrFilter } from '../shared/search.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 /** Generate a URL-safe slug from a title */
 function slugify(title: string): string {
@@ -65,6 +67,11 @@ Deno.serve(async (req) => {
     }
     const session = loaded.session
 
+    if (req.method !== 'GET') {
+      const rl = await rateLimitAsync(req, 'admin-news-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
+    }
+
     const url = new URL(req.url)
     const resourceId = url.searchParams.get("resource_id")
     const itemId = resourceId
@@ -85,7 +92,10 @@ Deno.serve(async (req) => {
       if (type) query = query.eq('type', type)
       if (status === 'published') query = query.eq('is_published', true)
       if (status === 'draft') query = query.eq('is_published', false)
-      if (q) query = query.or(`title.ilike.%${q}%,body.ilike.%${q}%,excerpt.ilike.%${q}%`)
+      if (q) {
+        const orFilter = buildIlikeOrFilter(['title', 'body', 'excerpt'], q)
+        if (orFilter) query = query.or(orFilter)
+      }
       query = query.range((page - 1) * perPage, page * perPage - 1)
       const { data, error, count } = await query
       if (error) throw new Error(error.message)
