@@ -9,6 +9,8 @@ export default defineConfig({
   retries: CI ? 2 : 0,
   workers: CI ? 1 : undefined,
   reporter: CI ? [['html', { open: 'never' }], ['list']] : 'list',
+  timeout: 60_000,
+  expect: { timeout: 15_000 },
 
   use: {
     baseURL: process.env.BASE_URL || 'https://luma-welfare.vercel.app',
@@ -21,13 +23,15 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /member-mobile\.spec\.ts/,
+    },
+    {
+      name: 'mobile-chrome',
+      use: {
+        ...devices['Pixel 5'],
+        viewport: { width: 375, height: 812 },
+      },
+      testMatch: /member-mobile\.spec\.ts/,
     },
   ],
-
-  // Start local dev server for non-CI runs (if needed)
-  // webServer: {
-  //   command: 'npm run dev',
-  //   url: 'http://localhost:5173',
-  //   reuseExistingServer: !CI,
-  // },
 })

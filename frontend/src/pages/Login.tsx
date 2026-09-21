@@ -240,6 +240,7 @@ export function Login() {
 
                 <motion.button
                   type="submit"
+                  data-testid="login-submit"
                   disabled={busy || googleBusy}
                   whileTap={reduceMotion ? undefined : { scale: 0.98 }}
                   className="w-full rounded-xl bg-luma-700 py-3 text-sm font-bold text-white hover:bg-luma-800 disabled:opacity-60 transition-all shadow-sm"
