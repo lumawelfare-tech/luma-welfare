@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { AuthBootGate } from './components/AuthBootGate'
 import { ScrollToTop } from './components/ScrollToTop'
 import { Layout } from './components/Layout'
 import { AdminLayout } from './components/AdminLayout'
@@ -62,8 +63,9 @@ const AdminMedia = lazy(() => import('./pages/admin/AdminMedia').then(m => ({ de
 const AdminHealthCheck = lazy(() => import('./pages/admin/AdminHealthCheck').then(m => ({ default: m.AdminHealthCheck })))
 
 function PageLoader() {
+  // Route-level Suspense only — keep compact; full-screen boot uses AppBootLoader.
   return (
-    <div className="flex min-h-[40vh] items-center justify-center">
+    <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-live="polite">
       <div className="text-sm text-gray-500">Loading…</div>
     </div>
   )
@@ -73,12 +75,13 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <BrowserRouter>
-          <ScrollToTop />
-          <SWUpdateBanner />
-          <SyncStatus />
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
+        <AuthBootGate>
+          <BrowserRouter>
+            <ScrollToTop />
+            <SWUpdateBanner />
+            <SyncStatus />
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
               {/* ===== PUBLIC WEBSITE ===== */}
               <Route element={<Layout />}>
                 <Route path="/" element={<Home />} />
@@ -140,6 +143,7 @@ export default function App() {
             </Routes>
           </Suspense>
         </BrowserRouter>
+        </AuthBootGate>
       </AuthProvider>
     </ErrorBoundary>
   )
