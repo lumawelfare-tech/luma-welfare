@@ -1,6 +1,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createUserClient, createAdminClient } from '../shared/supabase.ts'
 import { rateLimitAsync, addRateLimitHeaders } from '../shared/rate-limit.ts'
+import { parseLoginBody, ValidationError } from '../shared/validate.ts'
 
 /**
  * Auth Login — authenticate user and check 2FA status
@@ -28,14 +29,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const body = await req.json()
-    const { email, password } = body
-
-    if (!email || !password) {
-      return new Response(JSON.stringify({ message: 'Email and password are required.', code: 'VALIDATION' }), {
+    let body: unknown
+    try {
+      body = await req.json()
+    } catch {
+      return new Response(JSON.stringify({ message: 'Invalid JSON body.', code: 'VALIDATION' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    const { email, password } = parseLoginBody(body)
 
     const userClient = createUserClient(req)
     const { data, error } = await userClient.auth.signInWithPassword({ email, password })
@@ -65,14 +68,21 @@ Deno.serve(async (req) => {
       requires2fa = true
     }
 
-    return new Response(JSON.stringify({
+    const response = new Response(JSON.stringify({
       session: data.session,
       member,
       requires_2fa: requires2fa,
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+    return addRateLimitHeaders(response, limit, 10)
   } catch (err) {
+    if (err instanceof ValidationError) {
+      return new Response(JSON.stringify({ message: err.message, code: 'VALIDATION' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    console.error('auth-login: unexpected error', err instanceof Error ? err.name : 'unknown')
     return new Response(JSON.stringify({ message: 'Internal server error', code: 'INTERNAL' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

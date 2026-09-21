@@ -1,6 +1,9 @@
 /**
  * CORS headers for Edge Functions.
  * Reflects a single allowlisted Origin (never a comma-separated ACAO value).
+ *
+ * Exact origin matching only. Preview hosts must be listed explicitly in
+ * CORS_ALLOWED_ORIGIN — there is no *.vercel.app wildcard.
  */
 
 import { CSP_DIRECTIVES } from './security.ts'
@@ -14,33 +17,13 @@ function getAllowedOrigins(): string[] {
 function resolveAllowOrigin(reqOrigin: string | null): string {
   const allowed = getAllowedOrigins()
   if (reqOrigin && allowed.includes(reqOrigin)) return reqOrigin
-  // Vercel preview deployments (*.vercel.app) — same project family
-  if (reqOrigin) {
-    try {
-      const host = new URL(reqOrigin).hostname
-      if (host.endsWith('.vercel.app') && allowed.some((o) => o.includes('vercel.app'))) {
-        return reqOrigin
-      }
-    } catch {
-      /* ignore invalid Origin */
-    }
-  }
   // Fall back to primary configured origin for non-browser / same-origin tooling
   return allowed[0] ?? 'https://luma-welfare.vercel.app'
 }
 
 export function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return false
-  if (getAllowedOrigins().includes(origin)) return true
-  try {
-    const host = new URL(origin).hostname
-    if (host.endsWith('.vercel.app') && getAllowedOrigins().some((o) => o.includes('vercel.app'))) {
-      return true
-    }
-  } catch {
-    return false
-  }
-  return false
+  return getAllowedOrigins().includes(origin)
 }
 
 export function getCorsHeaders(req?: Request): Record<string, string> {

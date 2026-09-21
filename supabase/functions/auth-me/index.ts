@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
     const userId = user.id
 
     // Get member profile
-    const { data: member, error: memberError } = await adminClient
+    const { data: member } = await adminClient
       .from('members')
       .select('*')
       .eq('id', userId)
@@ -65,7 +65,6 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       member: member ?? null,
-      error: memberError ? memberError.message : null,
       subscriptions: subscriptions ?? [],
       isAdmin,
       adminRole,
@@ -75,6 +74,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
+    console.error('auth-me: unexpected', err instanceof Error ? err.name : 'unknown')
     return new Response(JSON.stringify({ message: 'Internal server error', code: 'INTERNAL' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

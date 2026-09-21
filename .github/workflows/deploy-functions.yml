@@ -19,6 +19,10 @@ on:
         required: false
         type: string
 
+# Manual deploy needs contents read + secrets via environment.
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy Edge Functions

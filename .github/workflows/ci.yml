@@ -18,6 +18,10 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege — jobs that need more must declare it explicitly.
+permissions:
+  contents: read
+
 # Cancel in-progress runs for the same branch/PR
 concurrency:
   group: ci-${{ github.ref }}
@@ -72,9 +76,9 @@ jobs:
           echo "============================================="
           echo ""
 
-          # Check for critical/high vulnerabilities
-          CRITICAL=$(grep -c "critical" audit-full.txt 2>/dev/null || echo "0")
-          HIGH=$(grep -c "high" audit-full.txt 2>/dev/null || echo "0")
+          # Prefer npm's machine-readable severity counts (avoid grep false positives).
+          CRITICAL=$(npm audit --json --omit=dev 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const j=JSON.parse(s);console.log(j.metadata?.vulnerabilities?.critical||0)}catch{console.log(0)}})")
+          HIGH=$(npm audit --json --omit=dev 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const j=JSON.parse(s);console.log(j.metadata?.vulnerabilities?.high||0)}catch{console.log(0)}})")
 
           echo "Critical vulnerabilities: $CRITICAL"
           echo "High vulnerabilities: $HIGH"

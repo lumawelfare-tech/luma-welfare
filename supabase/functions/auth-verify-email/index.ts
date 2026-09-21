@@ -12,6 +12,7 @@ import {
   RESEND_HOURLY_LIMIT,
   OtpConfigError,
 } from '../shared/otp.ts'
+import { parseVerifyEmailBody, ValidationError } from '../shared/validate.ts'
 
 /**
  * auth-verify-email — server-authoritative OTP email verification.
@@ -31,7 +32,6 @@ import {
  */
 
 const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000'
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function json(status: number, payload: Record<string, unknown>): Response {
   return new Response(JSON.stringify(payload), {
@@ -69,7 +69,7 @@ async function activateMember(
   if (error) {
     // Member activation is already effective; log so ops can confirm the
     // Supabase auth flag (only matters when email confirmations are enforced).
-    console.error(`auth-verify-email: updateUserById failed for ${userId}: ${error.message}`)
+    console.error(`auth-verify-email: updateUserById failed for ${userId}: ${error.name ?? 'AuthError'}`)
   }
 }
 
@@ -83,36 +83,38 @@ Deno.serve(async (req) => {
   }
 
   const url = new URL(req.url)
-  let action = url.searchParams.get('action') ?? 'verify'
-  let body: Record<string, unknown> = {}
+  let raw: unknown = {}
   try {
-    body = await req.json() as Record<string, unknown>
+    raw = await req.json()
   } catch {
-    body = {}
-  }
-  if (typeof body.action === 'string' && body.action) action = body.action
-  action = action.toLowerCase()
-
-  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
-
-  if (!email || !EMAIL_RE.test(email)) {
-    return json(400, { message: 'A valid email address is required.', code: 'VALIDATION' })
+    raw = {}
   }
 
+  let parsed
+  try {
+    parsed = parseVerifyEmailBody(raw, url.searchParams.get('action'))
+  } catch (err) {
+    if (err instanceof ValidationError) {
+      if (err.message.includes('6-digit')) return invalidCode()
+      return json(400, { message: err.message, code: 'VALIDATION' })
+    }
+    throw err
+  }
+
+  const email = parsed.email
   const adminClient = createAdminClient()
 
   // ── VERIFY ────────────────────────────────────────────────────────────────
-  if (action === 'verify') {
+  if (parsed.action === 'verify') {
     const limit = await rateLimitAsync(req, 'auth-verify-email', { windowMs: 60_000, max: 10 })
     if (!limit.ok) return limit.response!
 
-    const code = typeof body.code === 'string' ? body.code.replace(/\s/g, '') : ''
-    if (!/^\d{6}$/.test(code)) return invalidCode()
+    const code = parsed.code
 
     const { data: member } = await adminClient
       .from('members')
       .select('id, status')
-      .ilike('email', email)
+      .eq('email', email)
       .maybeSingle()
 
     if (!member) {
@@ -214,14 +216,14 @@ Deno.serve(async (req) => {
   }
 
   // ── RESEND ────────────────────────────────────────────────────────────────
-  if (action === 'resend') {
+  if (parsed.action === 'resend') {
     const limit = await rateLimitAsync(req, 'auth-verify-email-resend', { windowMs: 60_000, max: 5 })
     if (!limit.ok) return limit.response!
 
     const { data: member } = await adminClient
       .from('members')
       .select('id, status')
-      .ilike('email', email)
+      .eq('email', email)
       .maybeSingle()
 
     if (!member) {
@@ -367,6 +369,9 @@ Deno.serve(async (req) => {
 
   return json(400, { message: 'Unknown action.', code: 'VALIDATION' })
   } catch (err) {
+    if (err instanceof ValidationError) {
+      return json(400, { message: err.message, code: 'VALIDATION' })
+    }
     if (err instanceof OtpConfigError) {
       console.error('auth-verify-email: OTP configuration error')
       return json(503, { message: 'Verification is temporarily unavailable.', code: 'OTP_CONFIG' })

@@ -3,6 +3,7 @@ import { createAdminClient, logAudit } from '../shared/supabase.ts'
 import { sendEmail, buildOtpEmail } from '../shared/email.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { generateOtp, hashOtp, OTP_TTL_MINUTES, OtpConfigError } from '../shared/otp.ts'
+import { parseRegisterBody, ValidationError } from '../shared/validate.ts'
 
 /**
  * auth-register — creates the Supabase Auth user, a member record in
@@ -12,8 +13,6 @@ import { generateOtp, hashOtp, OTP_TTL_MINUTES, OtpConfigError } from '../shared
  * activates the auth user + member record. Registration itself never
  * activates the account.
  */
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function json(status: number, payload: Record<string, unknown>): Response {
   return new Response(JSON.stringify(payload), {
@@ -35,33 +34,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const body = await req.json()
-    const { email, password, fullName, phone, idNumber } = body
-
-    // Validation
-    if (!email || !password || !fullName || !phone) {
-      return json(400, { message: 'Missing required fields.', code: 'VALIDATION' })
+    let raw: unknown
+    try {
+      raw = await req.json()
+    } catch {
+      return json(400, { message: 'Invalid JSON body.', code: 'VALIDATION' })
     }
 
-    if (typeof email !== 'string' || !EMAIL_RE.test(email.trim())) {
-      return json(400, { message: 'Enter a valid email address.', code: 'VALIDATION' })
-    }
-
-    if (password.length < 8) {
-      return json(400, { message: 'Password must be at least 8 characters.', code: 'VALIDATION' })
-    }
-
-    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-      return json(400, { message: 'Password must contain at least one letter and one number.', code: 'VALIDATION' })
-    }
-
-    if (!/^0[17]\d{8}$/.test(phone)) {
-      return json(400, { message: 'Enter a valid Kenyan phone number.', code: 'VALIDATION' })
-    }
+    const { email, password, fullName, phone, idNumber } = parseRegisterBody(raw)
 
     const adminClient = createAdminClient()
 
-    // Create auth user using admin client (unconfirmed until OTP verification)
     const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
       email,
       password,
@@ -70,31 +53,31 @@ Deno.serve(async (req) => {
     })
 
     if (authError) {
-      if (authError.message.toLowerCase().includes('already registered')) {
+      const msg = (authError.message ?? '').toLowerCase()
+      if (msg.includes('already registered') || msg.includes('already been registered')) {
         return json(409, { message: 'That email is already registered. Sign in instead.', code: 'EMAIL_TAKEN' })
       }
-      return json(400, { message: authError.message, code: 'AUTH' })
+      console.error('auth-register: createUser failed', authError.name ?? 'AuthError')
+      return json(400, { message: 'Could not create account. Please try again.', code: 'AUTH' })
     }
 
     const userId = authData.user.id
 
-    // Create member record in PENDING state — activated by OTP verification.
     const { error: memberError } = await adminClient.from('members').insert({
       id: userId,
       full_name: fullName,
       phone,
-      id_number: idNumber || null,
-      email: email.toLowerCase(),
+      id_number: idNumber,
+      email,
       status: 'pending_approval',
     })
 
     if (memberError) {
-      // Roll back the auth user so the email isn't locked out of re-registration.
       await adminClient.auth.admin.deleteUser(userId)
-      return json(500, { message: memberError.message, code: 'DB_ERROR' })
+      console.error('auth-register: member insert failed', memberError.code ?? 'DB')
+      return json(500, { message: 'Could not create membership. Please try again.', code: 'DB_ERROR' })
     }
 
-    // Audit: account registered (pending verification)
     await logAudit(adminClient, {
       actor_id: userId,
       action: 'registered',
@@ -102,7 +85,6 @@ Deno.serve(async (req) => {
       resource_id: userId,
     })
 
-    // ── OTP verification code ──────────────────────────────────────────────
     const code = generateOtp()
     const otpHash = await hashOtp(userId, code)
     const nowIso = new Date().toISOString()
@@ -112,7 +94,7 @@ Deno.serve(async (req) => {
       .from('email_verifications')
       .upsert({
         user_id: userId,
-        email: email.toLowerCase(),
+        email,
         otp_hash: otpHash,
         expires_at: expiresAt,
         attempts: 0,
@@ -124,7 +106,7 @@ Deno.serve(async (req) => {
 
     let emailSent = false
     if (otpError) {
-      console.error('Failed to store verification code:', otpError.message)
+      console.error('Failed to store verification code:', otpError.code ?? 'OTP_STORE')
     } else {
       const result = await sendEmail(
         email,
@@ -140,18 +122,17 @@ Deno.serve(async (req) => {
           resource_id: userId,
         })
       } else {
-        console.error('Verification email failed:', result.error)
+        console.error('Verification email failed: delivery_error')
         await logAudit(adminClient, {
           actor_id: userId,
           action: 'EMAIL_DELIVERY_FAILED',
           resource: 'email_verification',
           resource_id: userId,
-          meta: { context: 'register', reason: result.error ?? 'unknown' },
+          meta: { context: 'register', reason: 'delivery_failed' },
         })
       }
     }
 
-    // Create registration fee record (KSh 300 one-time)
     const { error: feeError } = await adminClient.from('registration_fees').insert({
       member_id: userId,
       fee_type: 'registration',
@@ -160,7 +141,7 @@ Deno.serve(async (req) => {
       status: 'unpaid',
     })
     if (feeError) {
-      console.error('Failed to create registration fee record:', feeError.message)
+      console.error('Failed to create registration fee record:', feeError.code ?? 'FEE')
     }
 
     return json(201, {
@@ -168,14 +149,18 @@ Deno.serve(async (req) => {
         ? 'Account created. We sent a 6-digit verification code to your email. It expires in 10 minutes.'
         : 'Account created. We could not send the verification email right now — use "Resend code" on the next screen.',
       userId,
-      email: email.toLowerCase(),
+      email,
       emailSent,
     })
   } catch (err) {
+    if (err instanceof ValidationError) {
+      return json(400, { message: err.message, code: 'VALIDATION' })
+    }
     if (err instanceof OtpConfigError) {
       console.error('auth-register: OTP configuration error')
       return json(503, { message: 'Verification is temporarily unavailable.', code: 'OTP_CONFIG' })
     }
+    console.error('auth-register: unexpected', err instanceof Error ? err.name : 'unknown')
     return json(500, { message: 'Internal server error', code: 'INTERNAL' })
   }
 })
