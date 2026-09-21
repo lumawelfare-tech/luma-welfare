@@ -7,13 +7,16 @@
  * - Remediation recommendations
  * - Go/no-go deployment decision
  *
- * Run: npx tsx src/tests/dependency-audit.ts
+ * Run: npx tsx scripts/dependency-audit.ts
  * Or:  npm run audit:security
  */
 
 import { execSync } from 'child_process'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { join } from 'path'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 interface AuditVulnerability {
   name: string
@@ -94,17 +97,15 @@ async function main() {
   console.log(`  Date: ${new Date().toISOString()}`)
   console.log('')
 
-  const projectRoot = join(__dirname, '..', '..')
+  const projectRoot = join(__dirname, '..')
   const frontendDir = join(projectRoot, 'frontend')
-  const backendDir = join(projectRoot, 'backend')
 
   const results: Array<{ name: string; audit: AuditOutput | null }> = []
 
-  // Audit each workspace
+  // Audit each workspace (Supabase-only — no Hono backend package)
   for (const [name, dir] of [
     ['Root', projectRoot],
     ['Frontend', frontendDir],
-    ['Backend', backendDir],
   ]) {
     if (!existsSync(join(dir, 'package.json'))) continue
 

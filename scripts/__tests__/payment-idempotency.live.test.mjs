@@ -1,4 +1,9 @@
 /**
+ * Relocated from backend/src/__tests__ during Supabase-only migration.
+ * Live / DATABASE_URL required — not run in CI.
+ * Run: node --test --import tsx <this-file>
+ */
+/**
  * Phase 2A Idempotency Hardening Tests
  *
  * Tests scenarios A through I for payment initiation idempotency.
@@ -12,9 +17,9 @@ import { describe, it, before, after, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import pg from 'pg'
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 // Database connection
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 
 const DATABASE_URL = process.env.DATABASE_URL
 const TEST_MEMBER_A = '11111111-1111-1111-1111-111111111111'
@@ -89,7 +94,7 @@ async function insertPayment(memberId, idempotencyKey, opts = {}) {
     return { success: true, payment: result.rows[0] }
   } catch (err) {
     if (err.code === '23505') {
-      // Unique violation â€” query existing
+      // Unique violation GÇö query existing
       const existing = await client.query(
         'SELECT id, checkout_request_id, status FROM payments WHERE member_id = $1 AND idempotency_key = $2',
         [memberId, idempotencyKey]
@@ -120,9 +125,9 @@ async function completePayment(checkoutRequestId, mpesaReceipt) {
   return update.rows[0] || null
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 // Tests
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 
 describe('Scenario A: Single Pay click', () => {
   it('one initiation creates exactly one payment', async () => {
@@ -136,7 +141,7 @@ describe('Scenario A: Single Pay click', () => {
 })
 
 describe('Scenario B: Double-click (same requestId)', () => {
-  it('two requests with same requestId â€” exactly one payment', async () => {
+  it('two requests with same requestId GÇö exactly one payment', async () => {
     if (!client) return
     const key = crypto.randomUUID()
 
@@ -242,7 +247,7 @@ describe('Scenario E: Existing CheckoutRequestID', () => {
 })
 
 describe('Scenario F: Repeated callback (same CheckoutRequestID)', () => {
-  it('callback processed multiple times â€” financial records remain exactly once', async () => {
+  it('callback processed multiple times GÇö financial records remain exactly once', async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const checkoutId = `ws_CO_CB_${Date.now()}`
@@ -258,12 +263,12 @@ describe('Scenario F: Repeated callback (same CheckoutRequestID)', () => {
       [checkoutId, r1.payment.id]
     )
 
-    // First callback â€” succeeds
+    // First callback GÇö succeeds
     const c1 = await completePayment(checkoutId, receipt)
     assert.ok(c1, 'First callback should complete payment')
     assert.equal(c1.status, 'Completed')
 
-    // Second callback â€” should be no-op
+    // Second callback GÇö should be no-op
     const c2 = await completePayment(checkoutId, receipt)
     assert.equal(c2, null, 'Second callback should be no-op (already Completed)')
 
@@ -304,7 +309,7 @@ describe('Scenario H: Cross-member attack', () => {
     const r1 = await insertPayment(TEST_MEMBER_A, key)
     assert.equal(r1.success, true)
 
-    // Member B tries same key â€” should succeed (different member scope)
+    // Member B tries same key GÇö should succeed (different member scope)
     const r2 = await insertPayment(TEST_MEMBER_B, key)
     assert.equal(r2.success, true, 'Different member can use same key')
     assert.notEqual(r1.payment.id, r2.payment.id, 'Different payment ids')

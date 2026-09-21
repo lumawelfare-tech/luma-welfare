@@ -19,14 +19,6 @@ export default defineConfig({
       exclude: ['src/**/*.test.*', 'src/**/*.d.ts'],
     },
   },
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
-    },
-  },
   build: {
     rollupOptions: {
       output: {

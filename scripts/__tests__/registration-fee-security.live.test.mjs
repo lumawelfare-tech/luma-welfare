@@ -1,4 +1,9 @@
 /**
+ * Relocated from backend/src/__tests__ during Supabase-only migration.
+ * Live / DATABASE_URL required — not run in CI.
+ * Run: node --test --import tsx <this-file>
+ */
+/**
  * Registration Fee Security Tests
  *
  * Proves that:
@@ -20,9 +25,9 @@ const MEMBER_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 const MEMBER_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 let client
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 // Setup / Teardown
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 
 before(async () => {
   if (!DATABASE_URL) {
@@ -68,9 +73,9 @@ after(async () => {
   await client.end()
 })
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 // Tests
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 
 describe('RLS: registration_fees policies exist', () => {
   it('SELECT policy exists for members', async () => {
@@ -94,7 +99,7 @@ describe('RLS: registration_fees policies exist', () => {
     const { rows } = await client.query(
       "SELECT policyname FROM pg_policies WHERE tablename = 'registration_fees' AND cmd = 'UPDATE'"
     )
-    assert.equal(rows.length, 0, 'UPDATE policy must NOT exist â€” members cannot self-confirm')
+    assert.equal(rows.length, 0, 'UPDATE policy must NOT exist GÇö members cannot self-confirm')
   })
 
   it('DELETE policy does NOT exist for members', async () => {
@@ -191,7 +196,7 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     await client.query('ROLLBACK')
 
     // The update should affect 0 rows due to RLS (no UPDATE policy)
-    assert.equal(result.rowCount, 0, 'UPDATE must affect 0 rows â€” no UPDATE policy exists')
+    assert.equal(result.rowCount, 0, 'UPDATE must affect 0 rows GÇö no UPDATE policy exists')
   })
 
   it('amount cannot be changed to arbitrary value', async () => {
@@ -208,7 +213,7 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     `, [MEMBER_A])
     await client.query('ROLLBACK')
 
-    assert.equal(result.rowCount, 0, 'UPDATE amount must affect 0 rows â€” no UPDATE policy')
+    assert.equal(result.rowCount, 0, 'UPDATE amount must affect 0 rows GÇö no UPDATE policy')
   })
 
   it('mpesa_receipt cannot be set by member', async () => {
@@ -225,7 +230,7 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     `, [MEMBER_A])
     await client.query('ROLLBACK')
 
-    assert.equal(result.rowCount, 0, 'UPDATE mpesa_receipt must affect 0 rows â€” no UPDATE policy')
+    assert.equal(result.rowCount, 0, 'UPDATE mpesa_receipt must affect 0 rows GÇö no UPDATE policy')
   })
 
   it('transaction_reference cannot be set by member', async () => {
@@ -242,7 +247,7 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     `, [MEMBER_A])
     await client.query('ROLLBACK')
 
-    assert.equal(result.rowCount, 0, 'UPDATE transaction_reference must affect 0 rows â€” no UPDATE policy')
+    assert.equal(result.rowCount, 0, 'UPDATE transaction_reference must affect 0 rows GÇö no UPDATE policy')
   })
 
   it('payment_method cannot be changed by member', async () => {
@@ -259,7 +264,7 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     `, [MEMBER_A])
     await client.query('ROLLBACK')
 
-    assert.equal(result.rowCount, 0, 'UPDATE payment_method must affect 0 rows â€” no UPDATE policy')
+    assert.equal(result.rowCount, 0, 'UPDATE payment_method must affect 0 rows GÇö no UPDATE policy')
   })
 
   it('paid_at cannot be set by member', async () => {
@@ -276,7 +281,7 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     `, [MEMBER_A])
     await client.query('ROLLBACK')
 
-    assert.equal(result.rowCount, 0, 'UPDATE paid_at must affect 0 rows â€” no UPDATE policy')
+    assert.equal(result.rowCount, 0, 'UPDATE paid_at must affect 0 rows GÇö no UPDATE policy')
   })
 })
 
@@ -340,7 +345,7 @@ describe('Security: service-role can update (admin operations)', () => {
   it('Service-role can update registration fee status to paid', async () => {
     if (!client) return
 
-    // Service-role bypasses RLS â€” this simulates admin confirmation
+    // Service-role bypasses RLS GÇö this simulates admin confirmation
     const result = await client.query(`
       UPDATE registration_fees
       SET status = 'paid', paid_at = now(), mpesa_receipt = 'TEST_RECEIPT'

@@ -4,23 +4,25 @@
   "private": true,
   "description": "Luma Welfare membership and contribution management platform",
   "workspaces": [
-    "frontend",
-    "backend"
+    "frontend"
   ],
   "scripts": {
     "dev": "npm run dev -w frontend",
-    "dev:backend": "npm run dev -w backend",
-    "build": "npm run build -w frontend && npm run build -w backend",
-    "typecheck": "cd frontend && npx tsc --noEmit && cd ../backend && npm run typecheck",
+    "build": "npm run build -w frontend",
+    "typecheck": "cd frontend && npx tsc --noEmit",
+    "lint": "npm run lint -w frontend",
+    "test": "npm run test -w frontend",
+    "test:qualify": "node --test --import tsx scripts/__tests__/qualify.test.ts",
+    "test:all": "npm run test && npm run test:qualify && npm run test:e2e",
     "audit": "npm audit",
     "audit:fix": "npm audit fix",
-    "audit:security": "npx tsx backend/src/tests/dependency-audit.ts",
+    "audit:security": "npx tsx scripts/dependency-audit.ts",
     "security:check": "npm audit && npm run audit:security",
+    "admin:bootstrap": "npx tsx scripts/admin-bootstrap.ts",
     "deploy:functions": "bash scripts/deploy-edge-functions.sh",
     "verify:deploy": "bash scripts/verify-deploy.sh",
     "test:e2e": "npx playwright test",
     "test:e2e:ui": "npx playwright test --ui",
-    "test:all": "npm run test -w frontend && npm run test:e2e",
     "prepare": "husky || true"
   },
   "engines": {
@@ -36,9 +38,15 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "@types/node": "^24.13.3",
+    "@types/pg": "^8.23.1",
     "@vercel/node": "^7.0.0",
+    "dotenv": "^16.4.5",
     "husky": "^9.1.7",
     "lint-staged": "^17.4.1",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "tsx": "^4.19.0",
+    "typescript": "~6.0.2"
   }
 }

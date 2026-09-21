@@ -6,11 +6,13 @@
  * It is idempotent — safe to run multiple times.
  *
  * Usage:
- *   npx tsx src/_admin-bootstrap.ts
+ *   npx tsx scripts/admin-bootstrap.ts
  *
  * Environment variables required:
  *   SUPABASE_URL          — Supabase project URL
  *   SUPABASE_SECRET_KEY   — Supabase service role key (NEVER commit this)
+ *   DATABASE_URL          — Postgres connection string (for admins upsert)
+ *   ADMIN_BOOTSTRAP_PASSWORD — initial password (NEVER commit this)
  *
  * What it does:
  *   1. Creates or finds the Supabase Auth user for lumawelfare@gmail.com
