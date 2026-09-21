@@ -182,38 +182,57 @@ function createZip(files: { name: string; data: Uint8Array }[]): Uint8Array {
 
 // ─── Data Query Helpers ─────────────────────────────────────
 
+/**
+ * Structural PostgREST filter chain after `.select()`.
+ * Avoids assigning FilterBuilder into QueryBuilder (TS2739) and avoids
+ * unifying incompatible per-table FilterBuilder generics across switch arms.
+ */
+type ReportFilterQuery = {
+  eq: (column: string, value: string) => ReportFilterQuery
+  gte: (column: string, value: string) => ReportFilterQuery
+  lte: (column: string, value: string) => ReportFilterQuery
+  order: (
+    column: string,
+    options?: { ascending?: boolean },
+  ) => {
+    limit: (
+      count: number,
+    ) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>
+  }
+}
+
 async function queryReportData(
   adminClient: ReturnType<typeof createAdminClient>,
   reportType: string,
   filters: Record<string, string>,
 ): Promise<{ headers: string[]; rows: (string | number | null)[][] }> {
-  let query: ReturnType<typeof adminClient.from>
+  let query: ReportFilterQuery
   let headers: string[] = []
 
   switch (reportType) {
     case 'members': {
-      query = adminClient.from('members').select('membership_number, full_name, phone, email, status, joined_at, created_at')
+      query = adminClient.from('members').select('membership_number, full_name, phone, email, status, joined_at, created_at') as unknown as ReportFilterQuery
       headers = ['membership_number', 'full_name', 'phone', 'email', 'status', 'joined_at', 'created_at']
       break
     }
     case 'contributions': {
-      query = adminClient.from('contributions').select('status, amount, period, notes, created_at, members(full_name), packages(name)')
+      query = adminClient.from('contributions').select('status, amount, period, notes, created_at, members(full_name), packages(name)') as unknown as ReportFilterQuery
       headers = ['status', 'amount', 'period', 'notes', 'created_at', 'member_name', 'package_name']
       break
     }
     case 'claims': {
-      query = adminClient.from('claims').select('claim_number, claim_type, amount_requested, approved_amount, status, created_at, submitted_at, decided_at, members(full_name), packages(name)')
+      query = adminClient.from('claims').select('claim_number, claim_type, amount_requested, approved_amount, status, created_at, submitted_at, decided_at, members(full_name), packages(name)') as unknown as ReportFilterQuery
       headers = ['claim_number', 'claim_type', 'amount_requested', 'approved_amount', 'status', 'created_at', 'submitted_at', 'decided_at', 'member_name', 'package_name']
       break
     }
     case 'registration-fees': {
       query = adminClient.from('registration_fees').select('amount, currency, status, payment_method, mpesa_receipt, paid_at, created_at, members(full_name, email)')
-        .eq('fee_type', 'registration')
+        .eq('fee_type', 'registration') as unknown as ReportFilterQuery
       headers = ['amount', 'currency', 'status', 'payment_method', 'mpesa_receipt', 'paid_at', 'created_at', 'member_name', 'email']
       break
     }
     case 'subscriptions': {
-      query = adminClient.from('subscriptions').select('status, started_at, next_due_date, cancelled_at, created_at, members(full_name, email), packages(name), package_tiers(name, amount)')
+      query = adminClient.from('subscriptions').select('status, started_at, next_due_date, cancelled_at, created_at, members(full_name, email), packages(name), package_tiers(name, amount)') as unknown as ReportFilterQuery
       headers = ['status', 'started_at', 'next_due_date', 'cancelled_at', 'created_at', 'member_name', 'email', 'package_name', 'tier_name', 'tier_amount']
       break
     }
@@ -229,7 +248,8 @@ async function queryReportData(
   if (error) throw new Error(error.message)
 
   // Flatten nested objects
-  const rows = (data ?? []).map((row: Record<string, unknown>) => {
+  const rows = (data ?? []).map((raw) => {
+    const row = raw as Record<string, unknown>
     return headers.map(h => {
       // Handle nested objects like members(full_name), packages(name)
       if (h === 'member_name') {
@@ -395,7 +415,9 @@ Deno.serve(async (req) => {
         meta: { count: files.length, ids },
       })
 
-      return new Response(zipData, {
+      // Copy into a fresh ArrayBuffer-backed view for Response/Blob BodyInit typing.
+      const zipBody = new Uint8Array(zipData)
+      return new Response(zipBody, {
         status: 200,
         headers: {
           ...corsHeaders,

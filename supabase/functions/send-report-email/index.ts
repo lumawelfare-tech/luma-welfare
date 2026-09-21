@@ -90,7 +90,8 @@ Deno.serve(async (req) => {
 
     // Try to read the report file from Storage for attachment
     const adminClient = createAdminClient()
-    let attachments: Awaited<ReturnType<typeof readFileAsAttachment>>[] = []
+    type EmailAttachment = NonNullable<Awaited<ReturnType<typeof readFileAsAttachment>>>
+    let attachments: EmailAttachment[] = []
 
     if (filename) {
       // Search for the file in any user folder
@@ -104,7 +105,7 @@ Deno.serve(async (req) => {
     }
 
     // Send email with attachment
-    const result = await sendEmail(recipient_email, subject, html, attachments.length > 0 ? attachments as NonNullable<Awaited<ReturnType<typeof readFileAsAttachment>>[]> : undefined)
+    const result = await sendEmail(recipient_email, subject, html, attachments.length > 0 ? attachments : undefined)
 
     if (!result.success) {
       console.error('send-report-email: Failed to send:', result.error)

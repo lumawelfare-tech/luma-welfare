@@ -59,8 +59,11 @@ function generateSecret(): string {
 }
 
 async function hmacSha1(key: Uint8Array, message: Uint8Array): Promise<Uint8Array> {
-  const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
-  const signature = await crypto.subtle.sign('HMAC', cryptoKey, message)
+  // Copy into ArrayBuffer-backed views for SubtleCrypto BufferSource typing (Deno/TS).
+  const keyBytes = Uint8Array.from(key)
+  const messageBytes = Uint8Array.from(message)
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageBytes)
   return new Uint8Array(signature)
 }
 
