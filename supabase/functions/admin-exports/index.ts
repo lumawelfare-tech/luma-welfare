@@ -6,6 +6,7 @@ import {
   requirePermission, handleAdminError,
   logAudit,
 } from '../shared/supabase.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 /**
  * Admin Exports — Async CSV generation with background worker.
@@ -386,6 +387,9 @@ Deno.serve(async (req) => {
     // -----------------------------------------------------------------------
     // Route: ?type=members&format=csv&...  →  create export job (async)
     // -----------------------------------------------------------------------
+    const rl = await rateLimitAsync(req, 'admin-exports', { userId: session.id, adminClient })
+    if (!rl.ok) return rl.response!
+
     const type = (url.searchParams.get('type') ?? 'members') as ExportType
     const format = url.searchParams.get('format') ?? 'csv'
 

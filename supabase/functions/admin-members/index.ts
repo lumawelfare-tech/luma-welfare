@@ -1,5 +1,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
+import { sanitizeSearch } from '../shared/search.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -20,6 +22,11 @@ Deno.serve(async (req) => {
     }
     const session = loaded.session
 
+    if (req.method !== 'GET') {
+      const rl = await rateLimitAsync(req, 'admin-members-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
+    }
+
     const url = new URL(req.url)
     const resourceId = url.searchParams.get('resource_id')
     const action = url.searchParams.get('action')
@@ -28,7 +35,7 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && !resourceId) {
       requirePermission(session, 'members', 'read')
       const status = url.searchParams.get('status')
-      const q = url.searchParams.get('q')
+      const q = sanitizeSearch(url.searchParams.get('q')) || null
       const page = parseInt(url.searchParams.get('page') || '1')
       const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '50'), 200)
 

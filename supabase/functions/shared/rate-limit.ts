@@ -1,165 +1,262 @@
 /**
- * LUMA WELFARE — PHASE 5: ENHANCED RATE LIMITER
+ * Distributed rate limiting via Postgres RPC `consume_rate_limit`.
  *
- * Improved rate limiting with:
- * - Per-endpoint configurable limits
- * - Database-backed distributed limiting (optional)
- * - Sliding window algorithm
- * - Graceful degradation if DB is unavailable
+ * Identity:
+ * - Prefer authenticated subject (`user:<id>`) for authenticated routes.
+ * - Prefer `cf-connecting-ip` when present (CDN-set; not claimed as
+ *   Supabase platform-verified — Edge has no documented trusted IP API).
+ * - Do NOT trust `X-Forwarded-For` (spoofable at the Edge).
+ * - When no trusted IP exists, use `ip:untrusted` (shared bucket — fail-safe).
  *
- * Usage:
- *   const limit = rateLimit(req, 'login', { windowMs: 60_000, max: 10 })
- *   if (!limit.ok) return limit.response!
+ * Production behavior when RPC is unavailable:
+ * - Auth, payments, and admin mutations → FAIL CLOSED (503).
+ * - Memory fallback is NOT used for those identifiers (avoids a false
+ *   sense of distributed protection across isolates).
  */
 
-type RateLimitEntry = { count: number; resetAt: number }
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from './cors.ts'
+import {
+  memoryConsume,
+  resolveRateLimitSubject,
+  isFailClosedIdentifier,
+  type MemoryEntry,
+} from './rate-limit-core.ts'
 
-const store = new Map<string, RateLimitEntry>()
+export { resolveRateLimitSubject, isFailClosedIdentifier, FAIL_CLOSED_IDENTIFIERS } from './rate-limit-core.ts'
 
-// Cleanup old entries every 5 minutes
-setInterval(() => {
-  const now = Date.now()
-  for (const [key, entry] of store) {
-    if (entry.resetAt < now) store.delete(key)
-  }
-}, 5 * 60_000)
-
-interface RateLimitOptions {
-  /** Time window in milliseconds (default: 60 000 = 1 minute) */
+export type RateLimitOptions = {
+  /** Time window in milliseconds (default: 60_000). */
   windowMs?: number
-  /** Max requests per window (default: 60) */
+  /** Max requests per window (default: 60). */
   max?: number
-  /** Custom key prefix (default: 'global') */
+  /** Custom key prefix. */
   keyPrefix?: string
+  /** Authenticated subject (user id) when available. */
+  userId?: string
+  /** Optional pre-built admin/service client. */
+  adminClient?: SupabaseClient
+  /**
+   * When true, fail closed if Postgres RPC is unavailable.
+   * Defaults to true for FAIL_CLOSED_IDENTIFIERS.
+   */
+  requireDistributed?: boolean
 }
 
-interface RateLimitResult {
+export type RateLimitResult = {
   ok: boolean
   remaining: number
   resetAt: number
   response?: Response
+  source: 'db' | 'memory' | 'unavailable'
 }
 
-const corsHeaders: Record<string, string> = {
-  'Access-Control-Allow-Origin': 'https://luma-welfare.vercel.app',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-// ============================================================================
-// PREDEFINED ENDPOINT LIMITS
-// ============================================================================
-
-const ENDPOINT_LIMITS: Record<string, RateLimitOptions> = {
-  // Authentication — strict limits to prevent brute force
+/** Documented endpoint limits — mutation-focused; GETs mostly unrestricted. */
+export const ENDPOINT_LIMITS: Record<string, { windowMs: number; max: number }> = {
+  // Auth
   'auth-login': { windowMs: 60_000, max: 10 },
+  login: { windowMs: 60_000, max: 10 },
   'auth-register': { windowMs: 300_000, max: 5 },
-  'auth-me': { windowMs: 60_000, max: 30 },
+  register: { windowMs: 300_000, max: 5 },
+  'auth-verify-email': { windowMs: 60_000, max: 10 },
+  'auth-verify-email-resend': { windowMs: 60_000, max: 5 },
 
-  // Member endpoints — moderate limits
-  'member-dashboard': { windowMs: 60_000, max: 30 },
-  'member-contributions': { windowMs: 60_000, max: 20 },
-  'member-claims': { windowMs: 60_000, max: 20 },
-  'member-notifications': { windowMs: 60_000, max: 60 },
-  'member-notification-prefs': { windowMs: 60_000, max: 30 },
-  'member-profile': { windowMs: 60_000, max: 15 },
-  'member-subscriptions': { windowMs: 60_000, max: 15 },
-
-  // Admin endpoints — higher limits for admin workload
-  'admin-dashboard': { windowMs: 60_000, max: 60 },
-  'admin-members': { windowMs: 60_000, max: 60 },
-  'admin-contributions': { windowMs: 60_000, max: 40 },
-  'admin-claims': { windowMs: 60_000, max: 40 },
-  'admin-reports': { windowMs: 60_000, max: 20 },
-
-  // Export — very strict (expensive operation)
-  'admin-exports': { windowMs: 300_000, max: 5 },
-  'admin-exports-worker': { windowMs: 60_000, max: 30 },
-
-  // Payment — strict
+  // Payments (kill-switch still applies separately)
   'payments-initiate': { windowMs: 60_000, max: 5 },
-  'payments-callback': { windowMs: 60_000, max: 100 },
 
-  // Public — generous
-  'public-data': { windowMs: 60_000, max: 120 },
-  'health': { windowMs: 60_000, max: 30 },
+  // Admin mutations
+  'admin-settings-mutation': { windowMs: 60_000, max: 30 },
+  'admin-members-mutation': { windowMs: 60_000, max: 30 },
+  'admin-packages-mutation': { windowMs: 60_000, max: 20 },
+  'admin-subscriptions-mutation': { windowMs: 60_000, max: 20 },
+  'admin-claims-mutation': { windowMs: 60_000, max: 20 },
+  'admin-contributions-mutation': { windowMs: 60_000, max: 20 },
+  'admin-news-mutation': { windowMs: 60_000, max: 30 },
+  'admin-media-mutation': { windowMs: 60_000, max: 30 },
+  'admin-gallery-mutation': { windowMs: 60_000, max: 30 },
+  'admin-reconciliation-mutation': { windowMs: 60_000, max: 30 },
+  'admin-scheduled-reports-mutation': { windowMs: 60_000, max: 20 },
+  'admin-exports': { windowMs: 300_000, max: 5 },
+  'admin-webhook-test': { windowMs: 60_000, max: 10 },
 }
 
-// ============================================================================
-// RATE LIMIT FUNCTION
-// ============================================================================
+const memoryStore = new Map<string, MemoryEntry>()
 
+function build429(max: number, resetAt: number): Response {
+  const retryAfter = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))
+  return new Response(
+    JSON.stringify({
+      message: 'Too many requests. Please try again later.',
+      code: 'RATE_LIMITED',
+      retry_after: retryAfter,
+    }),
+    {
+      status: 429,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        'Retry-After': String(retryAfter),
+        'X-RateLimit-Limit': String(max),
+        'X-RateLimit-Remaining': '0',
+        'X-RateLimit-Reset': String(Math.ceil(resetAt / 1000)),
+      },
+    },
+  )
+}
+
+function build503Unavailable(): Response {
+  return new Response(
+    JSON.stringify({
+      message: 'Service temporarily unavailable. Please try again later.',
+      code: 'RATE_LIMIT_UNAVAILABLE',
+    }),
+    {
+      status: 503,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        'Retry-After': '30',
+      },
+    },
+  )
+}
+
+function serviceClient(): SupabaseClient | null {
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) return null
+  return createClient(url, key)
+}
+
+function shouldFailClosed(identifier: string, options: RateLimitOptions): boolean {
+  if (options.requireDistributed === true) return true
+  if (options.requireDistributed === false) return false
+  return isFailClosedIdentifier(identifier)
+}
+
+/**
+ * Async distributed rate limit (preferred).
+ *
+ * Sensitive identifiers (auth / payments / admin mutations) fail closed
+ * when the Postgres RPC is unavailable — they do not silently fall back
+ * to per-isolate memory.
+ */
+export async function rateLimitAsync(
+  req: Request,
+  identifier: string,
+  options: RateLimitOptions = {},
+): Promise<RateLimitResult> {
+  const endpointConfig = ENDPOINT_LIMITS[identifier]
+  const windowMs = options.windowMs ?? endpointConfig?.windowMs ?? 60_000
+  const max = options.max ?? endpointConfig?.max ?? 60
+  const keyPrefix = options.keyPrefix ?? 'global'
+  const subject = resolveRateLimitSubject(req, options.userId)
+  const bucketKey = `${keyPrefix}:${identifier}:${subject}`
+  const failClosed = shouldFailClosed(identifier, options)
+
+  const client = options.adminClient ?? serviceClient()
+  if (client) {
+    try {
+      const { data, error } = await client.rpc('consume_rate_limit', {
+        p_key: bucketKey,
+        p_window_ms: windowMs,
+        p_max: max,
+      })
+      if (!error && data && typeof data === 'object') {
+        const row = data as {
+          allowed?: boolean
+          remaining?: number
+          reset_at?: string
+        }
+        const resetAt = row.reset_at ? Date.parse(row.reset_at) : Date.now() + windowMs
+        if (row.allowed === false) {
+          return {
+            ok: false,
+            remaining: 0,
+            resetAt,
+            response: build429(max, resetAt),
+            source: 'db',
+          }
+        }
+        return {
+          ok: true,
+          remaining: typeof row.remaining === 'number' ? row.remaining : max,
+          resetAt,
+          source: 'db',
+        }
+      }
+      console.error('rateLimitAsync: RPC failed', error?.message ?? 'no data')
+    } catch (err) {
+      console.error('rateLimitAsync: exception', err instanceof Error ? err.name : 'unknown')
+    }
+  } else {
+    console.error('rateLimitAsync: no service client available')
+  }
+
+  if (failClosed) {
+    return {
+      ok: false,
+      remaining: 0,
+      resetAt: Date.now() + 30_000,
+      response: build503Unavailable(),
+      source: 'unavailable',
+    }
+  }
+
+  // Non-sensitive identifiers only: degraded memory fallback
+  const mem = memoryConsume(memoryStore, bucketKey, windowMs, max)
+  if (!mem.ok) {
+    return {
+      ok: false,
+      remaining: 0,
+      resetAt: mem.resetAt,
+      response: build429(max, mem.resetAt),
+      source: 'memory',
+    }
+  }
+  return { ok: true, remaining: mem.remaining, resetAt: mem.resetAt, source: 'memory' }
+}
+
+/**
+ * Sync in-memory limiter retained for call sites that cannot await.
+ * Prefer rateLimitAsync. Sensitive identifiers should not use this path
+ * in production — it cannot provide distributed limits.
+ */
 export function rateLimit(
   req: Request,
   identifier: string,
   options: RateLimitOptions = {},
 ): RateLimitResult {
-  // Look up endpoint-specific limits if no options provided
-  const endpointConfig = ENDPOINT_LIMITS[identifier]
-  const { windowMs = endpointConfig?.windowMs ?? 60_000, max = endpointConfig?.max ?? 60, keyPrefix = 'global' } = options
-
-  // Use IP + identifier as key
-  // Priority: CF-Connecting-IP (Cloudflare real IP) > X-Forwarded-For > unknown
-  // When behind Cloudflare, CF-Connecting-IP is the true client IP.
-  // X-Forwarded-For may contain Cloudflare IPs which would cluster all traffic.
-  const ip = req.headers.get('cf-connecting-ip')
-    ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    ?? 'unknown'
-  const key = `${keyPrefix}:${identifier}:${ip}`
-
-  const now = Date.now()
-  const entry = store.get(key)
-
-  let count: number
-  let resetAt: number
-
-  if (!entry || entry.resetAt < now) {
-    // New window
-    count = 1
-    resetAt = now + windowMs
-    store.set(key, { count, resetAt })
-  } else if (entry.count >= max) {
-    // Rate limit exceeded
-    const retryAfter = Math.ceil((entry.resetAt - now) / 1000)
+  if (shouldFailClosed(identifier, options)) {
+    console.error('rateLimit: sync path refused for fail-closed identifier', identifier)
     return {
       ok: false,
       remaining: 0,
-      resetAt: entry.resetAt,
-      response: new Response(
-        JSON.stringify({
-          message: 'Too many requests. Please try again later.',
-          code: 'RATE_LIMITED',
-          retry_after: retryAfter,
-        }),
-        {
-          status: 429,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-            'Retry-After': String(retryAfter),
-            'X-RateLimit-Limit': String(max),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': String(Math.ceil(entry.resetAt / 1000)),
-          },
-        },
-      ),
+      resetAt: Date.now() + 30_000,
+      response: build503Unavailable(),
+      source: 'unavailable',
     }
-  } else {
-    // Within limit
-    count = entry.count + 1
-    resetAt = entry.resetAt
-    store.set(key, { count, resetAt })
   }
 
-  return {
-    ok: true,
-    remaining: max - count,
-    resetAt,
+  const endpointConfig = ENDPOINT_LIMITS[identifier]
+  const windowMs = options.windowMs ?? endpointConfig?.windowMs ?? 60_000
+  const max = options.max ?? endpointConfig?.max ?? 60
+  const keyPrefix = options.keyPrefix ?? 'global'
+  const subject = resolveRateLimitSubject(req, options.userId)
+  const bucketKey = `${keyPrefix}:${identifier}:${subject}`
+  const mem = memoryConsume(memoryStore, bucketKey, windowMs, max)
+  if (!mem.ok) {
+    return {
+      ok: false,
+      remaining: 0,
+      resetAt: mem.resetAt,
+      response: build429(max, mem.resetAt),
+      source: 'memory',
+    }
   }
+  return { ok: true, remaining: mem.remaining, resetAt: mem.resetAt, source: 'memory' }
 }
 
-/**
- * Apply standard rate limit headers to a successful response.
- */
 export function addRateLimitHeaders(
   response: Response,
   result: RateLimitResult,
@@ -174,19 +271,4 @@ export function addRateLimitHeaders(
     statusText: response.statusText,
     headers,
   })
-}
-
-/**
- * Get rate limit status for monitoring (admin only).
- */
-export function getRateLimitStats(): {
-  totalKeys: number
-  activeWindows: number
-} {
-  const now = Date.now()
-  let activeWindows = 0
-  for (const [, entry] of store) {
-    if (entry.resetAt > now) activeWindows++
-  }
-  return { totalKeys: store.size, activeWindows }
 }

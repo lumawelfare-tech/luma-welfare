@@ -1,6 +1,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import {createAdminClient, handleAdminError} from '../shared/supabase.ts'
 import { requireCronSecret } from '../shared/internal-auth.ts'
+import { buildIlikeOrFilter } from '../shared/search.ts'
 
 /**
  * Admin Exports Worker — Background job processor for queued export jobs.
@@ -210,9 +211,14 @@ async function* fetchBatch(
 
   if (filters.q) {
     if (config.resource === 'members') {
-      query = query.or(`full_name.ilike.%${filters.q}%,phone.ilike.%${filters.q}%,email.ilike.%${filters.q}%,membership_number.ilike.%${filters.q}%`)
+      const orFilter = buildIlikeOrFilter(
+        ['full_name', 'phone', 'email', 'membership_number'],
+        filters.q,
+      )
+      if (orFilter) query = query.or(orFilter)
     } else if (config.resource === 'claims') {
-      query = query.or(`claim_number.ilike.%${filters.q}%`)
+      const orFilter = buildIlikeOrFilter(['claim_number'], filters.q)
+      if (orFilter) query = query.or(orFilter)
     }
   }
 

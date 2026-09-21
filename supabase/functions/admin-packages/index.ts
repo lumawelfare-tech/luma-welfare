@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -17,6 +18,11 @@ Deno.serve(async (req) => {
       return adminSessionDeniedResponse(loaded)
     }
     const session = loaded.session
+
+    if (req.method !== 'GET') {
+      const rl = await rateLimitAsync(req, 'admin-packages-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
+    }
 
     const url = new URL(req.url)
     const resourceId = url.searchParams.get("resource_id")

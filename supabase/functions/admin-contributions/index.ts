@@ -1,6 +1,8 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { sendNotification } from '../shared/notifications.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
+import { sanitizeSearch } from '../shared/search.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -17,6 +19,11 @@ Deno.serve(async (req) => {
     }
     const session = loaded.session
 
+    if (req.method !== 'GET') {
+      const rl = await rateLimitAsync(req, 'admin-contributions-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
+    }
+
     const url = new URL(req.url)
     const resourceId = url.searchParams.get('resource_id')
     const contribId = resourceId
@@ -25,7 +32,7 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && !contribId) {
       requirePermission(session, 'contributions', 'read')
       const status = url.searchParams.get('status')
-      const q = url.searchParams.get('q')
+      const q = sanitizeSearch(url.searchParams.get('q')) || null
       const dateFrom = url.searchParams.get('date_from')
       const dateTo = url.searchParams.get('date_to')
       const packageId = url.searchParams.get('package_id')

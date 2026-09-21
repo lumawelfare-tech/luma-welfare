@@ -1,7 +1,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createAdminClient, logAudit } from '../shared/supabase.ts'
 import { sendEmail, buildOtpEmail } from '../shared/email.ts'
-import { rateLimit } from '../shared/rate-limit.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 import {
   generateOtp,
   hashOtp,
@@ -10,6 +10,7 @@ import {
   OTP_MAX_ATTEMPTS,
   RESEND_COOLDOWN_SECONDS,
   RESEND_HOURLY_LIMIT,
+  OtpConfigError,
 } from '../shared/otp.ts'
 
 /**
@@ -76,6 +77,7 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
+  try {
   if (req.method !== 'POST') {
     return json(405, { message: 'Method not allowed' })
   }
@@ -101,7 +103,7 @@ Deno.serve(async (req) => {
 
   // ── VERIFY ────────────────────────────────────────────────────────────────
   if (action === 'verify') {
-    const limit = rateLimit(req, 'auth-verify-email', { windowMs: 60_000, max: 10 })
+    const limit = await rateLimitAsync(req, 'auth-verify-email', { windowMs: 60_000, max: 10 })
     if (!limit.ok) return limit.response!
 
     const code = typeof body.code === 'string' ? body.code.replace(/\s/g, '') : ''
@@ -213,7 +215,7 @@ Deno.serve(async (req) => {
 
   // ── RESEND ────────────────────────────────────────────────────────────────
   if (action === 'resend') {
-    const limit = rateLimit(req, 'auth-verify-email-resend', { windowMs: 60_000, max: 5 })
+    const limit = await rateLimitAsync(req, 'auth-verify-email-resend', { windowMs: 60_000, max: 5 })
     if (!limit.ok) return limit.response!
 
     const { data: member } = await adminClient
@@ -364,4 +366,12 @@ Deno.serve(async (req) => {
   }
 
   return json(400, { message: 'Unknown action.', code: 'VALIDATION' })
+  } catch (err) {
+    if (err instanceof OtpConfigError) {
+      console.error('auth-verify-email: OTP configuration error')
+      return json(503, { message: 'Verification is temporarily unavailable.', code: 'OTP_CONFIG' })
+    }
+    console.error('auth-verify-email error:', err instanceof Error ? err.name : 'unknown')
+    return json(500, { message: 'Internal server error', code: 'INTERNAL' })
+  }
 })

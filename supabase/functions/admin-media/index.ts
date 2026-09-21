@@ -1,5 +1,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
+import { buildIlikeOrFilter } from '../shared/search.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 function makeStoragePath(filename: string): string {
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 50)
@@ -68,6 +70,11 @@ Deno.serve(async (req) => {
     }
     const session = loaded.session
 
+    if (req.method !== 'GET') {
+      const rl = await rateLimitAsync(req, 'admin-media-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
+    }
+
     const url = new URL(req.url)
     const resourceId = url.searchParams.get("resource_id")
     const itemId = resourceId
@@ -89,7 +96,10 @@ Deno.serve(async (req) => {
         .from('media_items')
         .select('*', { count: 'exact' })
 
-      if (q) query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,category.ilike.%${q}%`)
+      if (q) {
+        const orFilter = buildIlikeOrFilter(['title', 'description', 'category'], q)
+        if (orFilter) query = query.or(orFilter)
+      }
       if (type && type !== 'all') query = query.eq('media_type', type)
       if (status === 'published') query = query.eq('is_published', true)
       else if (status === 'draft') query = query.eq('is_published', false)
