@@ -741,7 +741,10 @@ export function AdminDashboard() {
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-gray-400">No data</div>
+                  <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center" role="status">
+                    <p className="text-sm font-medium text-gray-600">No report generation data yet</p>
+                    <p className="text-xs text-gray-400">Generated reports will appear here by month.</p>
+                  </div>
                 )}
               </div>
             </div>

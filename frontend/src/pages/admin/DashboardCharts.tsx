@@ -11,9 +11,18 @@ function formatKes(amount: number) {
 
 const PIE_COLORS = ['#6D9B3A', '#2563EB', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899', '#14B8A6']
 
+function ChartEmpty({ message }: { message: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center" role="status">
+      <p className="text-sm font-medium text-gray-600">{message}</p>
+      <p className="text-xs text-gray-400">Try another date range, or check back when activity is recorded.</p>
+    </div>
+  )
+}
+
 const ClaimsPieChart = memo(function ClaimsPieChart({ data }: { data: Record<string, number> }) {
   const entries = Object.entries(data).filter(([, v]) => v > 0)
-  if (entries.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No claims data</div>
+  if (entries.length === 0) return <ChartEmpty message="No claims data for this range" />
   const chartData = entries.map(([name, value]) => ({ name, value }))
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -31,7 +40,7 @@ const ClaimsPieChart = memo(function ClaimsPieChart({ data }: { data: Record<str
 const FUNNEL_COLORS = ['#2563EB', '#3B82F6', '#6D9B3A', '#8BC34A', '#F59E0B', '#10B981']
 
 const MembershipFunnel = memo(function MembershipFunnel({ data }: { data: DashboardData['membership_funnel'] }) {
-  if (!data || data.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No funnel data</div>
+  if (!data || data.length === 0) return <ChartEmpty message="No membership funnel data yet" />
   const maxCount = Math.max(...data.map(d => d.count))
   return (
     <div className="space-y-2">
@@ -69,7 +78,7 @@ const MembershipFunnel = memo(function MembershipFunnel({ data }: { data: Dashbo
 })
 
 const ContribChart = memo(function ContribChart({ data, onMonthClick }: { data: DashboardData['monthly_contributions']; onMonthClick: (month: string) => void }) {
-  if (data.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No contribution data</div>
+  if (data.length === 0) return <ChartEmpty message="No contribution data for this range" />
   return (
     <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }} onClick={(e: Record<string, unknown>) => {
@@ -101,7 +110,7 @@ const ContribChart = memo(function ContribChart({ data, onMonthClick }: { data: 
 })
 
 const PackageBarChart = memo(function PackageBarChart({ data }: { data: DashboardData['package_breakdown'] }) {
-  if (data.length === 0) return <div className="flex h-full items-center justify-center text-sm text-gray-400">No subscription data</div>
+  if (data.length === 0) return <ChartEmpty message="No subscription breakdown yet" />
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>

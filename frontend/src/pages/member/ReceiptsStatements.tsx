@@ -5,6 +5,7 @@ import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { SkeletonRow } from '../../components/Skeleton'
 import { reportLoadError } from '../../lib/userFacingError'
+import { maskEmail, maskPhone } from '../../lib/pii'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useHead } from '../../lib/seo'
 
@@ -169,7 +170,57 @@ function downloadPDFStatement(transactions: Transaction[], _filename: string) {
   window.open(url, '_blank')
 }
 
+function receiptMemberContact(r: ReceiptData) {
+  return {
+    email: maskEmail(r.member?.email),
+    phone: maskPhone(r.member?.phone),
+  }
+}
+
+function buildShareText(r: ReceiptData): string {
+  const { email, phone } = receiptMemberContact(r)
+  const lines = [
+    `Luma Welfare — ${r.type} Receipt`,
+    `Receipt #: ${r.number}`,
+    `Member: ${r.member?.full_name ?? '—'}`,
+    `Membership #: ${r.member?.membership_number ?? '—'}`,
+    `Email: ${email}`,
+    `Phone: ${phone}`,
+  ]
+  if (r.package) lines.push(`Package: ${r.package}`)
+  if (r.period) lines.push(`Period: ${r.period}`)
+  lines.push(`Date: ${new Date(r.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}`)
+  lines.push(`Amount: KSh ${r.amount.toLocaleString('en-KE')}`)
+  lines.push(`Status: ${r.status}`)
+  if (r.reference) lines.push(`Reference: ${r.reference}`)
+  lines.push('', 'Contact details are partially masked for privacy.')
+  return lines.join('\n')
+}
+
+async function shareReceipt(r: ReceiptData): Promise<'shared' | 'copied' | 'unavailable'> {
+  const text = buildShareText(r)
+  const title = `${r.type} Receipt ${r.number}`
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      await navigator.share({ title, text })
+      return 'shared'
+    }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return 'unavailable'
+  }
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return 'copied'
+    }
+  } catch {
+    /* fall through */
+  }
+  return 'unavailable'
+}
+
 function downloadReceiptPDF(r: ReceiptData) {
+  const { email, phone } = receiptMemberContact(r)
   const title = `${escapeHtml(r.type)} Receipt`
   const html = `<!DOCTYPE html><html><head><title>${escapeHtml(r.number)}</title>
 <style>
@@ -193,8 +244,8 @@ function downloadReceiptPDF(r: ReceiptData) {
 </div>
 <div class="field"><span class="label">Member</span><span class="value">${escapeHtml(r.member?.full_name ?? '—')}</span></div>
 <div class="field"><span class="label">Membership #</span><span class="value">${escapeHtml(r.member?.membership_number ?? '—')}</span></div>
-<div class="field"><span class="label">Email</span><span>${escapeHtml(r.member?.email ?? '—')}</span></div>
-<div class="field"><span class="label">Phone</span><span>${escapeHtml(r.member?.phone ?? '—')}</span></div>
+<div class="field"><span class="label">Email</span><span>${escapeHtml(email)}</span></div>
+<div class="field"><span class="label">Phone</span><span>${escapeHtml(phone)}</span></div>
 ${r.package ? `<div class="field"><span class="label">Package</span><span class="value">${escapeHtml(r.package)}</span></div>` : ''}
 ${r.period ? `<div class="field"><span class="label">Period</span><span>${escapeHtml(r.period)}</span></div>` : ''}
 <div class="field"><span class="label">Date</span><span>${new Date(r.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
@@ -203,7 +254,7 @@ ${r.payment_method ? `<div class="field"><span class="label">Payment Method</spa
 ${r.reference ? `<div class="field"><span class="label">Reference</span><span>${escapeHtml(r.reference)}</span></div>` : ''}
 <div class="amount">KSh ${r.amount.toLocaleString('en-KE')}</div>
 <div class="footer">
-  <p>This is a computer-generated receipt. No signature required.</p>
+  <p>This is a computer-generated receipt. Contact details are partially masked for privacy.</p>
   <p>Generated: ${new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
 </div>
 </body></html>`
@@ -239,8 +290,16 @@ export function ReceiptsStatements() {
       const d = await api<{ receipt: ReceiptData }>(`/member/receipts/receipt?id=${id}`, { auth: true })
       setReceipt(d.receipt)
     } catch (e) {
-      addToast('error', e instanceof Error ? e.message : 'Could not load receipt.')
+      addToast('error', reportLoadError(e, { page: 'member-receipt-detail' }, 'Could not load receipt.'))
     }
+  }
+
+  async function handleShare() {
+    if (!receipt) return
+    const result = await shareReceipt(receipt)
+    if (result === 'shared') addToast('success', 'Receipt shared.')
+    else if (result === 'copied') addToast('success', 'Receipt details copied (contacts masked).')
+    else addToast('error', 'Sharing is not available on this device.')
   }
 
   return (
@@ -345,8 +404,8 @@ export function ReceiptsStatements() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-gray-500">Member</span><span className="font-medium">{receipt.member?.full_name ?? '—'}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Membership #</span><span>{receipt.member?.membership_number ?? '—'}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Email</span><span>{receipt.member?.email ?? '—'}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{receipt.member?.phone ?? '—'}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Email</span><span>{maskEmail(receipt.member?.email)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{maskPhone(receipt.member?.phone)}</span></div>
               {receipt.package && <div className="flex justify-between"><span className="text-gray-500">Package</span><span className="font-medium">{receipt.package}</span></div>}
               {receipt.period && <div className="flex justify-between"><span className="text-gray-500">Period</span><span>{receipt.period}</span></div>}
               <div className="flex justify-between"><span className="text-gray-500">Date</span><span>{new Date(receipt.date).toLocaleDateString()}</span></div>
@@ -354,10 +413,12 @@ export function ReceiptsStatements() {
               <div className="flex justify-between"><span className="text-gray-500">Status</span><span className="font-semibold">{receipt.status}</span></div>
               {receipt.reference && <div className="flex justify-between"><span className="text-gray-500">Reference</span><span>{receipt.reference}</span></div>}
               {receipt.payment_method && <div className="flex justify-between"><span className="text-gray-500">Method</span><span>{receipt.payment_method}</span></div>}
+              <p className="pt-1 text-[11px] text-gray-400">Email and phone are partially masked for privacy when viewing or sharing.</p>
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end gap-2">
-              <button onClick={() => downloadReceiptPDF(receipt)} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800">Download PDF</button>
-              <button onClick={() => setReceipt(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Close</button>
+            <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={handleShare} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]">Share</button>
+              <button type="button" onClick={() => downloadReceiptPDF(receipt)} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 min-h-[44px]">Download PDF</button>
+              <button type="button" onClick={() => setReceipt(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]">Close</button>
             </div>
           </div>
         </div>
