@@ -154,6 +154,20 @@ export function Home() {
 
       <StatBar />
 
+      <MotionSection className="border-y border-luma-100/80 bg-luma-50/40 py-6" as="div">
+        <div className="container-luma text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-luma-700">
+            Standing with everyone through the Mission of Mercy
+          </p>
+          <p className="mt-2 text-sm text-gray-600">
+            Founded 2021 in Kitengela · Chairman Boss Williams ·{' '}
+            <Link to="/about" className="font-semibold text-luma-700 hover:underline">
+              Our Story
+            </Link>
+          </p>
+        </div>
+      </MotionSection>
+
       {/* What We Offer */}
       <MotionSection className="py-16 lg:py-20">
         <div className="container-luma">

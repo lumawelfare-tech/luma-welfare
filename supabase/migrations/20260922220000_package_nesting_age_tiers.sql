@@ -96,13 +96,13 @@ WHERE pt.package_id = p.id AND p.code = 'welfare' AND pt.name = 'Extended Family
 -- Mission of Mercy (parent) + three joinable sub-categories @ KSh 500
 -- Assumption (flagged in ORG_DOCS_AUDIT): each sub-category carries its own
 -- flat KSh 500 tier so members join a specific nested option.
--- Description marked DRAFT pending client wording approval.
+-- Descriptions from master document §4 / §8 (no invented benefit promises).
 -- ---------------------------------------------------------------------------
 INSERT INTO public.packages (code, name, description, coverage, waiting_period_months, is_active, sort_order)
 SELECT
   'mission_of_mercy',
   'Mission of Mercy',
-  'DRAFT: needs final description — community outreach package supporting vulnerable groups under the Mission of Mercy (KSh 500/month; 12-month waiting period). Nested sub-categories below.',
+  'Our Mission of Mercy is the heart of LUMA Welfare: to stand with everyone. It encourages compassion toward members, families, vulnerable people, children and communities. Contribution KSh 500 per month with a 12-month waiting period. Nested focus areas: Children''s Orphanage/Vulnerables, Widows, and Single Mothers. Specific benefits follow approved package schedules.',
   ARRAY['Children / orphans / vulnerables', 'Widows', 'Single mothers', 'Community outreach']::text[],
   '12',
   true,
@@ -129,7 +129,7 @@ INSERT INTO public.packages (code, name, description, coverage, waiting_period_m
 SELECT
   'mission_children',
   'Children''s Orphanage/Vulnerables',
-  'DRAFT: needs final description — Mission of Mercy sub-category for children''s orphanage and vulnerable children support.',
+  'Mission of Mercy focus area for children''s orphanage and vulnerable children support. Contribution KSh 500 per month with a 12-month waiting period. Benefits follow approved package schedules.',
   ARRAY['Children / orphans', 'Vulnerable children']::text[],
   '12',
   true,
@@ -141,7 +141,7 @@ INSERT INTO public.packages (code, name, description, coverage, waiting_period_m
 SELECT
   'mission_widows',
   'Widows',
-  'DRAFT: needs final description — Mission of Mercy sub-category for widows support.',
+  'Mission of Mercy focus area for widows support. Contribution KSh 500 per month with a 12-month waiting period. Benefits follow approved package schedules.',
   ARRAY['Widows support']::text[],
   '12',
   true,
@@ -153,7 +153,7 @@ INSERT INTO public.packages (code, name, description, coverage, waiting_period_m
 SELECT
   'mission_single_mothers',
   'Single Mothers',
-  'DRAFT: needs final description — Mission of Mercy sub-category for single mothers support.',
+  'Mission of Mercy focus area for single mothers support. Contribution KSh 500 per month with a 12-month waiting period. Benefits follow approved package schedules.',
   ARRAY['Single mothers support']::text[],
   '12',
   true,

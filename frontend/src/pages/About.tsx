@@ -80,7 +80,24 @@ export function About() {
             the future, and have access to meaningful welfare opportunities when they need them.
           </p>
           <p className="mt-4 text-sm leading-relaxed text-gray-500">
-            LUMA Welfare was founded in 2021 in Kitengela, Kenya.
+            LUMA Welfare was founded in 2021 in Kitengela, Kenya, under the leadership of Chairman
+            Boss Williams. Guiding mission: to stand with everyone through the Mission of Mercy.
+          </p>
+        </section>
+
+        <section className="glass-card mt-8 max-w-3xl p-8">
+          <h2 className="text-2xl font-bold text-gray-900">From the Chairman</h2>
+          <p className="mt-4 leading-relaxed text-gray-600">
+            LUMA Welfare began in Kitengela in 2021 with a vision of creating a community where
+            people can support one another through difficult moments. Our Mission of Mercy calls us
+            to remember the vulnerable, support families, encourage education, care about children,
+            and respond responsibly when people need help.
+          </p>
+          <p className="mt-4 text-sm font-medium text-gray-800">
+            — Boss Williams, Chairman, LUMA Welfare
+          </p>
+          <p className="mt-2 text-xs uppercase tracking-[0.12em] text-luma-700">
+            Standing with everyone through the Mission of Mercy
           </p>
         </section>
 
