@@ -12,6 +12,7 @@ import { RequireAdmin } from './components/RequireAdmin'
 import { RequirePermission } from './components/RequirePermission'
 import { RequireSuperadmin } from './components/RequireSuperadmin'
 import { SWUpdateBanner } from './components/SWUpdateBanner'
+import { PWAInstallBanner } from './components/PWAInstallBanner'
 import { SyncStatus } from './components/SyncStatus'
 
 // Public pages — loaded eagerly (small, high-traffic)
@@ -82,6 +83,7 @@ export default function App() {
           <BrowserRouter>
             <ScrollToTop />
             <SWUpdateBanner />
+            <PWAInstallBanner />
             <SyncStatus />
             <Suspense fallback={<PageLoader />}>
               <Routes>

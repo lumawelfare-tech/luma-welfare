@@ -30,6 +30,15 @@ Enable “Require status checks to pass before merging” and require:
 
 Without Supabase secrets, RLS and authenticated E2E **skip** rather than fail. Configure secrets on the repo (or environment) so those suites actually run before go-live.
 
+### Canonical repo gate (`lumawelfare-tech/luma-welfare`)
+
+CI job `🔐 Live Secrets Gate` runs only on that repository:
+
+1. **Soft mode (default):** emits a GitHub warning when any of the secrets above are empty (forks skip the job entirely).
+2. **Hard mode:** set repository variable `ENFORCE_LIVE_SECRETS=true` after secrets are populated. The gate then **fails** CI instead of allowing green-via-skip.
+
+Also add `🔐 Live Secrets Gate` to required checks once hard mode is enabled (optional while soft).
+
 ## Coverage (informational)
 
 The `🧪 Tests` job uploads Vitest coverage (`lcov`) as an artifact. It is **informational** — coverage thresholds are not enforced yet. Review the artifact on PRs that touch `frontend/src/lib`, hooks, or auth context.

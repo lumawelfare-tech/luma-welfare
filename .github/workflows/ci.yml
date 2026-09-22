@@ -33,6 +33,54 @@ env:
 
 jobs:
   # ============================================================================
+  # LIVE SECRETS GATE (canonical repo only — forks stay soft)
+  # ============================================================================
+  live-secrets-gate:
+    name: "🔐 Live Secrets Gate"
+    runs-on: ubuntu-latest
+    # Only enforce/notice on the production GitHub repo. Forks keep self-skip behavior.
+    if: github.repository == 'lumawelfare-tech/luma-welfare'
+    steps:
+      - name: Check live verification secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_MEMBER_EMAIL: ${{ secrets.E2E_MEMBER_EMAIL }}
+          E2E_MEMBER_PASSWORD: ${{ secrets.E2E_MEMBER_PASSWORD }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          # Set repo variable ENFORCE_LIVE_SECRETS=true after secrets are populated to hard-fail.
+          ENFORCE: ${{ vars.ENFORCE_LIVE_SECRETS }}
+        run: |
+          set -euo pipefail
+          MISSING=()
+          [ -z "${SUPABASE_URL:-}" ] && MISSING+=("SUPABASE_URL")
+          [ -z "${SUPABASE_ANON_KEY:-}" ] && MISSING+=("SUPABASE_ANON_KEY")
+          [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ] && MISSING+=("SUPABASE_SERVICE_ROLE_KEY")
+          [ -z "${E2E_MEMBER_EMAIL:-}" ] && MISSING+=("E2E_MEMBER_EMAIL")
+          [ -z "${E2E_MEMBER_PASSWORD:-}" ] && MISSING+=("E2E_MEMBER_PASSWORD")
+          [ -z "${E2E_ADMIN_EMAIL:-}" ] && MISSING+=("E2E_ADMIN_EMAIL")
+          [ -z "${E2E_ADMIN_PASSWORD:-}" ] && MISSING+=("E2E_ADMIN_PASSWORD")
+
+          if [ "${#MISSING[@]}" -eq 0 ]; then
+            echo "✅ Live verification secrets are configured."
+            exit 0
+          fi
+
+          echo "::warning::Missing secrets for live RLS/E2E: ${MISSING[*]}"
+          echo "RLS and authenticated E2E will self-skip until these are set on a dedicated test project."
+          echo "See docs/BRANCH_PROTECTION.md"
+          echo ""
+
+          if [ "${ENFORCE:-}" = "true" ]; then
+            echo "::error::ENFORCE_LIVE_SECRETS=true — refusing green-via-skip on lumawelfare-tech/luma-welfare."
+            exit 1
+          fi
+
+          echo "ℹ️ Soft mode: set repository variable ENFORCE_LIVE_SECRETS=true to fail CI when secrets are missing."
+
+  # ============================================================================
   # SECURITY AUDIT
   # ============================================================================
   security-audit:
@@ -425,11 +473,12 @@ jobs:
   security-summary:
     name: "📊 Security Summary"
     runs-on: ubuntu-latest
-    needs: [security-audit, typecheck, lint, test, build, e2e, edge-function-check]
+    needs: [live-secrets-gate, security-audit, typecheck, lint, test, build, e2e, edge-function-check]
     if: always()
     steps:
       - name: Check all jobs
         env:
+          LIVE_SECRETS: ${{ needs.live-secrets-gate.result }}
           SECURITY_AUDIT: ${{ needs.security-audit.result }}
           TYPECHECK: ${{ needs.typecheck.result }}
           LINT: ${{ needs.lint.result }}
@@ -444,6 +493,7 @@ jobs:
           echo ""
 
           # Normalize empty/missing results (can happen if a needed job was cancelled early).
+          LIVE_SECRETS="${LIVE_SECRETS:-missing}"
           SECURITY_AUDIT="${SECURITY_AUDIT:-missing}"
           TYPECHECK="${TYPECHECK:-missing}"
           LINT="${LINT:-missing}"
@@ -452,6 +502,7 @@ jobs:
           E2E="${E2E:-missing}"
           EDGE_CHECK="${EDGE_CHECK:-missing}"
 
+          echo "Live Secrets Gate: $LIVE_SECRETS"
           echo "Security Audit:    $SECURITY_AUDIT"
           echo "Typecheck:         $TYPECHECK"
           echo "Lint:              $LINT"
@@ -479,9 +530,9 @@ jobs:
                 FAILED=1
                 ;;
               skipped)
-                # E2E / Edge check skip on develop-only pushes (not PR); Build skips only if deps failed.
-                if [ "$name" = "E2E" ] || [ "$name" = "Edge Check" ]; then
-                  echo "⚠️  $name skipped (expected on some branch push events — required on PRs and main)"
+                # Live secrets gate skips on forks; E2E / Edge check skip on develop-only pushes.
+                if [ "$name" = "Live Secrets Gate" ] || [ "$name" = "E2E" ] || [ "$name" = "Edge Check" ]; then
+                  echo "⚠️  $name skipped (expected on forks or some branch push events)"
                 elif [ "$name" = "Build" ] && { [ "$TYPECHECK" != "success" ] || [ "$LINT" != "success" ] || [ "$TESTS" != "success" ]; }; then
                   echo "⚠️  $name skipped (upstream typecheck/lint/tests did not succeed)"
                 else
@@ -496,6 +547,7 @@ jobs:
             esac
           }
 
+          check_required "Live Secrets Gate" "$LIVE_SECRETS"
           check_required "Security Audit" "$SECURITY_AUDIT"
           check_required "Typecheck" "$TYPECHECK"
           check_required "Lint" "$LINT"
