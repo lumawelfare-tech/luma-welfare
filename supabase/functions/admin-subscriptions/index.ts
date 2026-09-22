@@ -146,6 +146,87 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ subscription: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    // DELETE /admin-subscriptions/:id — hard-delete cancelled/rejected subscription
+    if (req.method === 'DELETE' && subId) {
+      requirePermission(session, 'members', 'delete')
+      const rl = await rateLimitAsync(req, 'admin-subscriptions-mutation', { userId: session.id, adminClient })
+      if (!rl.ok) return rl.response!
+
+      const { data: sub, error: subError } = await adminClient
+        .from('subscriptions')
+        .select('id, status, member_id')
+        .eq('id', subId)
+        .maybeSingle()
+      if (subError) throw new Error(subError.message)
+      if (!sub) {
+        return new Response(JSON.stringify({ message: 'Subscription not found', code: 'NOT_FOUND' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (!['cancelled', 'rejected'].includes(sub.status)) {
+        return new Response(JSON.stringify({
+          message: 'Only cancelled or rejected subscriptions can be permanently deleted.',
+          code: 'STATUS_NOT_DELETABLE',
+        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const { count: claimCount, error: claimErr } = await adminClient
+        .from('claims')
+        .select('id', { count: 'exact', head: true })
+        .eq('subscription_id', subId)
+      if (claimErr) throw new Error(claimErr.message)
+      if ((claimCount ?? 0) > 0) {
+        return new Response(JSON.stringify({
+          message: 'Cannot permanently delete a subscription that has claims. Resolve or retain claim history first.',
+          code: 'HAS_CLAIMS',
+        }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const { count: contribCount, error: contribErr } = await adminClient
+        .from('contributions')
+        .select('id', { count: 'exact', head: true })
+        .eq('subscription_id', subId)
+      if (contribErr) throw new Error(contribErr.message)
+      if ((contribCount ?? 0) > 0) {
+        return new Response(JSON.stringify({
+          message: 'Cannot permanently delete a subscription that has contribution history. Financial records must be retained.',
+          code: 'HAS_CONTRIBUTIONS',
+        }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      // Preserve payment ledger rows; detach optional FK before hard delete
+      const { error: detachErr } = await adminClient
+        .from('payments')
+        .update({ subscription_id: null })
+        .eq('subscription_id', subId)
+      if (detachErr) throw new Error(detachErr.message)
+
+      const { error: deleteErr } = await adminClient
+        .from('subscriptions')
+        .delete()
+        .eq('id', subId)
+      if (deleteErr) {
+        return new Response(JSON.stringify({
+          message: deleteErr.message || 'Could not permanently delete subscription.',
+          code: 'DELETE_FAILED',
+        }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: 'subscription_deleted',
+        resource: 'subscription',
+        resource_id: subId,
+        meta: { member_id: sub.member_id, previous_status: sub.status },
+      })
+
+      return new Response(JSON.stringify({ ok: true, id: subId }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     return new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
     return handleAdminError(err, 'admin-subscriptions')

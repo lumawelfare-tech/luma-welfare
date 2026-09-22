@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
+import { useAuth } from '../../context/AuthContext'
+import { hasAdminPermission } from '../../lib/adminPermissions'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { BulkActionBar } from '../../components/BulkActionBar'
@@ -15,6 +17,8 @@ import { exportSubscriptionsCSV, exportSubscriptionsExcel, exportSubscriptionsPD
 import { ErrorState } from '../../components/ErrorState'
 import { SkeletonTable } from '../../components/Skeleton'
 import { reportLoadError } from '../../lib/userFacingError'
+
+const DELETABLE_SUB_STATUSES = new Set(['cancelled', 'rejected'])
 
 type Subscription = {
   id: string
@@ -69,6 +73,8 @@ const ALLOWED_SUB_STATUS = new Set(filterTabs.map((f) => f.value))
 export function AdminSubscriptions() {
   useHead('Subscriptions', undefined, { noindex: true })
   const { addToast } = useToast()
+  const { adminPermissions, isSuperadmin } = useAuth()
+  const canDeleteSubscription = hasAdminPermission(adminPermissions, isSuperadmin, 'members:delete')
   const [searchParams, setSearchParams] = useSearchParams()
   const statusFromUrl = searchParams.get('status') ?? ''
   const initialFilter = ALLOWED_SUB_STATUS.has(statusFromUrl) ? statusFromUrl : ''
@@ -100,6 +106,7 @@ export function AdminSubscriptions() {
   const [approveTarget, setApproveTarget] = useState<Subscription | null>(null)
   const [suspendTarget, setSuspendTarget] = useState<Subscription | null>(null)
   const [cancelTarget, setCancelTarget] = useState<Subscription | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Subscription | null>(null)
   const [approveReason, setApproveReason] = useState('')
   const [suspendReason, setSuspendReason] = useState('')
   const [cancelReason, setCancelReason] = useState('')
@@ -200,6 +207,26 @@ export function AdminSubscriptions() {
       await load()
     } catch (e) {
       addToast('error', e instanceof ApiError ? e.message : 'Could not cancel subscription.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function deletePermanently(sub: Subscription) {
+    setBusyId(sub.id)
+    try {
+      await api(`/admin/subscriptions/${sub.id}`, { method: 'DELETE', auth: true })
+      addToast('success', `Subscription for ${sub.members?.full_name ?? 'member'} permanently deleted.`)
+      setDeleteTarget(null)
+      setSelectedIds((prev) => {
+        if (!prev.has(sub.id)) return prev
+        const next = new Set(prev)
+        next.delete(sub.id)
+        return next
+      })
+      await load()
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not permanently delete subscription.')
     } finally {
       setBusyId(null)
     }
@@ -318,6 +345,16 @@ export function AdminSubscriptions() {
                 <button disabled={busyId === s.id} onClick={() => { setApproveTarget(s); setApproveReason('') }} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">Reactivate</button>
                 <button disabled={busyId === s.id} onClick={() => { setCancelTarget(s); setCancelReason('') }} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">Cancel</button>
               </>
+            )}
+            {canDeleteSubscription && DELETABLE_SUB_STATUSES.has(s.status) && (
+              <button
+                type="button"
+                disabled={busyId === s.id}
+                onClick={() => setDeleteTarget(s)}
+                className="rounded-lg border border-red-300 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 transition-colors"
+              >
+                Delete Permanently
+              </button>
             )}
           </div>
         )
@@ -510,6 +547,16 @@ export function AdminSubscriptions() {
                       <button disabled={busyId === s.id} onClick={() => { setCancelTarget(s); setCancelReason('') }} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Cancel</button>
                     </>
                   )}
+                  {canDeleteSubscription && DELETABLE_SUB_STATUSES.has(s.status) && (
+                    <button
+                      type="button"
+                      disabled={busyId === s.id}
+                      onClick={() => setDeleteTarget(s)}
+                      className="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                    >
+                      Delete Permanently
+                    </button>
+                  )}
                 </div>
               </div>
             )
@@ -642,6 +689,27 @@ export function AdminSubscriptions() {
                 <label className="text-xs font-medium text-gray-600">Reason (optional)</label>
                 <textarea value={bulkReason} onChange={(e) => setBulkReason(e.target.value)} placeholder="e.g. Non-payment, policy violation…" rows={2} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500 resize-none" aria-label="Bulk action reason" />
               </div>
+            )}
+          </>
+        }
+      />
+
+      {/* Delete Permanently Confirm Dialog */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete Permanently"
+        variant="danger"
+        confirmLabel="Delete Permanently"
+        loading={deleteTarget !== null && busyId === deleteTarget.id}
+        onConfirm={() => deleteTarget && deletePermanently(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+        message={
+          <>
+            <p>Are you sure you want to permanently delete this subscription? This action cannot be undone.</p>
+            {deleteTarget && (
+              <p className="mt-2 text-sm text-gray-600">
+                {deleteTarget.members?.full_name ?? 'Member'} · {deleteTarget.packages?.name ?? 'package'} ({deleteTarget.status})
+              </p>
             )}
           </>
         }
