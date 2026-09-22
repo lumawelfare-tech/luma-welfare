@@ -79,6 +79,9 @@ export function About() {
             Our vision is simple: to build a community where members support one another, plan for
             the future, and have access to meaningful welfare opportunities when they need them.
           </p>
+          <p className="mt-4 text-sm leading-relaxed text-gray-500">
+            LUMA Welfare was founded in 2021 in Kitengela, Kenya.
+          </p>
         </section>
 
         <section className="glass-card mt-8 max-w-3xl p-8">

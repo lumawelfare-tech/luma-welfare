@@ -36,6 +36,8 @@ type Claim = {
   checklist_membership_ok?: boolean
   checklist_contributions_ok?: boolean
   checklist_completed_at?: string | null
+  eligibility_verified_by?: string | null
+  contributions_verified_by?: string | null
 }
 
 type ClaimDocument = {
@@ -56,7 +58,13 @@ type ClaimPayout = {
 }
 
 function checklistReady(c: Claim | null | undefined): boolean {
-  return Boolean(c?.checklist_docs_ok && c?.checklist_membership_ok && c?.checklist_contributions_ok)
+  return Boolean(
+    c?.checklist_docs_ok &&
+      c?.checklist_membership_ok &&
+      c?.checklist_contributions_ok &&
+      c?.eligibility_verified_by?.trim() &&
+      c?.contributions_verified_by?.trim(),
+  )
 }
 
 function isReviewable(status: string): boolean {
@@ -107,6 +115,8 @@ export function AdminClaims() {
   const [payouts, setPayouts] = useState<ClaimPayout[]>([])
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [checklistBusy, setChecklistBusy] = useState(false)
+  const [eligibilityBy, setEligibilityBy] = useState('')
+  const [contributionsBy, setContributionsBy] = useState('')
 
   // Dialogs
   const [approveTarget, setApproveTarget] = useState<Claim | null>(null)
@@ -233,12 +243,16 @@ export function AdminClaims() {
 
   async function viewDetail(claim: Claim) {
     setDetail(claim)
+    setEligibilityBy(claim.eligibility_verified_by ?? '')
+    setContributionsBy(claim.contributions_verified_by ?? '')
     setDocuments([])
     setPayouts([])
     setLoadingDetail(true)
     try {
       const d = await api<{ claim: Claim; documents: ClaimDocument[]; payouts?: ClaimPayout[] }>(`/admin/claims/${claim.id}`, { auth: true })
       setDetail(d.claim)
+      setEligibilityBy(d.claim.eligibility_verified_by ?? '')
+      setContributionsBy(d.claim.contributions_verified_by ?? '')
       setDocuments(d.documents ?? [])
       setPayouts(d.payouts ?? [])
     } catch {
@@ -248,16 +262,26 @@ export function AdminClaims() {
     }
   }
 
-  async function updateChecklist(field: 'checklistDocsOk' | 'checklistMembershipOk' | 'checklistContributionsOk', value: boolean) {
+  async function updateChecklist(
+    field: 'checklistDocsOk' | 'checklistMembershipOk' | 'checklistContributionsOk',
+    value: boolean,
+  ) {
     if (!detail) return
     setChecklistBusy(true)
     try {
       const d = await api<{ claim: Claim }>(`/admin/claims/${detail.id}`, {
         method: 'PATCH',
         auth: true,
-        body: { action: 'checklist', [field]: value },
+        body: {
+          action: 'checklist',
+          [field]: value,
+          eligibilityVerifiedBy: eligibilityBy.trim() || undefined,
+          contributionsVerifiedBy: contributionsBy.trim() || undefined,
+        },
       })
       setDetail(d.claim)
+      setEligibilityBy(d.claim.eligibility_verified_by ?? '')
+      setContributionsBy(d.claim.contributions_verified_by ?? '')
       await load(page)
     } catch (e) {
       addToast('error', e instanceof ApiError ? e.message : 'Could not update checklist.')
@@ -266,9 +290,33 @@ export function AdminClaims() {
     }
   }
 
+  async function saveVerifierNames() {
+    if (!detail) return
+    setChecklistBusy(true)
+    try {
+      const d = await api<{ claim: Claim }>(`/admin/claims/${detail.id}`, {
+        method: 'PATCH',
+        auth: true,
+        body: {
+          action: 'checklist',
+          eligibilityVerifiedBy: eligibilityBy.trim() || undefined,
+          contributionsVerifiedBy: contributionsBy.trim() || undefined,
+        },
+      })
+      setDetail(d.claim)
+      setEligibilityBy(d.claim.eligibility_verified_by ?? '')
+      setContributionsBy(d.claim.contributions_verified_by ?? '')
+      addToast('success', 'Officer verification names saved.')
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not save officer names.')
+    } finally {
+      setChecklistBusy(false)
+    }
+  }
+
   function openApprove(claim: Claim) {
     if (!checklistReady(claim)) {
-      addToast('warning', 'Complete the review checklist (documents, membership, contributions) before approving.')
+      addToast('warning', 'Complete the review checklist and officer names before approving.')
       return
     }
     setApproveTarget(claim)
@@ -763,12 +811,14 @@ export function AdminClaims() {
               {isReviewable(detail.status) && (
                 <div className="rounded-lg border border-gray-200 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Review checklist</p>
-                  <p className="mt-1 text-xs text-gray-500">Confirm documents, membership, and contributions before approving.</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Confirm documents, membership, and contributions. Record officer names for eligibility and contribution status (paper-form parity).
+                  </p>
                   <ul className="mt-3 space-y-2">
                     {(
                       [
                         { key: 'checklistDocsOk' as const, label: 'Documents verified', checked: Boolean(detail.checklist_docs_ok) },
-                        { key: 'checklistMembershipOk' as const, label: 'Membership verified', checked: Boolean(detail.checklist_membership_ok) },
+                        { key: 'checklistMembershipOk' as const, label: 'Membership / eligibility verified', checked: Boolean(detail.checklist_membership_ok) },
                         { key: 'checklistContributionsOk' as const, label: 'Contributions verified', checked: Boolean(detail.checklist_contributions_ok) },
                       ]
                     ).map((item) => (
@@ -785,8 +835,61 @@ export function AdminClaims() {
                       </li>
                     ))}
                   </ul>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600" htmlFor="eligibility-verified-by">
+                        Eligibility verified by
+                      </label>
+                      <input
+                        id="eligibility-verified-by"
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500"
+                        value={eligibilityBy}
+                        disabled={checklistBusy || !detail.checklist_membership_ok}
+                        onChange={(e) => setEligibilityBy(e.target.value)}
+                        placeholder="Officer name"
+                        maxLength={120}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600" htmlFor="contributions-verified-by">
+                        Contribution status verified by
+                      </label>
+                      <input
+                        id="contributions-verified-by"
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500"
+                        value={contributionsBy}
+                        disabled={checklistBusy || !detail.checklist_contributions_ok}
+                        onChange={(e) => setContributionsBy(e.target.value)}
+                        placeholder="Officer name"
+                        maxLength={120}
+                      />
+                    </div>
+                  </div>
+                  {(detail.checklist_membership_ok || detail.checklist_contributions_ok) && (
+                    <button
+                      type="button"
+                      disabled={checklistBusy}
+                      onClick={() => void saveVerifierNames()}
+                      className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Save officer names
+                    </button>
+                  )}
                   {!checklistReady(detail) && (
-                    <p className="mt-2 text-xs text-amber-700">Approve stays disabled until all three checks are complete.</p>
+                    <p className="mt-2 text-xs text-amber-700">
+                      Approve stays disabled until all three checks and both officer names are complete.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {!isReviewable(detail.status) && (detail.eligibility_verified_by || detail.contributions_verified_by) && (
+                <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                  {detail.eligibility_verified_by && (
+                    <p>Eligibility verified by: <span className="font-medium text-gray-800">{detail.eligibility_verified_by}</span></p>
+                  )}
+                  {detail.contributions_verified_by && (
+                    <p className="mt-1">Contribution status verified by: <span className="font-medium text-gray-800">{detail.contributions_verified_by}</span></p>
                   )}
                 </div>
               )}

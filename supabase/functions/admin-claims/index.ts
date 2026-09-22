@@ -5,13 +5,29 @@ import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
 import { withSignedClaimDocumentUrls } from '../shared/storage-signed.ts'
 
-/** Claim review checklist complete when all three ops stages are true. */
+/** Claim review checklist complete when all three ops stages are true and named officers recorded. */
 function checklistComplete(c: {
   checklist_docs_ok?: boolean | null
   checklist_membership_ok?: boolean | null
   checklist_contributions_ok?: boolean | null
+  eligibility_verified_by?: string | null
+  contributions_verified_by?: string | null
 }): boolean {
-  return Boolean(c.checklist_docs_ok && c.checklist_membership_ok && c.checklist_contributions_ok)
+  return Boolean(
+    c.checklist_docs_ok &&
+      c.checklist_membership_ok &&
+      c.checklist_contributions_ok &&
+      typeof c.eligibility_verified_by === 'string' &&
+      c.eligibility_verified_by.trim() &&
+      typeof c.contributions_verified_by === 'string' &&
+      c.contributions_verified_by.trim(),
+  )
+}
+
+function sanitizeOfficerName(raw: unknown, fallback: string): string {
+  const fromBody = typeof raw === 'string' ? raw.trim() : ''
+  const name = (fromBody || fallback).trim().slice(0, 120)
+  return name
 }
 
 function sanitizeText(input: unknown, max: number): string {
@@ -201,7 +217,7 @@ Deno.serve(async (req) => {
         requirePermission(session, 'claims', 'approve')
         const { data: existing, error: loadErr } = await adminClient
           .from('claims')
-          .select('id, status, checklist_docs_ok, checklist_membership_ok, checklist_contributions_ok')
+          .select('id, status, checklist_docs_ok, checklist_membership_ok, checklist_contributions_ok, eligibility_verified_by, contributions_verified_by')
           .eq('id', claimId)
           .maybeSingle()
         if (loadErr) throw new Error(loadErr.message)
@@ -222,12 +238,51 @@ Deno.serve(async (req) => {
         const docsOk = typeof body.checklistDocsOk === 'boolean' ? body.checklistDocsOk : existing.checklist_docs_ok
         const membershipOk = typeof body.checklistMembershipOk === 'boolean' ? body.checklistMembershipOk : existing.checklist_membership_ok
         const contributionsOk = typeof body.checklistContributionsOk === 'boolean' ? body.checklistContributionsOk : existing.checklist_contributions_ok
-        const complete = Boolean(docsOk && membershipOk && contributionsOk)
+
+        const eligibilityVerifiedBy = membershipOk
+          ? sanitizeOfficerName(
+            body.eligibilityVerifiedBy ?? existing.eligibility_verified_by,
+            session.display_name,
+          )
+          : null
+        const contributionsVerifiedBy = contributionsOk
+          ? sanitizeOfficerName(
+            body.contributionsVerifiedBy ?? existing.contributions_verified_by,
+            session.display_name,
+          )
+          : null
+
+        if (membershipOk && !eligibilityVerifiedBy) {
+          return new Response(JSON.stringify({
+            message: 'Eligibility verified by (officer name) is required when membership is checked.',
+            code: 'VALIDATION',
+          }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        if (contributionsOk && !contributionsVerifiedBy) {
+          return new Response(JSON.stringify({
+            message: 'Contribution status verified by (officer name) is required when contributions are checked.',
+            code: 'VALIDATION',
+          }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        const complete = checklistComplete({
+          checklist_docs_ok: docsOk,
+          checklist_membership_ok: membershipOk,
+          checklist_contributions_ok: contributionsOk,
+          eligibility_verified_by: eligibilityVerifiedBy,
+          contributions_verified_by: contributionsVerifiedBy,
+        })
         const now = new Date().toISOString()
         const updates: Record<string, unknown> = {
           checklist_docs_ok: docsOk,
           checklist_membership_ok: membershipOk,
           checklist_contributions_ok: contributionsOk,
+          eligibility_verified_by: eligibilityVerifiedBy,
+          contributions_verified_by: contributionsVerifiedBy,
           checklist_updated_by: session.id,
           checklist_completed_at: complete ? now : null,
           reviewed_at: now,
@@ -251,7 +306,14 @@ Deno.serve(async (req) => {
           action: 'claim_checklist_updated',
           resource: 'claim',
           resource_id: claimId,
-          meta: { docsOk, membershipOk, contributionsOk, complete },
+          meta: {
+            docsOk,
+            membershipOk,
+            contributionsOk,
+            complete,
+            eligibilityVerifiedBy,
+            contributionsVerifiedBy,
+          },
         })
 
         return new Response(JSON.stringify({ claim: data }), {
@@ -373,7 +435,7 @@ Deno.serve(async (req) => {
 
       const { data: current, error: curErr } = await adminClient
         .from('claims')
-        .select('id, status, checklist_docs_ok, checklist_membership_ok, checklist_contributions_ok, claim_number, member_id')
+        .select('id, status, checklist_docs_ok, checklist_membership_ok, checklist_contributions_ok, eligibility_verified_by, contributions_verified_by, claim_number, member_id')
         .eq('id', claimId)
         .maybeSingle()
       if (curErr) throw new Error(curErr.message)
@@ -385,7 +447,7 @@ Deno.serve(async (req) => {
 
       if (decision === 'approve' && !checklistComplete(current)) {
         return new Response(JSON.stringify({
-          message: 'Complete the review checklist (documents, membership, contributions) before approving.',
+          message: 'Complete the review checklist (documents, membership, contributions) and record officer names before approving.',
           code: 'CHECKLIST_INCOMPLETE',
         }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
