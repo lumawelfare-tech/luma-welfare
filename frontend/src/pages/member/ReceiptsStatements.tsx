@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { useToast } from '../../components/Toast'
 import { EmptyState } from '../../components/EmptyState'
+import { ErrorState } from '../../components/ErrorState'
 import { SkeletonRow } from '../../components/Skeleton'
+import { reportLoadError } from '../../lib/userFacingError'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useHead } from '../../lib/seo'
 
@@ -224,7 +226,7 @@ export function ReceiptsStatements() {
   useEffect(() => {
     api<{ transactions: Transaction[] }>('/member/receipts/transactions', { auth: true })
       .then((d) => setTransactions(d.transactions ?? []))
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(reportLoadError(e, { page: 'member-receipts' }, 'Could not load transactions.')))
       .finally(() => setLoading(false))
   }, [])
 
@@ -270,7 +272,21 @@ export function ReceiptsStatements() {
           {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
         </div>
       )}
-      {error && <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div className="mt-4">
+          <ErrorState
+            message={error}
+            onRetry={() => {
+              setError(null)
+              setLoading(true)
+              api<{ transactions: Transaction[] }>('/member/receipts/transactions', { auth: true })
+                .then((d) => setTransactions(d.transactions ?? []))
+                .catch((e) => setError(reportLoadError(e, { page: 'member-receipts' }, 'Could not load transactions.')))
+                .finally(() => setLoading(false))
+            }}
+          />
+        </div>
+      )}
 
       {!loading && !error && (
         <div className="mt-6 overflow-x-auto glass-panel">

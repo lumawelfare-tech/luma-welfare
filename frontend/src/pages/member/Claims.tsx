@@ -8,6 +8,7 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { useHead } from '../../lib/seo'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type Subscription = { id: string; status: string; packages: { code: string; name: string }[]; qualification?: { status: string } | null }
 type Claim = {
@@ -87,7 +88,7 @@ export function Claims() {
       setSubscriptions((me.subscriptions ?? []).filter((s: Subscription) => s.status === 'active'))
       setClaims(claimsData.claims ?? [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load claims.')
+      setError(reportLoadError(e, { page: 'member-claims' }, 'Could not load claims.'))
     } finally {
       setLoading(false)
     }

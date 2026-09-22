@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useHead } from '../../lib/seo'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState } from '../../components/ErrorState'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type Notification = {
   id: string
@@ -26,7 +29,7 @@ export function Notifications() {
       const d = await api<{ notifications: Notification[] }>('/member/notifications', { auth: true })
       setNotifications(d.notifications ?? [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load notifications.')
+      setError(reportLoadError(e, { page: 'member-notifications' }, 'Could not load notifications.'))
     } finally {
       setLoading(false)
     }
@@ -144,24 +147,21 @@ export function Notifications() {
       )}
 
       {error && !loading && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2" role="alert">
-          <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-          <span className="flex-1">{error}</span>
-          <button onClick={() => { setError(null); setLoading(true); load() }} className="font-medium underline flex-shrink-0">Retry</button>
+        <div className="mt-6">
+          <ErrorState
+            message={error}
+            onRetry={() => { setError(null); setLoading(true); load() }}
+          />
         </div>
       )}
 
       {!loading && !error && notifications.length === 0 && (
-        <div className="mt-12 glass-panel p-12 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-luma-50 text-luma-400">
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-            </svg>
-          </div>
-          <h2 className="mt-4 text-lg font-semibold text-gray-900">You're all caught up!</h2>
-          <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
-            When there are updates about your contributions, claims, or membership, they'll appear here.
-          </p>
+        <div className="mt-12">
+          <EmptyState
+            icon="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
+            title="You're all caught up!"
+            message="When there are updates about your contributions, claims, or membership, they'll appear here."
+          />
         </div>
       )}
 

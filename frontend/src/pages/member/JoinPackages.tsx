@@ -7,6 +7,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { StatusBadge } from '../../components/StatusBadge'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type Tier = { id: string; name: string; amount: number }
 type Package = {
@@ -47,7 +48,7 @@ export function JoinPackages() {
         setPackages(pkgData.packages ?? [])
         setMine(meData.subscriptions ?? [])
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load packages.'))
+      .catch((e) => setError(reportLoadError(e, { page: 'member-join-packages' }, 'Could not load packages.')))
       .finally(() => setLoading(false))
   }, [])
 

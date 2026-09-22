@@ -4,7 +4,9 @@ import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/EmptyState'
+import { ErrorState } from '../../components/ErrorState'
 import { SkeletonCard } from '../../components/Skeleton'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type RuleMap = Record<string, unknown>
 type Tier = { id: string; name: string; amount: number }
@@ -49,7 +51,7 @@ export function AdminPackages() {
       }
       setEditing(defaults)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load packages.')
+      setError(reportLoadError(e, { page: 'admin-packages' }, 'Could not load packages.'))
     } finally {
       setLoading(false)
     }
@@ -139,7 +141,14 @@ export function AdminPackages() {
         </form>
       )}
 
-      {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && !loading && (
+        <div className="mt-4">
+          <ErrorState
+            message={error}
+            onRetry={() => { setError(null); setLoading(true); load() }}
+          />
+        </div>
+      )}
 
       {loading ? (
         <div className="mt-6 space-y-4">

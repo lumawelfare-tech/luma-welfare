@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState } from '../../components/ErrorState'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type FamilyMember = { id: string; full_name: string; relationship: string; id_number: string | null; tier: 'nuclear' | 'extended' }
 
@@ -9,6 +12,7 @@ export function Family() {
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [form, setForm] = useState({ full_name: '', relationship: 'spouse', tier: 'nuclear', id_number: '' })
   const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -16,8 +20,9 @@ export function Family() {
     try {
       const d = await api<{ family_members: FamilyMember[] }>('/member/family', { auth: true })
       setMembers(d.family_members ?? [])
+      setLoadError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load family members.')
+      setLoadError(reportLoadError(e, { page: 'member-family' }, 'Could not load family members.'))
     } finally {
       setLoading(false)
     }
@@ -99,10 +104,18 @@ export function Family() {
             </div>
           )}
 
-          {!loading && members.length === 0 && (
-            <div className="glass-panel p-10 text-center">
-              <p className="text-sm text-gray-500">No family members registered yet.</p>
-            </div>
+          {loadError && !loading && (
+            <ErrorState
+              message={loadError}
+              onRetry={() => { setLoadError(null); setLoading(true); load() }}
+            />
+          )}
+
+          {!loading && !loadError && members.length === 0 && (
+            <EmptyState
+              title="No family members yet"
+              message="No family members registered yet."
+            />
           )}
 
           <div className="grid gap-3 sm:grid-cols-2">

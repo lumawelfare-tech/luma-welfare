@@ -8,6 +8,7 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { useHead } from '../../lib/seo'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type Subscription = { id: string; status: string; packages: { code: string; name: string }[]; package_tiers: { name: string; amount: number }[] }
 type Contribution = { id: string; subscription_id: string; period: string; amount: number; status: string; packages: { code: string; name: string }[]; created_at: string; notes?: string | null }
@@ -78,7 +79,7 @@ export function Contributions() {
         }
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load contributions.')
+      setError(reportLoadError(e, { page: 'member-contributions' }, 'Could not load contributions.'))
     } finally {
       setLoading(false)
       setPageLoading(false)

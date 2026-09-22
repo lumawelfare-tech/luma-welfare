@@ -5,6 +5,9 @@ import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { ErrorState } from '../../components/ErrorState'
+import { SkeletonTable } from '../../components/Skeleton'
+import { reportLoadError } from '../../lib/userFacingError'
 
 /** Must match server SUPERADMIN_GRANT_CONFIRM in shared/validate.ts */
 const SUPERADMIN_GRANT_CONFIRM = 'GRANT SUPERADMIN'
@@ -88,7 +91,7 @@ export function AdminStaffRoles() {
     try {
       await Promise.all([loadRoles(), loadStaff(), loadHistory()])
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load staff roles.')
+      setError(reportLoadError(e, { page: 'admin-staff-roles' }, 'Could not load staff roles.'))
     } finally {
       setLoading(false)
     }
@@ -200,8 +203,8 @@ export function AdminStaffRoles() {
       </div>
 
       {error && (
-        <div role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div className="mt-4">
+          <ErrorState message={error} onRetry={refresh} />
         </div>
       )}
 
@@ -345,7 +348,9 @@ export function AdminStaffRoles() {
           <div>
             <h2 className="text-base font-semibold text-gray-900">Current staff</h2>
             {loading ? (
-              <p className="mt-3 text-sm text-gray-500">Loading…</p>
+              <div className="mt-3">
+                <SkeletonTable rows={5} />
+              </div>
             ) : staff.length === 0 ? (
               <p className="mt-3 text-sm text-gray-500">No staff assignments.</p>
             ) : (

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { api, ApiError } from '../../lib/api'
+import { api } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { ErrorState } from '../../components/ErrorState'
+import { SkeletonTable } from '../../components/Skeleton'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type AuditLog = {
   id: string
@@ -48,7 +51,7 @@ export function AdminAuditLogs() {
       setTotalPages(d.pages ?? 1)
       if (d.actions) setUniqueActions(d.actions)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load audit logs.')
+      setError(reportLoadError(e, { page: 'admin-audit-logs' }, 'Could not load audit logs.'))
     } finally {
       setLoading(false)
     }
@@ -81,7 +84,11 @@ export function AdminAuditLogs() {
         <p className="mt-1 text-sm text-gray-500">Immutable record of administrative actions.</p>
       </div>
 
-      {error && <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div className="mt-4">
+          <ErrorState message={error} onRetry={() => { setLoading(true); load() }} />
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -107,13 +114,7 @@ export function AdminAuditLogs() {
       {/* Table */}
       <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <svg className="h-6 w-6 animate-spin text-luma-600" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <span className="ml-3 text-sm text-gray-500">Loading audit logs…</span>
-          </div>
+          <SkeletonTable rows={5} />
         ) : (
           <>
             <table className="w-full text-sm">

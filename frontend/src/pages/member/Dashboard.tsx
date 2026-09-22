@@ -14,6 +14,8 @@ import {
   usePaymentTracker,
   type PaymentUiStatus,
 } from '../../hooks/usePaymentTracker'
+import { ErrorState } from '../../components/ErrorState'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type Qualification = {
   status: 'eligible' | 'not_eligible' | 'at_risk' | 'revoked'
@@ -197,7 +199,7 @@ export function Dashboard() {
       setRecentPayments(dashboard.recent_payments ?? [])
       setNotifications((notifData.notifications ?? []).slice(0, 3))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load dashboard.')
+      setError(reportLoadError(e, { page: 'member-dashboard' }, 'Could not load your membership information.'))
     } finally {
       setLoading(false)
       setRegistrationFeeLoading(false)
@@ -418,7 +420,7 @@ export function Dashboard() {
   // Show registration fee prompt if not paid
   if (!loading && !registrationFeeLoading && registrationFeePaid === false) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-8 max-w-6xl mx-auto">
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-600">
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -555,7 +557,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
+    <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-8 max-w-6xl mx-auto">
       {/* Welcome */}
       <PageHeader
         title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, ${memberName}`}
@@ -709,19 +711,10 @@ export function Dashboard() {
 
       {/* Error */}
       {error && !loading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-          <p className="text-sm text-red-700">
-            {error.includes('Failed to fetch') || error.includes('Unable to reach')
-              ? 'Unable to reach the server. Check your connection and try again.'
-              : "We couldn't load your membership information."}
-          </p>
-          {error && !error.includes('Failed to fetch') && !error.includes('Unable to reach') && (
-            <p className="mt-1 text-xs text-red-600/80">{error}</p>
-          )}
-          <button onClick={() => { setError(null); setLoading(true); setRegistrationFeeLoading(true); loadDashboard() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 transition-colors min-h-[44px]">
-            Try Again
-          </button>
-        </div>
+        <ErrorState
+          message={error}
+          onRetry={() => { setError(null); setLoading(true); setRegistrationFeeLoading(true); loadDashboard() }}
+        />
       )}
 
       {/* Empty state */}
@@ -787,7 +780,7 @@ export function Dashboard() {
           )}
 
           {/* Summary stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
             <div className="glass-panel p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-luma-50 text-luma-600 flex-shrink-0">
@@ -835,21 +828,21 @@ export function Dashboard() {
           </div>
 
           {/* Two-column layout: Packages + Recent Activity */}
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
             {/* Package cards — 2 columns */}
             <div className="lg:col-span-2">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Your Packages</h2>
                 <Link to="/join" className="text-sm font-medium text-luma-600 hover:text-luma-700 hover:underline">
                   + Join a package
                 </Link>
               </div>
-              <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid gap-4 sm:gap-5 sm:grid-cols-2">
                 {cards.map((card) => {
                   const sc = statusConfig(card)
                   const pct = progressPercent(card)
                   return (
-                    <div key={card.subscription_id} className="glass-panel p-5 transition-shadow hover:shadow-md">
+                    <div key={card.subscription_id} className="glass-panel p-4 sm:p-5 transition-shadow hover:shadow-md">
                       {/* Header */}
                       <div className="flex items-start justify-between gap-3">
                         <div>

@@ -4,6 +4,9 @@ import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { DataTable, type Column } from '../../components/DataTable'
 import { StatusBadge } from '../../components/StatusBadge'
+import { ErrorState } from '../../components/ErrorState'
+import { SkeletonTable } from '../../components/Skeleton'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type RegistrationFee = {
   id: string
@@ -40,7 +43,7 @@ export function AdminRegistrationFees() {
       const d = await api<{ pending_fees: RegistrationFee[] }>(url, { auth: true })
       setFees(d.pending_fees ?? [])
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load registration fees.')
+      setError(reportLoadError(e, { page: 'admin-registration-fees' }, 'Could not load registration fees.'))
     } finally {
       setLoading(false)
     }
@@ -145,16 +148,16 @@ export function AdminRegistrationFees() {
         ))}
       </div>
 
-      {error && <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div className="mt-4">
+          <ErrorState message={error} onRetry={() => { setLoading(true); load() }} />
+        </div>
+      )}
 
       {/* Fees Table */}
       {loading ? (
-        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-12 text-center">
-          <svg className="mx-auto h-6 w-6 animate-spin text-luma-600" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <p className="mt-3 text-sm text-gray-500">Loading registration fees…</p>
+        <div className="mt-6">
+          <SkeletonTable rows={5} />
         </div>
       ) : (
         <div className="mt-6">

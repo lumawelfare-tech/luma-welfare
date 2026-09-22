@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { api } from '../../lib/api'
 import { useHead } from '../../lib/seo'
 import { isPushSupported, requestPushPermission, subscribeToPush, unsubscribeFromPush, isPushSubscribed } from '../../lib/push'
+import { ErrorState } from '../../components/ErrorState'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type Prefs = {
   email_enabled: boolean
@@ -59,6 +61,7 @@ export function NotificationPreferences() {
   useHead('Notification Preferences', undefined, { noindex: true })
   const [prefs, setPrefs] = useState<Prefs>({ email_enabled: true, sms_enabled: true, in_app_enabled: true, push_enabled: true })
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -66,17 +69,27 @@ export function NotificationPreferences() {
   const [pushSubscribed, setPushSubscribed] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
 
+  const loadPrefs = useCallback(async () => {
+    setLoadError(null)
+    setLoading(true)
+    try {
+      const d = await api<{ preferences: Prefs }>('/member/notification-prefs', { auth: true })
+      setPrefs(d.preferences)
+    } catch (e) {
+      setLoadError(reportLoadError(e, { page: 'notification-preferences' }, 'Could not load preferences.'))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
-    api<{ preferences: Prefs }>('/member/notification-prefs', { auth: true })
-      .then((d) => setPrefs(d.preferences))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
+    loadPrefs()
 
     // Check push subscription status
     if (pushSupported) {
       isPushSubscribed().then(setPushSubscribed)
     }
-  }, [pushSupported])
+  }, [pushSupported, loadPrefs])
 
   async function toggleChannel(key: keyof Prefs) {
     if (key === 'in_app_enabled') return // Cannot disable in-app
@@ -181,6 +194,14 @@ export function NotificationPreferences() {
             <div key={i} className="h-20 rounded-xl luma-skeleton" />
           ))}
         </div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-2xl mx-auto">
+        <ErrorState message={loadError} onRetry={loadPrefs} />
       </div>
     )
   }

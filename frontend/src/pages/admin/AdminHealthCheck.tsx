@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api } from '../../lib/api'
 import { useHead } from '../../lib/seo'
+import { ErrorState } from '../../components/ErrorState'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type HealthCheck = {
   id: string
@@ -163,7 +165,7 @@ export function AdminHealthCheck() {
       setData(d)
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load health check history.')
+      setError(reportLoadError(e, { page: 'admin-health-check' }, 'Could not load health check history.'))
     } finally {
       setLoading(false)
     }
@@ -204,7 +206,12 @@ export function AdminHealthCheck() {
       </div>
 
       {error && (
-        <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="mt-4">
+          <ErrorState
+            message={error}
+            onRetry={() => { setLoading(true); fetchData() }}
+          />
+        </div>
       )}
 
       {/* Summary Cards */}

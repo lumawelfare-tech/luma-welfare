@@ -12,6 +12,9 @@ import { SearchInput } from '../../components/SearchInput'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { exportClaimRecordsCSV, exportClaimRecordsExcel, exportClaimRecordsPDF, type ClaimRecord } from '../../lib/exports'
+import { ErrorState } from '../../components/ErrorState'
+import { SkeletonTable } from '../../components/Skeleton'
+import { reportLoadError } from '../../lib/userFacingError'
 
 type Claim = {
   id: string
@@ -109,7 +112,7 @@ export function AdminClaims() {
       setTotalPages(d.pages ?? 1)
       setPage(d.page ?? pageNum)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load claims.')
+      setError(reportLoadError(e, { page: 'admin-claims' }, 'Could not load claims.'))
     } finally {
       setLoading(false)
     }
@@ -481,17 +484,13 @@ export function AdminClaims() {
         </fieldset>
       </FilterDrawer>
 
-      {error && <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <ErrorState message={error} onRetry={() => { setLoading(true); load(page) }} />
+      )}
 
       {/* Claims Table */}
       {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
-          <svg className="mx-auto h-6 w-6 animate-spin text-luma-600" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <p className="mt-3 text-sm text-gray-500">Loading claims…</p>
-        </div>
+        <SkeletonTable rows={5} />
       ) : (
         <DataTable
           data={claims as unknown as Record<string, unknown>[]}

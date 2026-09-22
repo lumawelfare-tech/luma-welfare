@@ -18,6 +18,8 @@ import {
 import type { DashboardData, DatePreset } from './Dashboard.types'
 import { ClaimsPieChart, MembershipFunnel, ContribChart, PackageBarChart } from './DashboardCharts'
 import { StatusBadge } from '../../components/StatusBadge'
+import { ErrorState } from '../../components/ErrorState'
+import { reportLoadError } from '../../lib/userFacingError'
 
 const REFRESH_INTERVAL = 30_000 // 30 seconds
 
@@ -183,7 +185,7 @@ export function AdminDashboard() {
       }
     } catch (e) {
       if (!mountedRef.current) return
-      setError(e instanceof Error ? e.message : 'Could not load dashboard.')
+      setError(reportLoadError(e, { page: 'admin-dashboard' }, 'Could not load dashboard.'))
     } finally {
       if (mountedRef.current) {
         setLoading(false)
@@ -271,21 +273,8 @@ export function AdminDashboard() {
 
   if (error && !data) {
     return (
-      <div className="container-luma py-16 text-center">
-        <div className="mx-auto max-w-md rounded-3xl border border-red-200 bg-red-50 p-8">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-            <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-            </svg>
-          </div>
-          <p className="mt-4 text-lg font-bold text-red-700">Unable to load dashboard</p>
-          <p className="mt-2 text-sm text-gray-600">
-            {error}. If you are an admin, make sure your account is in the admins table.
-          </p>
-          <button onClick={() => fetchData()} className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors">
-            Try Again
-          </button>
-        </div>
+      <div className="container-luma py-16">
+        <ErrorState message={error} onRetry={() => fetchData()} />
       </div>
     )
   }

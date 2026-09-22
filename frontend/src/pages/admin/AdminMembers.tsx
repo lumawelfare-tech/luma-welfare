@@ -16,6 +16,9 @@ import { SearchInput } from '../../components/SearchInput'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { exportMemberRecordsCSV, exportMemberRecordsExcel, exportMemberRecordsPDF, type MemberRecord } from '../../lib/exports'
+import { ErrorState } from '../../components/ErrorState'
+import { SkeletonTable } from '../../components/Skeleton'
+import { reportLoadError } from '../../lib/userFacingError'
 
 /** Typed confirmation matches member full name (case-insensitive) or the word DELETE. */
 export function matchesDeleteConfirmation(typed: string, fullName: string): boolean {
@@ -122,7 +125,7 @@ export function AdminMembers() {
       setTotalPages(d.pages ?? 1)
       setPage(d.page ?? pageNum)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load members.')
+      setError(reportLoadError(e, { page: 'admin-members' }, 'Could not load members.'))
     } finally {
       setLoading(false)
     }
@@ -656,19 +659,15 @@ export function AdminMembers() {
       </div>
 
       {error && (
-        <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="mt-4">
+          <ErrorState message={error} onRetry={() => { setLoading(true); load(page) }} />
+        </div>
       )}
 
       {/* Members Table with Selection */}
       <div className="mt-6">
         {loading ? (
-          <div className="glass-panel p-12 text-center">
-            <svg className="mx-auto h-6 w-6 animate-spin text-luma-600" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <p className="mt-3 text-sm text-gray-500">Loading members…</p>
-          </div>
+          <SkeletonTable rows={5} />
         ) : (
           <DataTable
             data={members as unknown as Record<string, unknown>[]}
