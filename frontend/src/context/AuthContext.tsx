@@ -32,6 +32,7 @@ export type Member = {
   terms_accepted_at?: string | null
   privacy_policy_version?: string | null
   terms_version?: string | null
+  application_program_codes?: string[] | null
   payment_verified_at?: string | null
 }
 

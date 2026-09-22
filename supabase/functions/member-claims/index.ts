@@ -8,6 +8,7 @@ import { withSignedClaimDocumentUrls } from '../shared/storage-signed.ts'
  * Member Claims — Submit, List, Detail, Document Upload
  *
  * GET    /member-claims                    — list member's own claims
+ * GET    /member-claims?action=documents   — all claim evidence for this member (signed URLs)
  * POST   /member-claims                    — submit a new claim
  * GET    /member-claims?id=xxx             — get specific claim with documents
  * PATCH  /member-claims?id=xxx             — submit a draft claim (Draft → Submitted)
@@ -30,6 +31,42 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const claimId = url.searchParams.get('id')
     const uploadClaimId = url.searchParams.get('claimId')
+    const action = url.searchParams.get('action')
+
+    // GET — all claim documents for this member (documents inbox)
+    if (req.method === 'GET' && action === 'documents' && !claimId) {
+      const { data: claims, error: claimsErr } = await adminClient
+        .from('claims')
+        .select('id, claim_number, claim_type, status')
+        .eq('member_id', user.id)
+      if (claimsErr) throw new Error(claimsErr.message)
+      const claimIds = (claims ?? []).map((c: { id: string }) => c.id)
+      if (claimIds.length === 0) {
+        return new Response(JSON.stringify({ documents: [] }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const { data: documents, error: docsErr } = await adminClient
+        .from('claim_documents')
+        .select('id, claim_id, file_name, file_type, size_bytes, created_at, file_url')
+        .in('claim_id', claimIds)
+        .order('created_at', { ascending: false })
+      if (docsErr) throw new Error(docsErr.message)
+      const signedDocs = await withSignedClaimDocumentUrls(adminClient, documents ?? [])
+      const claimById = new Map((claims ?? []).map((c: { id: string; claim_number: string; claim_type: string; status: string }) => [c.id, c]))
+      const enriched = signedDocs.map((d: Record<string, unknown>) => {
+        const claim = claimById.get(String(d.claim_id))
+        return {
+          ...d,
+          claim_number: claim?.claim_number ?? null,
+          claim_type: claim?.claim_type ?? null,
+          claim_status: claim?.status ?? null,
+        }
+      })
+      return new Response(JSON.stringify({ documents: enriched }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     // GET — list member's claims
     if (req.method === 'GET' && !claimId) {

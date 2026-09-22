@@ -21,7 +21,7 @@ type Package = {
 type Subscription = { id: string; package_id: string; status: string; packages?: { name: string }[] }
 
 export function JoinPackages() {
-  useHead('Join Packages', undefined, { noindex: true })
+  useHead('Programs', undefined, { noindex: true })
   const { member, registrationFeePaid } = useAuth()
   const [packages, setPackages] = useState<Package[]>([])
   const [mine, setMine] = useState<Subscription[]>([])
@@ -112,7 +112,7 @@ export function JoinPackages() {
           title="Activation fee required"
           breadcrumbs={[
             { label: 'Dashboard', to: '/dashboard' },
-            { label: 'Explore Packages' },
+            { label: 'Programs' },
           ]}
         />
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
@@ -131,11 +131,11 @@ export function JoinPackages() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
       <PageHeader
-        title="Explore Packages"
-        description="Choose welfare packages available to you. Each package is tracked separately with its own contributions and qualification rules."
+        title="Programs"
+        description="Choose LUMA Welfare programs available to you. Each program is tracked separately with its own contributions and qualification rules."
         breadcrumbs={[
           { label: 'Dashboard', to: '/dashboard' },
-          { label: 'Explore Packages' },
+          { label: 'Programs' },
         ]}
       />
 
@@ -152,7 +152,7 @@ export function JoinPackages() {
 
       {activeSubs.length > 0 && (
         <section className="mb-8" aria-labelledby="your-packages-heading">
-          <h2 id="your-packages-heading" className="text-sm font-semibold text-gray-900 mb-3">Your packages</h2>
+          <h2 id="your-packages-heading" className="text-sm font-semibold text-gray-900 mb-3">Your programs</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {activeSubs.map((sub) => (
               <div key={sub.id} className="flex items-center justify-between gap-3 glass-panel px-4 py-3">

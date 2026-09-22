@@ -8,7 +8,7 @@ import { reportLoadError } from '../../lib/userFacingError'
 type FamilyMember = { id: string; full_name: string; relationship: string; id_number: string | null; tier: 'nuclear' | 'extended' }
 
 export function Family() {
-  useHead('Family Members', undefined, { noindex: true })
+  useHead('Family & beneficiaries', undefined, { noindex: true })
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [form, setForm] = useState({ full_name: '', relationship: 'spouse', tier: 'nuclear', id_number: '' })
   const [error, setError] = useState<string | null>(null)
@@ -54,8 +54,10 @@ export function Family() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Family Members</h1>
-        <p className="mt-1 text-sm text-gray-500">Registered dependents covered by the Welfare Package.</p>
+        <h1 className="text-2xl font-bold text-gray-900">Family &amp; beneficiaries</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Dependants and next-of-kin covered under your welfare programs. Keep this list accurate for claim eligibility.
+        </p>
       </div>
 
       {error && <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -63,7 +65,7 @@ export function Family() {
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* Add form */}
         <form onSubmit={add} className="glass-panel p-5">
-          <h2 className="text-sm font-semibold text-gray-900">Add Family Member</h2>
+          <h2 className="text-sm font-semibold text-gray-900">Add beneficiary / dependant</h2>
           <div className="mt-4 space-y-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Full name</label>
@@ -91,7 +93,7 @@ export function Family() {
               <input value={form.id_number} onChange={(e) => setForm((f) => ({ ...f, id_number: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-luma-500 focus:bg-white" />
             </div>
             <button disabled={busy} className="w-full rounded-lg bg-luma-700 py-2.5 text-sm font-semibold text-white hover:bg-luma-800 disabled:opacity-60 transition-all">
-              {busy ? 'Adding…' : 'Add Member'}
+              {busy ? 'Adding…' : 'Add beneficiary'}
             </button>
           </div>
         </form>
@@ -113,8 +115,8 @@ export function Family() {
 
           {!loading && !loadError && members.length === 0 && (
             <EmptyState
-              title="No family members yet"
-              message="No family members registered yet."
+              title="No beneficiaries yet"
+              message="Add dependants or next-of-kin who should be covered under your programs."
             />
           )}
 

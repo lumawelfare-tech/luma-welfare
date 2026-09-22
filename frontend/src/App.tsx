@@ -43,6 +43,7 @@ const Contributions = lazy(() => import('./pages/member/Contributions').then(m =
 const JoinPackages = lazy(() => import('./pages/member/JoinPackages').then(m => ({ default: m.JoinPackages })))
 const Profile = lazy(() => import('./pages/member/Profile').then(m => ({ default: m.Profile })))
 const Family = lazy(() => import('./pages/member/Family').then(m => ({ default: m.Family })))
+const MemberDocuments = lazy(() => import('./pages/member/MemberDocuments').then(m => ({ default: m.MemberDocuments })))
 const ReceiptsStatements = lazy(() => import('./pages/member/ReceiptsStatements').then(m => ({ default: m.ReceiptsStatements })))
 const Claims = lazy(() => import('./pages/member/Claims').then(m => ({ default: m.Claims })))
 const Notifications = lazy(() => import('./pages/member/Notifications').then(m => ({ default: m.Notifications })))
@@ -118,6 +119,7 @@ export default function App() {
                   <Route path="/join" element={<JoinPackages />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/family" element={<Family />} />
+                  <Route path="/documents" element={<MemberDocuments />} />
                   <Route path="/receipts-statements" element={<ReceiptsStatements />} />
                   <Route path="/claims" element={<Claims />} />
                   <Route path="/notifications" element={<Notifications />} />

@@ -144,7 +144,7 @@ New tables likely only for: applications (if not folded into members), documents
 | **0** | Audit (this doc) | — | — | N/A |
 | **1** | DB + security foundation | RLS, CI, audit_logs | **DONE in-repo** (`20260922140000_phase1_schema_foundation.sql`); live ENFORCE still operator | live RLS; reverse migration |
 | **2** | Membership application | `members`, fees, auth-register, AdminMembers | **DONE in-repo** — form fields + APP# + pending after email verify + admin approve issues membership # | E2E register→approve; feature-flag |
-| **3** | Member portal gaps | existing member pages | member documents inbox; beneficiary labels | member E2E; hide routes |
+| **3** | Member portal gaps | existing member pages | **DONE in-repo** — Programs nav, Family & beneficiaries, `/documents` inbox, profile membership summary | member E2E; hide routes |
 | **4** | Admin operations | AdminLayout, RBAC | Applications, complaints, community | permission E2E; drop routes |
 | **5** | Claims & welfare ops | qualify, claims EFs | checklist stages; payout notify | claims E2E; ignore new cols |
 | **6** | Documents + KB | storage-signed patterns | ACL docs + lifecycle | storage RLS; private default |
@@ -157,6 +157,6 @@ New tables likely only for: applications (if not folded into members), documents
 
 ## STOP
 
-**Phase 1** landed. **Phase 2** (membership application) — in progress / landed in-repo when committed.
+**Phases 1–3** landed in-repo (schema foundation, membership application, member portal gaps). `member-claims` documents action deployed.
 
-Await approval before **Phase 3**. Official form fields are mapped from `docs/LUMA_Welfare_Online_Membership_Registration_Form.pdf`.
+Await approval before **Phase 4** (admin operations: complaints, community, Applications polish).

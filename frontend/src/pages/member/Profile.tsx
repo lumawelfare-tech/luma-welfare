@@ -192,16 +192,27 @@ export function Profile() {
           <div>
             <h2 className="text-lg font-semibold text-gray-900">{member?.full_name ?? 'Member'}</h2>
             <p className="text-sm text-gray-500">{member?.email ?? ''}</p>
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
                 member?.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-600 border-gray-200'
               }`}>
-                {member?.status ?? 'unknown'}
+                {member?.status?.replace(/_/g, ' ') ?? 'unknown'}
               </span>
               {member?.membership_number && (
-                <span className="text-xs text-gray-400">#{member.membership_number}</span>
+                <span className="text-xs text-gray-500">Membership #{member.membership_number}</span>
+              )}
+              {member?.application_number && (
+                <span className="text-xs text-gray-400">{member.application_number}</span>
               )}
             </div>
+            {(member?.application_program_codes?.length ?? 0) > 0 && (
+              <p className="mt-2 text-xs text-gray-500">
+                Programs of interest:{' '}
+                <span className="font-medium text-gray-700">{member!.application_program_codes!.join(', ')}</span>
+                {' · '}
+                <Link to="/join" className="text-luma-700 hover:underline">Manage programs</Link>
+              </p>
+            )}
           </div>
         </div>
       </div>
