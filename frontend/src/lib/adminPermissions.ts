@@ -16,6 +16,7 @@ export const ADMIN_ROUTE_PERMISSIONS: Record<string, AdminPermission | 'superadm
   claims: 'claims:read',
   complaints: 'complaints:read',
   community: 'community:read',
+  documents: 'documents:read',
   packages: 'packages:read',
   news: 'packages:read',
   gallery: 'packages:read',

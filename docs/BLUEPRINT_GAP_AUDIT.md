@@ -147,7 +147,7 @@ New tables likely only for: applications (if not folded into members), documents
 | **3** | Member portal gaps | existing member pages | **DONE in-repo** — Programs nav, Family & beneficiaries, `/documents` inbox, profile membership summary | member E2E; hide routes |
 | **4** | Admin operations | AdminLayout, RBAC | **DONE in-repo** — Applications nav/detail polish, complaints, community support records | permission E2E; drop routes |
 | **5** | Claims & welfare ops | qualify, claims EFs | **DONE in-repo** — checklist stages; manual payout record + notify | claims E2E; ignore new cols |
-| **6** | Documents + KB | storage-signed patterns | ACL docs + lifecycle | storage RLS; private default |
+| **6** | Documents + KB | storage-signed patterns | **DONE in-repo** — `kb_documents` ACL + Draft→Approved→Archived; private `kb-documents` bucket | storage RLS; private default |
 | **7** | RAG / hybrid AI | auth + member query EFs | ingest, embeddings, assistant | AI security tests; kill switch |
 | **8** | Testing + hardening | Playwright, CI | ENFORCE gate, preview→prod | full suite |
 
@@ -157,6 +157,6 @@ New tables likely only for: applications (if not folded into members), documents
 
 ## STOP
 
-**Phases 1–5** landed in-repo. Phase 5: claim review checklist + manual payout recording with member notify (no M-Pesa).
+**Phases 1–6** landed in-repo. Phase 6: org KB with ACL + lifecycle; private signed downloads (no RAG).
 
-Await approval before **Phase 6** (documents + KB ACL lifecycle).
+Await approval before **Phase 7** (RAG / hybrid AI — ingest, embeddings, assistant).

@@ -59,6 +59,7 @@ const AdminContributions = lazy(() => import('./pages/admin/AdminContributions')
 const AdminClaims = lazy(() => import('./pages/admin/AdminClaims').then(m => ({ default: m.AdminClaims })))
 const AdminComplaints = lazy(() => import('./pages/admin/AdminComplaints').then(m => ({ default: m.AdminComplaints })))
 const AdminCommunity = lazy(() => import('./pages/admin/AdminCommunity').then(m => ({ default: m.AdminCommunity })))
+const AdminDocuments = lazy(() => import('./pages/admin/AdminDocuments').then(m => ({ default: m.AdminDocuments })))
 const AdminSubscriptions = lazy(() => import('./pages/admin/AdminSubscriptions').then(m => ({ default: m.AdminSubscriptions })))
 const AdminNews = lazy(() => import('./pages/admin/AdminNews').then(m => ({ default: m.AdminNews })))
 const AdminGallery = lazy(() => import('./pages/admin/AdminGallery').then(m => ({ default: m.AdminGallery })))
@@ -146,6 +147,7 @@ export default function App() {
                     <Route path="claims" element={<AdminClaims />} />
                     <Route path="complaints" element={<AdminComplaints />} />
                     <Route path="community" element={<AdminCommunity />} />
+                    <Route path="documents" element={<AdminDocuments />} />
                     <Route path="subscriptions" element={<AdminSubscriptions />} />
                     <Route path="news" element={<AdminNews />} />
                     <Route path="gallery" element={<AdminGallery />} />

@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useHead } from '../../lib/seo'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { reportLoadError } from '../../lib/userFacingError'
+import { useToast } from '../../components/Toast'
 
-type MemberDocument = {
+type ClaimDocument = {
   id: string
   claim_id: string
   file_name: string | null
@@ -20,31 +21,64 @@ type MemberDocument = {
   claim_status?: string | null
 }
 
+type OrgDocument = {
+  id: string
+  title: string
+  summary: string | null
+  category: string | null
+  file_name: string
+  access_level: string
+  approved_at: string | null
+  created_at: string
+  file_url?: string
+}
+
 /**
- * Member-scoped documents inbox: claim evidence (signed URLs) + links to
- * receipts and membership records. Organizational KB arrives in Phase 6.
+ * Member-scoped documents inbox: org KB (approved public/member) + claim evidence.
  */
 export function MemberDocuments() {
   useHead('My documents', undefined, { noindex: true })
   const { member } = useAuth()
+  const { addToast } = useToast()
   const navigate = useNavigate()
-  const [documents, setDocuments] = useState<MemberDocument[]>([])
+  const [documents, setDocuments] = useState<ClaimDocument[]>([])
+  const [orgDocs, setOrgDocs] = useState<OrgDocument[]>([])
   const [loading, setLoading] = useState(true)
+  const [orgLoading, setOrgLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   function load() {
     setLoading(true)
-    api<{ documents: MemberDocument[] }>('/member/claims?action=documents', { auth: true })
+    setOrgLoading(true)
+    api<{ documents: ClaimDocument[] }>('/member/claims?action=documents', { auth: true })
       .then((d) => {
         setDocuments(d.documents ?? [])
         setError(null)
       })
       .catch((e) => setError(reportLoadError(e, { page: 'member-documents' }, 'Could not load documents.')))
       .finally(() => setLoading(false))
+
+    api<{ documents: OrgDocument[] }>('/member/documents', { auth: true })
+      .then((d) => setOrgDocs(d.documents ?? []))
+      .catch(() => setOrgDocs([]))
+      .finally(() => setOrgLoading(false))
   }
 
   // eslint-disable-next-line oxc/react/set-state-in-effect — load on mount
   useEffect(() => { load() }, [])
+
+  async function downloadOrg(id: string) {
+    try {
+      const d = await api<{ document: OrgDocument }>(`/member/documents?id=${encodeURIComponent(id)}`, { auth: true })
+      if (!d.document.file_url) {
+        addToast('warning', 'Download link unavailable.')
+        return
+      }
+      window.open(d.document.file_url, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not open document.')
+    }
+  }
 
   const programs = member?.application_program_codes ?? []
 
@@ -52,7 +86,7 @@ export function MemberDocuments() {
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
       <PageHeader
         title="My documents"
-        description="Claim evidence and membership records for your account. Organizational policy documents will appear here when published for members."
+        description="Organization policies published for members, plus your claim evidence and membership records."
         breadcrumbs={[
           { label: 'Dashboard', to: '/dashboard' },
           { label: 'Documents' },
@@ -97,6 +131,39 @@ export function MemberDocuments() {
             Profile &amp; data export
           </Link>
         </div>
+      </section>
+
+      <section className="mb-8" aria-labelledby="org-docs-heading">
+        <h2 id="org-docs-heading" className="text-sm font-semibold text-gray-900 mb-3">Organization documents</h2>
+        {orgLoading ? (
+          <p className="text-sm text-gray-500">Loading…</p>
+        ) : orgDocs.length === 0 ? (
+          <p className="text-sm text-gray-500">No handbooks or policies have been published for members yet.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+            {orgDocs.map((doc) => (
+              <li key={doc.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">{doc.title}</p>
+                  <p className="text-xs text-gray-500">
+                    {doc.category ? `${doc.category} · ` : ''}
+                    {doc.file_name}
+                    {doc.approved_at ? ` · ${new Date(doc.approved_at).toLocaleDateString('en-KE')}` : ''}
+                  </p>
+                  {doc.summary && <p className="mt-1 text-xs text-gray-600 line-clamp-2">{doc.summary}</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => downloadOrg(doc.id)}
+                  className="inline-flex min-h-11 items-center rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Download
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section aria-labelledby="claim-evidence-heading">
@@ -149,7 +216,7 @@ export function MemberDocuments() {
       </section>
 
       <p className="mt-8 text-xs text-gray-400">
-        Downloads use short-lived secure links. Organizational handbooks and approved policies will be listed here after the knowledge-base phase.
+        Downloads use short-lived secure links. Staff-only and restricted documents are never listed here.
       </p>
     </div>
   )

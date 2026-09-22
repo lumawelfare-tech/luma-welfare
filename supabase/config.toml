@@ -89,6 +89,9 @@ verify_jwt = true
 [functions.member-complaints]
 verify_jwt = true
 
+[functions.member-documents]
+verify_jwt = true
+
 [functions.member-receipts]
 verify_jwt = true
 
@@ -130,6 +133,9 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.admin-community]
+verify_jwt = true
+
+[functions.admin-documents]
 verify_jwt = true
 
 [functions.admin-packages]
