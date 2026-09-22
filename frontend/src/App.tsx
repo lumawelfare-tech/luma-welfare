@@ -46,15 +46,19 @@ const Family = lazy(() => import('./pages/member/Family').then(m => ({ default: 
 const MemberDocuments = lazy(() => import('./pages/member/MemberDocuments').then(m => ({ default: m.MemberDocuments })))
 const ReceiptsStatements = lazy(() => import('./pages/member/ReceiptsStatements').then(m => ({ default: m.ReceiptsStatements })))
 const Claims = lazy(() => import('./pages/member/Claims').then(m => ({ default: m.Claims })))
+const MemberComplaints = lazy(() => import('./pages/member/MemberComplaints').then(m => ({ default: m.MemberComplaints })))
 const Notifications = lazy(() => import('./pages/member/Notifications').then(m => ({ default: m.Notifications })))
 const NotificationPreferences = lazy(() => import('./pages/member/NotificationPreferences').then(m => ({ default: m.NotificationPreferences })))
 
 // Admin pages — lazy loaded (largest, least frequently used)
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })))
 const AdminMembers = lazy(() => import('./pages/admin/AdminMembers').then(m => ({ default: m.AdminMembers })))
+const AdminApplications = lazy(() => import('./pages/admin/AdminApplications').then(m => ({ default: m.AdminApplications })))
 const AdminPackages = lazy(() => import('./pages/admin/AdminPackages').then(m => ({ default: m.AdminPackages })))
 const AdminContributions = lazy(() => import('./pages/admin/AdminContributions').then(m => ({ default: m.AdminContributions })))
 const AdminClaims = lazy(() => import('./pages/admin/AdminClaims').then(m => ({ default: m.AdminClaims })))
+const AdminComplaints = lazy(() => import('./pages/admin/AdminComplaints').then(m => ({ default: m.AdminComplaints })))
+const AdminCommunity = lazy(() => import('./pages/admin/AdminCommunity').then(m => ({ default: m.AdminCommunity })))
 const AdminSubscriptions = lazy(() => import('./pages/admin/AdminSubscriptions').then(m => ({ default: m.AdminSubscriptions })))
 const AdminNews = lazy(() => import('./pages/admin/AdminNews').then(m => ({ default: m.AdminNews })))
 const AdminGallery = lazy(() => import('./pages/admin/AdminGallery').then(m => ({ default: m.AdminGallery })))
@@ -122,6 +126,7 @@ export default function App() {
                   <Route path="/documents" element={<MemberDocuments />} />
                   <Route path="/receipts-statements" element={<ReceiptsStatements />} />
                   <Route path="/claims" element={<Claims />} />
+                  <Route path="/complaints" element={<MemberComplaints />} />
                   <Route path="/notifications" element={<Notifications />} />
                   <Route path="/notification-preferences" element={<NotificationPreferences />} />
                 </Route>
@@ -134,10 +139,13 @@ export default function App() {
                     <Route index element={<Navigate to="dashboard" replace />} />
                     <Route path="dashboard" element={<AdminDashboard />} />
                     <Route path="members" element={<AdminMembers />} />
+                    <Route path="applications" element={<AdminApplications />} />
                     <Route path="registration-fees" element={<AdminRegistrationFees />} />
                     <Route path="packages" element={<AdminPackages />} />
                     <Route path="contributions" element={<AdminContributions />} />
                     <Route path="claims" element={<AdminClaims />} />
+                    <Route path="complaints" element={<AdminComplaints />} />
+                    <Route path="community" element={<AdminCommunity />} />
                     <Route path="subscriptions" element={<AdminSubscriptions />} />
                     <Route path="news" element={<AdminNews />} />
                     <Route path="gallery" element={<AdminGallery />} />

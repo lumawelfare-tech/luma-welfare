@@ -105,8 +105,19 @@ export function AdminMembers() {
 
   // Member detail
   const [detailMember, setDetailMember] = useState<Member | null>(null)
-  const [detailData, setDetailData] = useState<{ member: Record<string, unknown>; subscriptions: Record<string, unknown>[]; family_members: Record<string, unknown>[]; contributions: Record<string, unknown>[] } | null>(null)
+  const [detailData, setDetailData] = useState<{
+    member: Record<string, unknown>
+    subscriptions: Record<string, unknown>[]
+    family_members: Record<string, unknown>[]
+    contributions: Record<string, unknown>[]
+    registration_fees?: Record<string, unknown>[]
+  } | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
+
+  // Application approve / reject dialog
+  const [decisionTarget, setDecisionTarget] = useState<{ member: Member; action: 'approve' | 'reject' } | null>(null)
+  const [decisionRemarks, setDecisionRemarks] = useState('')
+  const [markPaymentVerified, setMarkPaymentVerified] = useState(true)
 
   // Bulk dialogs
   const [bulkAction, setBulkAction] = useState<'active' | 'suspended' | 'closed' | null>(null)
@@ -217,7 +228,13 @@ export function AdminMembers() {
     setDetailData(null)
     setLoadingDetail(true)
     try {
-      const d = await api<{ member: Record<string, unknown>; subscriptions: Record<string, unknown>[]; family_members: Record<string, unknown>[]; contributions: Record<string, unknown>[] }>(`/admin/members/${member.id}`, { auth: true })
+      const d = await api<{
+        member: Record<string, unknown>
+        subscriptions: Record<string, unknown>[]
+        family_members: Record<string, unknown>[]
+        contributions: Record<string, unknown>[]
+        registration_fees?: Record<string, unknown>[]
+      }>(`/admin/members/${member.id}`, { auth: true })
       setDetailData(d)
     } catch {
       addToast('warning', 'Could not load member details.')
@@ -226,10 +243,16 @@ export function AdminMembers() {
     }
   }
 
+  function openDecision(member: Member, action: 'approve' | 'reject') {
+    setDecisionTarget({ member, action })
+    setDecisionRemarks('')
+    setMarkPaymentVerified(true)
+  }
+
   async function setStatus(
     id: string,
     status: 'active' | 'suspended' | 'closed',
-    opts?: { rejectApplication?: boolean; markPaymentVerified?: boolean },
+    opts?: { rejectApplication?: boolean; markPaymentVerified?: boolean; adminRemarks?: string },
   ) {
     setBusyId(id)
     try {
@@ -240,6 +263,7 @@ export function AdminMembers() {
           status,
           ...(status === 'active' ? { markPaymentVerified: opts?.markPaymentVerified !== false } : {}),
           ...(status === 'closed' && opts?.rejectApplication ? { rejectApplication: true } : {}),
+          ...(opts?.adminRemarks ? { adminRemarks: opts.adminRemarks } : {}),
         },
       })
       addToast(
@@ -252,11 +276,28 @@ export function AdminMembers() {
               ? 'Application rejected.'
               : 'Member closed.',
       )
+      setDecisionTarget(null)
       await load()
     } catch (e) {
       addToast('error', e instanceof ApiError ? e.message : 'Could not update the member.')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  async function confirmDecision() {
+    if (!decisionTarget) return
+    const remarks = decisionRemarks.trim()
+    if (decisionTarget.action === 'approve') {
+      await setStatus(decisionTarget.member.id, 'active', {
+        markPaymentVerified,
+        adminRemarks: remarks || undefined,
+      })
+    } else {
+      await setStatus(decisionTarget.member.id, 'closed', {
+        rejectApplication: true,
+        adminRemarks: remarks || undefined,
+      })
     }
   }
 
@@ -536,7 +577,7 @@ export function AdminMembers() {
               <button
                 type="button"
                 disabled={busyId === m.id}
-                onClick={() => setStatus(m.id, 'active', { markPaymentVerified: true })}
+                onClick={() => openDecision(m, 'approve')}
                 className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
               >
                 Approve
@@ -544,7 +585,7 @@ export function AdminMembers() {
               <button
                 type="button"
                 disabled={busyId === m.id}
-                onClick={() => setStatus(m.id, 'closed', { rejectApplication: true })}
+                onClick={() => openDecision(m, 'reject')}
                 className="min-h-[44px] rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors"
               >
                 Reject
@@ -765,8 +806,8 @@ export function AdminMembers() {
                       <>
                         {m.status === 'pending_approval' && (
                           <>
-                            <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'active', { markPaymentVerified: true })} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Approve</button>
-                            <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'closed', { rejectApplication: true })} className="min-h-[44px] rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-700">Reject</button>
+                            <button type="button" disabled={busyId === m.id} onClick={() => openDecision(m, 'approve')} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Approve</button>
+                            <button type="button" disabled={busyId === m.id} onClick={() => openDecision(m, 'reject')} className="min-h-[44px] rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-700">Reject</button>
                           </>
                         )}
                         {m.status === 'active' && (
@@ -1061,13 +1102,62 @@ export function AdminMembers() {
                 <div className="rounded-xl border border-gray-200 p-4">
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Member Info</h4>
                   <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div><span className="text-gray-400">Status</span><div className="font-medium capitalize">{String(detailData.member.status ?? '')}</div></div>
+                    <div><span className="text-gray-400">Status</span><div className="font-medium capitalize">{String(detailData.member.status ?? '').replace(/_/g, ' ')}</div></div>
                     <div><span className="text-gray-400">Phone</span><div className="font-medium">{String(detailData.member.phone ?? '')}</div></div>
                     <div><span className="text-gray-400">Email</span><div className="font-medium">{String(detailData.member.email ?? '—')}</div></div>
+                    <div><span className="text-gray-400">Application #</span><div className="font-medium">{String(detailData.member.application_number ?? '—')}</div></div>
                     <div><span className="text-gray-400">Membership #</span><div className="font-medium">{String(detailData.member.membership_number ?? '—')}</div></div>
                     <div><span className="text-gray-400">Joined</span><div className="font-medium">{detailData.member.joined_at ? new Date(String(detailData.member.joined_at)).toLocaleDateString() : '—'}</div></div>
+                    <div><span className="text-gray-400">Gender</span><div className="font-medium capitalize">{String(detailData.member.gender ?? '—').replace(/_/g, ' ')}</div></div>
+                    <div><span className="text-gray-400">Marital status</span><div className="font-medium capitalize">{String(detailData.member.marital_status ?? '—')}</div></div>
+                    <div className="col-span-2"><span className="text-gray-400">Residential address</span><div className="font-medium">{String(detailData.member.residential_address ?? '—')}</div></div>
+                    <div><span className="text-gray-400">WhatsApp</span><div className="font-medium">{String(detailData.member.whatsapp_phone ?? '—')}</div></div>
+                    <div><span className="text-gray-400">Family coverage</span><div className="font-medium capitalize">{String(detailData.member.family_coverage ?? '—')}</div></div>
+                    <div className="col-span-2">
+                      <span className="text-gray-400">Programs of interest</span>
+                      <div className="font-medium">
+                        {Array.isArray(detailData.member.application_program_codes) && (detailData.member.application_program_codes as string[]).length > 0
+                          ? (detailData.member.application_program_codes as string[]).join(', ')
+                          : '—'}
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-400">Emergency contact</span>
+                      <div className="font-medium">
+                        {[detailData.member.emergency_contact_name, detailData.member.emergency_contact_relationship, detailData.member.emergency_contact_phone]
+                          .filter(Boolean)
+                          .map(String)
+                          .join(' · ') || '—'}
+                      </div>
+                    </div>
+                    <div><span className="text-gray-400">Submitted</span><div className="font-medium">{detailData.member.application_submitted_at ? new Date(String(detailData.member.application_submitted_at)).toLocaleDateString() : '—'}</div></div>
+                    <div><span className="text-gray-400">Payment verified</span><div className="font-medium">{detailData.member.payment_verified_at ? new Date(String(detailData.member.payment_verified_at)).toLocaleDateString() : 'Not verified'}</div></div>
+                    {detailData.member.admin_remarks != null && String(detailData.member.admin_remarks) !== '' && (
+                      <div className="col-span-2"><span className="text-gray-400">Admin remarks</span><div className="font-medium whitespace-pre-wrap">{String(detailData.member.admin_remarks)}</div></div>
+                    )}
                   </div>
+                  {detailMember.status === 'pending_approval' && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => openDecision(detailMember, 'approve')} className="min-h-11 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white">Approve</button>
+                      <button type="button" onClick={() => openDecision(detailMember, 'reject')} className="min-h-11 rounded-md border border-red-200 px-3 text-xs font-medium text-red-700">Reject</button>
+                    </div>
+                  )}
                 </div>
+
+                {(detailData.registration_fees?.length ?? 0) > 0 && (
+                  <div className="rounded-xl border border-gray-200 p-4">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Registration fees</h4>
+                    <div className="space-y-1">
+                      {detailData.registration_fees!.map((f) => (
+                        <div key={String(f.id)} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-100 last:border-0">
+                          <span className="text-gray-600">KSh {Number(f.amount ?? 0).toLocaleString()}</span>
+                          <span className="text-xs font-medium">{String(f.status ?? '—')}</span>
+                          <span className="text-xs text-gray-400">{f.paid_at ? new Date(String(f.paid_at)).toLocaleDateString() : '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Subscriptions */}
                 <div className="rounded-xl border border-gray-200 p-4">
@@ -1126,6 +1216,46 @@ export function AdminMembers() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={Boolean(decisionTarget)}
+        title={decisionTarget?.action === 'approve' ? 'Approve application' : 'Reject application'}
+        message={
+          <div className="space-y-3 text-sm text-gray-600">
+            <p>
+              {decisionTarget?.action === 'approve'
+                ? `Approve ${decisionTarget?.member.full_name ?? 'this applicant'} and issue a membership number if missing.`
+                : `Reject ${decisionTarget?.member.full_name ?? 'this applicant'} and close the application.`}
+            </p>
+            <div>
+              <label htmlFor="admin-decision-remarks" className="mb-1 block text-xs font-medium text-gray-700">Admin remarks (optional)</label>
+              <textarea
+                id="admin-decision-remarks"
+                value={decisionRemarks}
+                onChange={(e) => setDecisionRemarks(e.target.value)}
+                maxLength={2000}
+                rows={3}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900"
+              />
+            </div>
+            {decisionTarget?.action === 'approve' && (
+              <label className="flex items-start gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={markPaymentVerified}
+                  onChange={(e) => setMarkPaymentVerified(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>Mark registration payment as verified (uncheck if fee still outstanding)</span>
+              </label>
+            )}
+          </div>
+        }
+        confirmLabel={decisionTarget?.action === 'approve' ? 'Approve' : 'Reject'}
+        variant={decisionTarget?.action === 'approve' ? 'primary' : 'danger'}
+        loading={busyId === decisionTarget?.member.id}
+        onConfirm={confirmDecision}
+        onCancel={() => setDecisionTarget(null)}
+      />
     </div>
   )
 }

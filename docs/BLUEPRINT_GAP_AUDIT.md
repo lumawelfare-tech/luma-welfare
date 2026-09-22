@@ -145,7 +145,7 @@ New tables likely only for: applications (if not folded into members), documents
 | **1** | DB + security foundation | RLS, CI, audit_logs | **DONE in-repo** (`20260922140000_phase1_schema_foundation.sql`); live ENFORCE still operator | live RLS; reverse migration |
 | **2** | Membership application | `members`, fees, auth-register, AdminMembers | **DONE in-repo** — form fields + APP# + pending after email verify + admin approve issues membership # | E2E register→approve; feature-flag |
 | **3** | Member portal gaps | existing member pages | **DONE in-repo** — Programs nav, Family & beneficiaries, `/documents` inbox, profile membership summary | member E2E; hide routes |
-| **4** | Admin operations | AdminLayout, RBAC | Applications, complaints, community | permission E2E; drop routes |
+| **4** | Admin operations | AdminLayout, RBAC | **DONE in-repo** — Applications nav/detail polish, complaints, community support records | permission E2E; drop routes |
 | **5** | Claims & welfare ops | qualify, claims EFs | checklist stages; payout notify | claims E2E; ignore new cols |
 | **6** | Documents + KB | storage-signed patterns | ACL docs + lifecycle | storage RLS; private default |
 | **7** | RAG / hybrid AI | auth + member query EFs | ingest, embeddings, assistant | AI security tests; kill switch |
@@ -157,6 +157,6 @@ New tables likely only for: applications (if not folded into members), documents
 
 ## STOP
 
-**Phases 1–3** landed in-repo (schema foundation, membership application, member portal gaps). `member-claims` documents action deployed.
+**Phases 1–4** landed in-repo (schema foundation, membership application, member portal gaps, admin ops). Phase 4: complaints + community tables, Applications polish.
 
-Await approval before **Phase 4** (admin operations: complaints, community, Applications polish).
+Await approval before **Phase 5** (claims & welfare ops: checklist stages, payout notify).

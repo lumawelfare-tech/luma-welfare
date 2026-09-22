@@ -76,10 +76,11 @@ Deno.serve(async (req) => {
         .single()
       if (error) throw new Error('Member not found')
 
-      const [subs, family, contribs] = await Promise.all([
+      const [subs, family, contribs, fees] = await Promise.all([
         adminClient.from('subscriptions').select('id, status, started_at, next_due_date, package_id, packages(code, name), package_tiers(name, amount)').eq('member_id', resourceId),
         adminClient.from('family_members').select('*').eq('member_id', resourceId).eq('is_active', true),
         adminClient.from('contributions').select('id, period, amount, status, package_id, created_at').eq('member_id', resourceId).order('period', { ascending: false }),
+        adminClient.from('registration_fees').select('id, amount, status, paid_at, payment_reference, created_at').eq('member_id', resourceId).order('created_at', { ascending: false }).limit(5),
       ])
 
       await logAudit(adminClient, {
@@ -95,6 +96,7 @@ Deno.serve(async (req) => {
         subscriptions: subs.data ?? [],
         family_members: family.data ?? [],
         contributions: contribs.data ?? [],
+        registration_fees: fees.data ?? [],
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

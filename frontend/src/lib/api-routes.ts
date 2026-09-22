@@ -45,6 +45,8 @@ export function pathToFunctionName(path: string): string | null {
   if (cleanPath.startsWith('admin/media')) return 'admin-media'
   if (cleanPath.startsWith('admin/contributions')) return 'admin-contributions'
   if (cleanPath.startsWith('admin/claims')) return 'admin-claims'
+  if (cleanPath.startsWith('admin/complaints')) return 'admin-complaints'
+  if (cleanPath.startsWith('admin/community')) return 'admin-community'
   if (cleanPath.startsWith('admin/subscriptions')) return 'admin-subscriptions'
   if (cleanPath.startsWith('admin/registration-fee')) return 'admin-registration-fee'
   if (cleanPath.startsWith('admin/2fa')) return 'admin-2fa'
@@ -58,6 +60,7 @@ export function pathToFunctionName(path: string): string | null {
 
   // Member routes (extended)
   if (cleanPath.startsWith('member/claims')) return 'member-claims'
+  if (cleanPath.startsWith('member/complaints')) return 'member-complaints'
   if (cleanPath.startsWith('member/receipts')) return 'member-receipts'
   if (cleanPath.startsWith('member/notification-prefs')) return 'member-notification-prefs'
   if (cleanPath.startsWith('member/notifications')) return 'member-notifications'

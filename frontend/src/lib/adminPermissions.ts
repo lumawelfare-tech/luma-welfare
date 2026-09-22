@@ -9,10 +9,13 @@ export type AdminPermission = `${string}:${string}`
 export const ADMIN_ROUTE_PERMISSIONS: Record<string, AdminPermission | 'superadmin'> = {
   dashboard: 'members:read',
   members: 'members:read',
+  applications: 'members:read',
   'registration-fees': 'members:read',
   subscriptions: 'members:read',
   contributions: 'contributions:read',
   claims: 'claims:read',
+  complaints: 'complaints:read',
+  community: 'community:read',
   packages: 'packages:read',
   news: 'packages:read',
   gallery: 'packages:read',
