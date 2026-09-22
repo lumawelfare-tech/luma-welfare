@@ -32,6 +32,7 @@ type KbDocument = {
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
   { value: 'draft', label: 'Draft' },
+  { value: 'under_review', label: 'Under review' },
   { value: 'approved', label: 'Approved' },
   { value: 'archived', label: 'Archived' },
 ]
@@ -42,6 +43,18 @@ const ACCESS_OPTIONS = [
   { value: 'staff', label: 'Staff' },
   { value: 'admin', label: 'Admin' },
   { value: 'restricted', label: 'Restricted' },
+]
+
+const CATEGORY_OPTIONS = [
+  { value: 'ORGANIZATIONAL', label: 'Organizational' },
+  { value: 'PUBLIC_CONTENT', label: 'Public content' },
+  { value: 'MEMBERSHIP', label: 'Membership' },
+  { value: 'POLICY', label: 'Policy' },
+  { value: 'PROGRAM', label: 'Program' },
+  { value: 'CLAIMS', label: 'Claims' },
+  { value: 'FINANCE', label: 'Finance' },
+  { value: 'COMMUNITY', label: 'Community' },
+  { value: 'OTHER', label: 'Other' },
 ]
 
 function fileToBase64(file: File): Promise<string> {
@@ -142,7 +155,7 @@ export function AdminDocuments() {
     }
   }
 
-  async function lifecycle(id: string, action: 'approve' | 'archive' | 'draft') {
+  async function lifecycle(id: string, action: 'approve' | 'archive' | 'draft' | 'under_review') {
     setBusy(true)
     try {
       await api(`/admin/documents/${id}`, {
@@ -150,7 +163,12 @@ export function AdminDocuments() {
         auth: true,
         body: { lifecycle: action },
       })
-      addToast('success', `Document ${action === 'draft' ? 'returned to draft' : action + 'd'}.`)
+      const label =
+        action === 'draft' ? 'returned to draft'
+        : action === 'under_review' ? 'submitted for review'
+        : action === 'approve' ? 'approved'
+        : 'archived'
+      addToast('success', `Document ${label}.`)
       await load()
     } catch (err) {
       addToast('error', err instanceof ApiError ? err.message : 'Could not update document.')
@@ -193,7 +211,7 @@ export function AdminDocuments() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Organization knowledge base — Draft → Approved → Archived. Access: Public / Member / Staff / Admin / Restricted. Files stay private with signed downloads.
+            Organization knowledge base — Draft → Under review → Approved → Archived. Public access_level still requires Approved before members/public see it. Files stay private with signed downloads.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -227,7 +245,12 @@ export function AdminDocuments() {
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600" htmlFor="kb-category">Category</label>
-            <input id="kb-category" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Constitution, Handbook" maxLength={100} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            <select id="kb-category" value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              <option value="">Select category</option>
+              {CATEGORY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600" htmlFor="kb-access">Access level</label>
@@ -273,7 +296,10 @@ export function AdminDocuments() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => download(doc.id)} className="min-h-11 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50">Download</button>
-                {doc.status !== 'approved' && (
+                {doc.status === 'draft' && (
+                  <button type="button" disabled={busy} onClick={() => lifecycle(doc.id, 'under_review')} className="min-h-11 rounded-lg border border-luma-200 px-3 text-xs font-medium text-luma-800 hover:bg-luma-50 disabled:opacity-50">Submit review</button>
+                )}
+                {doc.status !== 'approved' && doc.status !== 'archived' && (
                   <button type="button" disabled={busy} onClick={() => lifecycle(doc.id, 'approve')} className="min-h-11 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Approve</button>
                 )}
                 {doc.status === 'approved' && (

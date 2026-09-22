@@ -6,63 +6,153 @@ import { Icon } from '../components/Icon'
 import { siteConfig } from '../config/siteConfig'
 import { safeHref } from '../lib/sanitize'
 
-const values = [
-  { name: 'Integrity', text: 'We do what we say, and we keep records members can check.', icon: 'check-circle' as const },
-  { name: 'Compassion', text: 'Members help each other through difficult times without delay.', icon: 'heart' as const },
-  { name: 'Teamwork', text: 'Contributions pool together; support goes where it is needed.', icon: 'users' as const },
-  { name: 'Transparency', text: 'Contributions, waiting periods and payouts are shown per member, per package.', icon: 'eye' as const },
-  { name: 'Accountability', text: 'Money collected is accounted for, and every payout is recorded.', icon: 'document' as const },
-  { name: 'Excellence', text: 'We run the welfare fund the way members deserve — properly.', icon: 'star' as const },
+/** Commitments from LUMA Welfare Our Story (official PDF). */
+const commitments = [
+  {
+    name: 'Transparency',
+    text: 'Members should understand the rules, contributions, eligibility requirements, and procedures of every program they join.',
+    icon: 'eye' as const,
+  },
+  {
+    name: 'Accountability',
+    text: 'We aim to manage member contributions responsibly and maintain proper records.',
+    icon: 'document' as const,
+  },
+  {
+    name: 'Fairness',
+    text: 'Support and benefits are provided according to the official rules and eligibility requirements of each program.',
+    icon: 'shield' as const,
+  },
+  {
+    name: 'Community',
+    text: 'We encourage members to support one another and build a stronger welfare community.',
+    icon: 'users' as const,
+  },
+  {
+    name: 'Growth',
+    text: 'We want LUMA Welfare to develop programs that respond to the changing needs of our members.',
+    icon: 'plus' as const,
+  },
 ]
 
+const programs = [
+  'Welfare & Bereavement Support',
+  'Outpatient Hospital Support',
+  'Education Support',
+  'Business Support',
+  'Building & Land Support',
+  'Farming Support',
+  'Senior Citizen Support',
+  'Other member-focused programs',
+]
+
+/**
+ * About / Our Story — aligned with docs/LUMA_Welfare_Our_Story.pdf.
+ * Preserves existing layout components; content only.
+ */
 export function About() {
-  useHead('About', 'Learn about Luma Welfare — our mission, values, and how we provide accessible welfare services for all members in Kenya.', {
-    breadcrumbs: [
-      { name: 'Home', path: '/' },
-      { name: 'About', path: '/about' },
-    ],
-  })
+  useHead(
+    'About',
+    'Together We Are Stronger — learn about LUMA Welfare’s vision, mission, and member commitments.',
+    {
+      breadcrumbs: [
+        { name: 'Home', path: '/' },
+        { name: 'About', path: '/about' },
+      ],
+    },
+  )
   return (
     <div>
-      <PageHero eyebrow="About Us" title="About Luma Welfare" />
+      <PageHero eyebrow="Our Story" title="Together We Are Stronger" />
 
       <MotionSection as="div" className="container-luma py-14">
         <section className="glass-card max-w-3xl p-8">
-          <h2 className="text-2xl font-bold text-gray-900">Our Mission</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Welcome to LUMA Welfare</h2>
           <p className="mt-4 text-lg leading-relaxed text-gray-600">
-            To provide accessible, reliable, and compassionate welfare services that promote
-            dignity, empowerment, and financial security for all members.
+            At LUMA Welfare, we believe that life is better when we face its challenges together.
+            Every family experiences moments when financial support is needed most — whether it is
+            during a bereavement, a medical challenge, education needs, business plans, farming
+            activities, or other important moments in life. We created LUMA Welfare to bring people
+            together through a structured, affordable, and member-focused welfare system.
+          </p>
+          <p className="mt-4 leading-relaxed text-gray-600">
+            Our vision is simple: to build a community where members support one another, plan for
+            the future, and have access to meaningful welfare opportunities when they need them.
           </p>
         </section>
 
         <section className="glass-card mt-8 max-w-3xl p-8">
-          <h2 className="text-2xl font-bold text-gray-900">What Luma Welfare Is</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Why LUMA Welfare?</h2>
           <p className="mt-4 leading-relaxed text-gray-600">
-            Luma Welfare is a community welfare organization in Kenya. Members join one or more of
-            twelve support packages — hospital costs, education, business capital, burial support,
-            and others — and contribute monthly. Each package has its own contribution amount and
-            its own waiting period. When a member meets the conditions, they can claim support.
+            LUMA Welfare is built around the principle of <strong className="font-semibold text-gray-800">Together We Are Stronger</strong>.
+            We believe that small, consistent contributions from members can create a stronger
+            support system for individuals and families. Our programs are designed to help
+            registered members prepare for different needs while encouraging financial discipline,
+            unity, responsibility, and mutual support.
           </p>
-          <p className="mt-4 leading-relaxed text-gray-600">
-            The platform exists so members can check their own position: how many months they have
-            contributed, whether a package&apos;s waiting period is met, and whether their cover is
-            current. You should not have to call the office to find out if you are covered.
+          <ul className="mt-6 grid gap-2 sm:grid-cols-2">
+            {programs.map((p) => (
+              <li key={p} className="flex items-start gap-2 text-sm text-gray-700">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-luma-600" aria-hidden />
+                {p}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-xs leading-relaxed text-gray-500">
+            Programs and benefits are subject to the official LUMA Welfare constitution, rules,
+            contribution requirements, eligibility conditions, and applicable procedures.
           </p>
         </section>
 
+        <section className="mt-8 grid gap-6 max-w-3xl lg:grid-cols-2">
+          <div className="glass-card p-8">
+            <h2 className="text-xl font-bold text-gray-900">Our Vision</h2>
+            <p className="mt-3 leading-relaxed text-gray-600">
+              To become a trusted welfare community that empowers members and families to prepare
+              for life&apos;s challenges and opportunities together.
+            </p>
+          </div>
+          <div className="glass-card p-8">
+            <h2 className="text-xl font-bold text-gray-900">Our Mission</h2>
+            <p className="mt-3 leading-relaxed text-gray-600">
+              To provide affordable, organized, and member-focused welfare programs that promote
+              mutual support, financial responsibility, and community development.
+            </p>
+          </div>
+        </section>
+
         <section className="mt-12">
-          <h2 className="text-2xl font-bold text-gray-900">Our Values</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Our Commitment to Members</h2>
           <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {values.map((v) => (
-              <MotionCard key={v.name} className="glass-card p-6">
+            {commitments.map((c) => (
+              <MotionCard key={c.name} className="glass-card p-6">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-luma-50 text-luma-700" aria-hidden="true">
-                  <Icon name={v.icon} className="h-5 w-5" />
+                  <Icon name={c.icon} className="h-5 w-5" />
                 </div>
-                <h3 className="mt-3 font-bold text-gray-900">{v.name}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-600">{v.text}</p>
+                <h3 className="mt-3 font-bold text-gray-900">{c.name}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">{c.text}</p>
               </MotionCard>
             ))}
           </div>
+        </section>
+
+        <section className="glass-card mt-12 max-w-3xl p-8">
+          <h2 className="text-2xl font-bold text-gray-900">Who Can Join?</h2>
+          <p className="mt-4 leading-relaxed text-gray-600">
+            LUMA Welfare is designed for people who want to become part of an organized welfare
+            community. Membership is subject to the official LUMA Welfare constitution, membership
+            requirements, contribution rules, and eligibility conditions.
+          </p>
+          <p className="mt-4 leading-relaxed text-gray-600">
+            When you become a member, you become part of more than a welfare program — you become
+            part of a community that believes in supporting one another.
+          </p>
+          <Link
+            to="/register"
+            className="mt-6 inline-flex min-h-[44px] items-center rounded-lg bg-luma-700 px-5 text-sm font-semibold text-white hover:bg-luma-800"
+          >
+            Join LUMA Welfare
+          </Link>
         </section>
 
         {(siteConfig.phoneDisplay || siteConfig.email || siteConfig.whatsappUrl) && (

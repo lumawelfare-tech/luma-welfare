@@ -24,7 +24,11 @@ import { KB_DOC_BUCKET, withSignedKbDocumentUrls } from '../shared/storage-signe
  */
 
 const ACCESS_LEVELS = new Set(['public', 'member', 'staff', 'admin', 'restricted'])
-const STATUSES = new Set(['draft', 'approved', 'archived'])
+const STATUSES = new Set(['draft', 'under_review', 'approved', 'archived'])
+const CATEGORIES = new Set([
+  'ORGANIZATIONAL', 'PUBLIC_CONTENT', 'MEMBERSHIP', 'POLICY', 'PROGRAM',
+  'CLAIMS', 'FINANCE', 'COMMUNITY', 'OTHER',
+])
 
 function sanitizeText(input: unknown, max: number): string {
   if (typeof input !== 'string') return ''
@@ -271,6 +275,18 @@ Deno.serve(async (req) => {
         updates.status = 'archived'
         updates.archived_at = now
         updates.archived_by = session.id
+      } else if (lifecycle === 'under_review') {
+        requirePermission(session, 'documents', 'update')
+        if (existing.status === 'archived') {
+          return new Response(JSON.stringify({ message: 'Archived documents cannot be submitted for review.', code: 'VALIDATION' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        updates.status = 'under_review'
+        updates.approved_at = null
+        updates.approved_by = null
+        updates.archived_at = null
+        updates.archived_by = null
       } else if (lifecycle === 'draft') {
         requirePermission(session, 'documents', 'update')
         updates.status = 'draft'
@@ -290,7 +306,15 @@ Deno.serve(async (req) => {
           updates.title = title
         }
         if (body.summary !== undefined) updates.summary = sanitizeText(body.summary, 2000) || null
-        if (body.category !== undefined) updates.category = sanitizeText(body.category, 100) || null
+        if (body.category !== undefined) {
+          const category = sanitizeText(body.category, 100) || null
+          if (category && !CATEGORIES.has(category)) {
+            return new Response(JSON.stringify({ message: 'Invalid document category.', code: 'VALIDATION' }), {
+              status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+          }
+          updates.category = category
+        }
         if (body.slug !== undefined) updates.slug = sanitizeText(body.slug, 80) || null
         if (typeof body.accessLevel === 'string' || typeof body.access_level === 'string') {
           const accessLevel = sanitizeText(body.accessLevel ?? body.access_level, 32)
@@ -303,6 +327,13 @@ Deno.serve(async (req) => {
         }
         if (Array.isArray(body.tags)) {
           updates.tags = body.tags.filter((t: unknown) => typeof t === 'string').map((t: string) => sanitizeText(t, 40)).filter(Boolean).slice(0, 20)
+        }
+        if (body.versionLabel !== undefined || body.version_label !== undefined) {
+          updates.version_label = sanitizeText(body.versionLabel ?? body.version_label, 40) || null
+        }
+        if (body.effectiveDate !== undefined || body.effective_date !== undefined) {
+          const raw = body.effectiveDate ?? body.effective_date
+          updates.effective_date = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null
         }
       }
 
