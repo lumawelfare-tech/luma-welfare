@@ -237,7 +237,7 @@ export function AdminGallery() {
 
             {preview && (
               <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-                <img src={preview} alt="Preview" className="max-h-48 w-full object-contain" />
+                <img loading="lazy" decoding="async" src={preview} alt="Preview" className="max-h-48 w-full object-contain" />
                 <button type="button" onClick={() => { setPreview(null); if (fileRef.current) fileRef.current.value = '' }}
                   aria-label="Remove image preview" className="absolute right-2 top-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -276,7 +276,7 @@ export function AdminGallery() {
           {filtered.map((item) => (
             <div key={item.id} className="group overflow-hidden rounded-xl border border-gray-200 bg-white">
               <div className="aspect-square overflow-hidden bg-gray-100">
-                <img src={item.image_url} alt={item.title ?? 'Gallery image'} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                <img loading="lazy" decoding="async" src={item.image_url} alt={item.title ?? 'Gallery image'} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
               </div>
               <div className="p-3">
                 {item.title && <div className="font-medium text-gray-900 text-sm truncate">{item.title}</div>}

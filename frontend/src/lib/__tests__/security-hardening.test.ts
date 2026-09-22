@@ -38,6 +38,19 @@ describe('rate-limit source contracts', () => {
     expect(read('supabase/functions/payments-initiate/index.ts')).toContain('rateLimitAsync')
   })
 
+  it('auth-login writes auth_failed audit without logging full email', () => {
+    const src = read('supabase/functions/auth-login/index.ts')
+    expect(src).toContain("action: 'auth_failed'")
+    expect(src).toContain('email_domain')
+    expect(src).toContain('getClientIp')
+    expect(src).not.toMatch(/meta:\s*\{[^}]*\bemail\s*:/)
+  })
+
+  it('get_security_status counts auth_failed', () => {
+    const mig = read('supabase/migrations/20260922100000_align_auth_failed_security_status.sql')
+    expect(mig).toContain("action = 'auth_failed'")
+  })
+
   it('migration defines atomic consume_rate_limit RPC', () => {
     const mig = read('supabase/migrations/20260921120000_rate_limit_buckets.sql')
     expect(mig).toContain('CREATE OR REPLACE FUNCTION public.consume_rate_limit')

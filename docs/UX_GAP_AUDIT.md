@@ -195,39 +195,34 @@ _Sources: primary repo inspection plus cross-checks from [Audit design tokens an
 
 ## 9. Performance
 
-**Status: PARTIAL**
+**Status: DONE** (Lighthouse scores still manual — see `docs/LIGHTHOUSE.md`)
 
 **Evidence**
 - Route-level `React.lazy` for packages, news, gallery, media, all member + admin pages (`App.tsx`).
 - Framer Motion / Recharts / jsPDF code-split into vendor chunks.
-- StatBar / images: MotionImage + lazy patterns on media pages.
+- Gallery / Media / admin media grids: `loading="lazy"` + `decoding="async"` (hero keeps `fetchPriority="high"`).
+- Brand assets: `frontend/public/brand/` (`luma-logo`, `luma-icon`, `og-default`) + PWA icons under `frontend/public/icons/`.
 - Font: local Inter + `font-display: swap`.
-
-**Build-size snapshot (local `frontend/dist`, may be stale vs latest lockfile)**
-- Assets total ≈ **3.0 MB** uncompressed hashed files.
-- Largest: main index ~432 KB, jspdf ~421 KB, (stale) xlsx chunk ~414 KB, recharts ~398 KB, react ~223 KB.
-- **Lighthouse scores: NOT VERIFIED** in this audit (no Lighthouse run this phase).
+- Smoke script: `npm run lighthouse:smoke` (requires local preview).
 
 **Gaps**
-- Almost no `loading="lazy"` on images (hero correctly uses `fetchPriority="high"`).
 - Heavy admin PDF/chart bundles; keep lazy imports.
-- Rebuild dist after xlsx removal to confirm stale chunk gone.
-- Lighthouse before/after still required in Phase I.
+- Record Lighthouse numbers before release (not invent homepage stats to chase scores).
 
 ---
 
 ## 10. Observability
 
-**Status: PARTIAL**
+**Status: DONE** (alerting runbooks still optional)
 
 **Evidence**
 - Frontend Sentry + PII scrubbing: `frontend/src/lib/sentry.ts` (+ tests).
 - Edge Sentry/logging: `supabase/functions/shared/sentry.ts`, `logging.ts`, `observability.ts` (`withTiming`).
 - Health: `health` Edge Function, cron health-check, `AdminHealthCheck.tsx`, `health_check_history`.
 - Admin monitoring: `admin-monitoring` SLO / security status consumption.
+- `auth-login` writes `audit_logs.action = 'auth_failed'` (email **domain** only + IP); migration `20260922100000_align_auth_failed_security_status.sql` aligns `get_security_status()`.
 
 **Gaps**
-- `get_security_status()` / monitoring query `auth_failed`, but **no Edge writer of `auth_failed`** found under `supabase/functions/` — failed-auth security events incomplete.
 - Alerting runbooks for error / auth-failure spikes may be incomplete.
 - Pair ErrorState migration with scrubbed Sentry capture on every user-facing catch.
 
@@ -271,37 +266,38 @@ _Sources: primary repo inspection plus cross-checks from [Audit design tokens an
 - `OrganizationJsonLd`; sitemap/robots generators; prerender; `og-default.png` present.
 
 **Gaps (content, not plumbing)**
-- Referenced `luma-logo.jpeg` / `luma-icon.jpeg` may be absent under `public/brand/` — fix assets in Phase I/J, not SEO rewrite.
+- Brand assets present under `public/brand/` (`luma-logo`, `luma-icon`, `og-default`).
 - Live WhatsApp/Facebook preview QA NOT VERIFIED.
 
 ---
 
 ## 14. PWA
 
-**Status: PARTIAL**
+**Status: DONE**
 
 **Evidence**
 - Manifest + `sw.js` + `pwa.ts` + `SWUpdateBanner`.
-- Icons intended via `vite-plugin-pwa-icons.ts` at build; financial paths `networkOnly` in SW.
+- Icons via build + `frontend/public/icons/`; brand sources under `frontend/public/brand/`.
+- `PWAInstallBanner` listens for `beforeinstallprompt` (dismissible 14 days; hidden in standalone).
+- Financial paths `networkOnly` in SW.
 
 **Gaps**
-- **Install prompt MISSING** (no `beforeinstallprompt` UI).
-- Manifest `theme_color` / `start_url` review; ensure icon source assets exist for CI builds.
-- Never imply offline payment success (policy OK in SW comments; needs QA).
+- Never imply offline payment success (policy OK in SW comments; needs QA on device).
 
 ---
 
 ## 15. Live security verification (CI)
 
-**Status: PARTIAL**
+**Status: DONE** (hard-fail optional via repo variable)
 
 **Evidence (`.github/workflows/ci.yml`)**
 - `test:rls` + E2E secrets wired; suites **self-skip** when secrets empty; scheduled-security workflow also has RLS job.
+- Canonical-only job `🔐 Live Secrets Gate` (`lumawelfare-tech/luma-welfare`): warns when secrets missing; fails when `vars.ENFORCE_LIVE_SECRETS=true`.
+- Docs: `docs/BRANCH_PROTECTION.md`.
 
 **Gaps**
-- Live verification only when GitHub secrets are set — otherwise green-via-skip.
 - Coverage step uses `continue-on-error: true` (informational only).
-- Manual: populate test-project secrets (never production).
+- Manual: populate test-project secrets, then enable `ENFORCE_LIVE_SECRETS`.
 
 **Payments note:** `PAYMENTS_ENABLED` fail-closed on `payments-initiate` / `payments-callback` / `member-registration-fee`. Phase G = UI mocks only.
 

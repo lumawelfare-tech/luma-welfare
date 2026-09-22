@@ -27,6 +27,7 @@
     "verify:deploy": "bash scripts/verify-deploy.sh",
     "test:e2e": "npx playwright test",
     "test:e2e:ui": "npx playwright test --ui",
+    "lighthouse:smoke": "npx --yes lighthouse@12 http://127.0.0.1:4173 --only-categories=performance,accessibility,best-practices,seo --chrome-flags=--headless --output=json --output-path=./lighthouse-report.json --quiet",
     "prepare": "husky || true"
   },
   "engines": {

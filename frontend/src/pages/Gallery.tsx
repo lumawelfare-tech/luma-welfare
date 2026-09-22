@@ -79,6 +79,8 @@ export function Gallery() {
                 <figure className="glass-card group overflow-hidden">
                   <div className="overflow-hidden">
                     <img
+                      loading="lazy"
+                      decoding="async"
                       src={g.image_url}
                       alt={g.title ?? 'Luma Welfare event'}
                       className="h-56 w-full object-cover transition-transform duration-[var(--motion-normal)] ease-[var(--luma-ease-out)] motion-reduce:transition-none group-hover:scale-[1.03]"

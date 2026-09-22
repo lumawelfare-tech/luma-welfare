@@ -1,8 +1,9 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { createUserClient, createAdminClient } from '../shared/supabase.ts'
+import { createUserClient, createAdminClient, logAudit } from '../shared/supabase.ts'
 import { rateLimitAsync, addRateLimitHeaders } from '../shared/rate-limit.ts'
 import { parseLoginBody, ValidationError } from '../shared/validate.ts'
 import { withLogging } from '../shared/logging.ts'
+import { getClientIp } from '../shared/cloudflare.ts'
 
 /**
  * Auth Login — authenticate user and check 2FA status
@@ -45,6 +46,20 @@ Deno.serve(withLogging('auth-login', async (req) => {
     const { data, error } = await userClient.auth.signInWithPassword({ email, password })
 
     if (error) {
+      // Record failed login for security monitoring (no full email — domain only).
+      try {
+        const emailDomain = email.includes('@') ? email.split('@')[1]?.toLowerCase() ?? null : null
+        await logAudit(createAdminClient(), {
+          actor_id: null,
+          actor_role: null,
+          action: 'auth_failed',
+          resource: 'auth',
+          meta: { code: 'INVALID_LOGIN', email_domain: emailDomain },
+          ip: getClientIp(req),
+        })
+      } catch {
+        // Never block the login response on audit failure
+      }
       return new Response(JSON.stringify({ message: 'Email or password is incorrect.', code: 'INVALID_LOGIN' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

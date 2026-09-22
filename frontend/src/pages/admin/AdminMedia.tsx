@@ -540,7 +540,7 @@ export function AdminMedia() {
                     {pendingFiles.map((pf, i) => (
                       <div key={i} className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
                         {pf.preview ? (
-                          <img src={pf.preview} alt="" className="h-10 w-10 rounded object-cover" />
+                          <img loading="lazy" decoding="async" src={pf.preview} alt="" className="h-10 w-10 rounded object-cover" />
                         ) : (
                           <div className="flex h-10 w-10 items-center justify-center rounded bg-gray-200">
                             <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -569,7 +569,7 @@ export function AdminMedia() {
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">Replace File (optional)</label>
                 <div className="flex items-center gap-4">
                   {editing.thumbnail_url || editing.media_type === 'image' ? (
-                    <img src={editing.thumbnail_url || editing.file_url} alt="" className="h-20 w-20 rounded-lg object-cover border border-gray-200" />
+                    <img loading="lazy" decoding="async" src={editing.thumbnail_url || editing.file_url} alt="" className="h-20 w-20 rounded-lg object-cover border border-gray-200" />
                   ) : (
                     <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-gray-100 border border-gray-200">
                       <svg className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -764,7 +764,7 @@ export function AdminMedia() {
               {/* Thumbnail */}
               <div className="relative aspect-square overflow-hidden bg-gray-100">
                 {item.media_type === 'image' ? (
-                  <img src={item.thumbnail_url || item.file_url} alt={item.title}
+                  <img loading="lazy" decoding="async" src={item.thumbnail_url || item.file_url} alt={item.title}
                     className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
@@ -960,7 +960,7 @@ function PreviewModal({ item, onClose }: { item: MediaItem; onClose: () => void 
         {/* Content */}
         <div className="flex flex-col">
           {item.media_type === 'image' && (
-            <img src={item.thumbnail_url || item.file_url} alt={item.title} className="max-h-[60vh] w-full object-contain bg-gray-50" />
+            <img loading="lazy" decoding="async" src={item.thumbnail_url || item.file_url} alt={item.title} className="max-h-[60vh] w-full object-contain bg-gray-50" />
           )}
           {item.media_type === 'video' && (
             <video src={item.file_url} controls className="max-h-[60vh] w-full bg-black" preload="metadata" />

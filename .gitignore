@@ -17,3 +17,5 @@ supabase/supabase/
 .vercel
 .env*
 test-results/
+lighthouse-report.json
+lighthouse-report.html

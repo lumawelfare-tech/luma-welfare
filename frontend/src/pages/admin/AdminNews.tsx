@@ -232,7 +232,7 @@ export function AdminNews() {
               </div>
               {coverPreview && (
                 <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-                  <img src={coverPreview} alt="Cover preview" className="max-h-40 w-full object-contain" />
+                  <img loading="lazy" decoding="async" src={coverPreview} alt="Cover preview" className="max-h-40 w-full object-contain" />
                   <button type="button" onClick={() => { setCoverPreview(null); if (fileRef.current) fileRef.current.value = '' }} aria-label="Remove cover image preview"
                     className="absolute right-2 top-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70">
                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -285,7 +285,7 @@ export function AdminNews() {
             <div key={item.id} className="flex items-start gap-4 rounded-xl border border-gray-200 bg-white p-4">
               {item.cover_image && (
                 <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                  <img src={item.cover_image} alt="" className="h-full w-full object-cover" />
+                  <img loading="lazy" decoding="async" src={item.cover_image} alt="" className="h-full w-full object-cover" />
                 </div>
               )}
               <div className="flex-1 min-w-0">

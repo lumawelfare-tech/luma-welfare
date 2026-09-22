@@ -135,7 +135,7 @@ export function Media() {
                 >
                   <div className="aspect-video overflow-hidden bg-luma-50/50">
                     {item.media_type === 'image' ? (
-                      <img src={item.thumbnail_url || item.file_url} alt={item.title}
+                      <img loading="lazy" decoding="async" src={item.thumbnail_url || item.file_url} alt={item.title}
                         className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
@@ -232,7 +232,7 @@ export function Media() {
               >
                 <div className="relative aspect-square overflow-hidden bg-luma-50/40">
                   {item.media_type === 'image' ? (
-                    <img src={item.thumbnail_url || item.file_url} alt={item.title}
+                    <img loading="lazy" decoding="async" src={item.thumbnail_url || item.file_url} alt={item.title}
                       className="h-full w-full object-cover transition-transform duration-[var(--motion-normal)] ease-[var(--luma-ease-out)] motion-reduce:transition-none group-hover:scale-[1.03]" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
@@ -344,7 +344,7 @@ function ViewerModal({ item, onClose }: { item: MediaItem; onClose: () => void }
         <div className="flex flex-col">
           {/* Media content */}
           {item.media_type === 'image' && (
-            <img src={item.thumbnail_url || item.file_url} alt={item.title}
+            <img loading="lazy" decoding="async" src={item.thumbnail_url || item.file_url} alt={item.title}
               className="max-h-[60vh] w-full object-contain bg-gray-50" />
           )}
           {item.media_type === 'video' && (
