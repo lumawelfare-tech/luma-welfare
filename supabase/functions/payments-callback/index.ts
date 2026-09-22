@@ -220,32 +220,47 @@ Deno.serve(async (req) => {
       const memberId = result?.[0]?.member_id
 
       if (success && memberId) {
+        const { data: feeRow } = await adminClient
+          .from('registration_fees')
+          .select('amount, currency')
+          .eq('member_id', memberId)
+          .eq('fee_type', 'registration')
+          .maybeSingle()
+        const paidAmount = feeRow?.amount != null && Number(feeRow.amount) > 0
+          ? Number(feeRow.amount)
+          : null
+        const paidCurrency = feeRow?.currency === 'KES' ? 'KES' : 'KES'
+
         await sendNotification(adminClient, {
           memberId,
           type: 'payment_confirmed',
           subject: 'Membership Activated',
-          body: 'Your KSh 300 activation payment was successful. Your Luma Welfare membership is now active. You can explore and join welfare packages.',
+          body: paidAmount != null
+            ? `Your KSh ${paidAmount.toLocaleString('en-KE')} activation payment was successful. Your Luma Welfare membership is now active. You can explore and join welfare packages.`
+            : 'Your activation payment was successful. Your Luma Welfare membership is now active. You can explore and join welfare packages.',
           meta: { kind: 'registration_fee', mpesaReceipt: meta.mpesaReceipt },
           emailButtonText: 'Explore Packages',
           emailButtonUrl: 'https://luma-welfare.vercel.app/join',
         })
 
-        await adminClient.from('financial_ledger').insert({
-          transaction_type: 'registration_fee',
-          member_id: memberId,
-          entry_type: 'credit',
-          amount: 300,
-          currency: 'KES',
-          reference: meta.mpesaReceipt,
-          description: 'Registration fee payment',
-        })
+        if (paidAmount != null) {
+          await adminClient.from('financial_ledger').insert({
+            transaction_type: 'registration_fee',
+            member_id: memberId,
+            entry_type: 'credit',
+            amount: paidAmount,
+            currency: paidCurrency,
+            reference: meta.mpesaReceipt,
+            description: 'Registration fee payment',
+          })
+        }
 
         await logAudit(adminClient, {
           actor_id: memberId,
           action: 'registration_fee_paid',
           resource: 'registration_fee',
           resource_id: memberId,
-          meta: { mpesaReceipt: meta.mpesaReceipt, resultDesc: ResultDesc },
+          meta: { mpesaReceipt: meta.mpesaReceipt, resultDesc: ResultDesc, amount: paidAmount },
         })
       }
 

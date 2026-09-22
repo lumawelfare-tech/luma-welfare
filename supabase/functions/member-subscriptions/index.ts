@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
       .eq('fee_type', 'registration')
       .maybeSingle()
     if (!regFee || regFee.status !== 'paid') {
-      return new Response(JSON.stringify({ message: 'You must pay the KSh 300 registration fee before subscribing to packages.', code: 'REGISTRATION_FEE_REQUIRED' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ message: 'You must pay the registration activation fee before subscribing to packages.', code: 'REGISTRATION_FEE_REQUIRED' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     const { data: pkg } = await adminClient

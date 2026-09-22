@@ -1,12 +1,19 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
+import {
+  loadRegistrationFeeConfig,
+  RegistrationFeeConfigError,
+} from '../shared/registration-fee.ts'
 
 /**
  * Member Registration Fee — Check status, Initiate M-Pesa STK Push, Check status
  *
  * GET  /member-registration-fee           — check registration fee status
- * POST /member-registration-fee           — initiate M-Pesa STK Push for KSh 300
+ * POST /member-registration-fee           — initiate M-Pesa STK Push (amount from platform_settings)
  * POST /member-registration-fee?action=check-status — poll for payment confirmation
+ *
+ * Amount is always loaded from platform_settings.registration_fee (fail closed).
+ * PAYMENTS_ENABLED must stay false in production until Daraja go-live.
  */
 
 const DARADA_BASE: Record<string, string> = {
@@ -135,6 +142,23 @@ Deno.serve(async (req) => {
         })
       }
 
+      let feeConfig: { amount: number; currency: 'KES' }
+      try {
+        feeConfig = await loadRegistrationFeeConfig(adminClient)
+      } catch (e) {
+        const message = e instanceof RegistrationFeeConfigError
+          ? 'Registration fee is not configured. Please contact support.'
+          : 'Could not load registration fee configuration.'
+        return new Response(JSON.stringify({ message, code: 'REGISTRATION_FEE_CONFIG' }), {
+          status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Prefer amount already recorded on the member's fee row (historical accuracy)
+      const chargeAmount = existing?.amount != null && Number(existing.amount) > 0
+        ? Number(existing.amount)
+        : feeConfig.amount
+
       // Check if payments are enabled
       const paymentsEnabled = Deno.env.get('PAYMENTS_ENABLED') === 'true'
 
@@ -152,8 +176,8 @@ Deno.serve(async (req) => {
             .insert({
               member_id: user.id,
               fee_type: 'registration',
-              amount: 300,
-              currency: 'KES',
+              amount: feeConfig.amount,
+              currency: feeConfig.currency,
               status: 'pending',
               payment_method: 'mpesa',
             })
@@ -164,13 +188,14 @@ Deno.serve(async (req) => {
           action: 'registration_fee_initiated',
           resource: 'registration_fee',
           resource_id: user.id,
-          meta: { amount: 300, phone: formattedPhone, payments_enabled: false },
+          meta: { amount: chargeAmount, phone: formattedPhone, payments_enabled: false },
         })
 
         return new Response(JSON.stringify({
           message: 'Payment request recorded. M-Pesa is not yet enabled — an admin will verify your payment.',
           status: 'pending',
           payments_enabled: false,
+          registrationFee: { amount: chargeAmount, currency: feeConfig.currency },
         }), {
           status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -188,7 +213,6 @@ Deno.serve(async (req) => {
       }
 
       // Create/update fee record as pending
-      const idempotencyKey = `REG-${user.id}-${Date.now()}`
       if (existing) {
         await adminClient
           .from('registration_fees')
@@ -201,8 +225,8 @@ Deno.serve(async (req) => {
           .insert({
             member_id: user.id,
             fee_type: 'registration',
-            amount: 300,
-            currency: 'KES',
+            amount: feeConfig.amount,
+            currency: feeConfig.currency,
             status: 'pending',
             payment_method: 'mpesa',
           })
@@ -217,13 +241,13 @@ Deno.serve(async (req) => {
         Password: password,
         Timestamp: timestamp,
         TransactionType: 'CustomerPayBillOnline',
-        Amount: 300,
+        Amount: chargeAmount,
         PartyA: formattedPhone,
         PartyB: shortcode,
         PhoneNumber: formattedPhone,
         CallBackURL: callbackUrl,
         AccountReference: `LUMA-REG-${user.id.slice(0, 8)}`,
-        TransactionDesc: 'Luma Welfare - KSh 300 Activation Fee',
+        TransactionDesc: `Luma Welfare - KSh ${chargeAmount} Activation Fee`,
       }
 
       const stkRes = await fetch(`${base}/mpesa/stkpush/v1/processrequest`, {
@@ -265,7 +289,7 @@ Deno.serve(async (req) => {
         action: 'registration_fee_stk_sent',
         resource: 'registration_fee',
         resource_id: user.id,
-        meta: { amount: 300, phone: formattedPhone, checkoutRequestId: stkData.CheckoutRequestID },
+        meta: { amount: chargeAmount, phone: formattedPhone, checkoutRequestId: stkData.CheckoutRequestID },
       })
 
       return new Response(JSON.stringify({
@@ -281,6 +305,14 @@ Deno.serve(async (req) => {
       status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
+    if (err instanceof RegistrationFeeConfigError) {
+      return new Response(JSON.stringify({
+        message: 'Registration fee is not configured. Please contact support.',
+        code: 'REGISTRATION_FEE_CONFIG',
+      }), {
+        status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal server error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

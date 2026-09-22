@@ -167,7 +167,7 @@ export function JoinPackages() {
           ]}
         />
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
-          <h2 className="text-lg font-semibold text-gray-900">Complete your KSh 300 activation fee</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Complete your activation fee</h2>
           <p className="mt-2 text-sm text-gray-600">
             Online M-Pesa is not live yet. An administrator can verify your fee, or you can try online payment from the dashboard if it has been enabled.
           </p>

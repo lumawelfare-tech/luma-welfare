@@ -2,11 +2,24 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
 import { useHead } from '../lib/seo'
+import { memberStatusLabel } from '../lib/applicationPrograms'
+import {
+  clearPendingApplication,
+  resolvePendingApplication,
+  type PendingApplication,
+} from '../lib/pendingApplication'
 
 const OTP_LENGTH = 6
 const RESEND_SECONDS = 60
 
 type Phase = 'input' | 'verifying' | 'success'
+
+type VerifyLocationState = {
+  email?: string
+  applicationNumber?: string
+  membershipStatus?: string
+  registrationFee?: { amount: number; currency: string }
+}
 
 function messageFor(err: unknown): string {
   if (!(err instanceof ApiError)) return 'Network error. Check your connection and try again.'
@@ -35,7 +48,8 @@ export function VerifyEmail() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
 
-  const stateEmail = (location.state as { email?: string } | null)?.email
+  const navState = (location.state as VerifyLocationState | null) ?? null
+  const stateEmail = navState?.email
   const initialEmail = stateEmail ?? searchParams.get('email') ?? ''
 
   const [email, setEmail] = useState(initialEmail)
@@ -46,8 +60,25 @@ export function VerifyEmail() {
   const [notice, setNotice] = useState<string | null>(null)
   const [resending, setResending] = useState(false)
   const [countdown, setCountdown] = useState(initialEmail ? RESEND_SECONDS : 0)
+  const [pendingApp, setPendingApp] = useState<PendingApplication | null>(() =>
+    resolvePendingApplication({
+      stateEmail: stateEmail ?? initialEmail,
+      stateApplicationNumber: navState?.applicationNumber,
+      stateRegistrationFee: navState?.registrationFee ?? null,
+    }),
+  )
 
   const inputsRef = useRef<(HTMLInputElement | null)[]>([])
+
+  // Re-resolve after refresh / when email becomes known
+  useEffect(() => {
+    const resolved = resolvePendingApplication({
+      stateEmail: email || stateEmail,
+      stateApplicationNumber: navState?.applicationNumber,
+      stateRegistrationFee: navState?.registrationFee ?? null,
+    })
+    setPendingApp(resolved)
+  }, [email, stateEmail, navState?.applicationNumber, navState?.registrationFee])
 
   // Countdown ticker
   useEffect(() => {
@@ -75,6 +106,7 @@ export function VerifyEmail() {
         )
         if (data.verified || data.alreadyVerified) {
           setPhase('success')
+          clearPendingApplication()
           setTimeout(() => navigate('/login', { state: { verified: true } }), 1600)
         }
       } catch (err) {
@@ -281,6 +313,37 @@ export function VerifyEmail() {
               </p>
             )}
           </div>
+
+          {pendingApp?.applicationNumber && phase !== 'success' && (
+            <div
+              className="mt-6 rounded-xl border border-luma-100 bg-luma-50/60 px-4 py-4 text-left"
+              data-testid="application-received"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-luma-700">
+                Application received
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                Your application has been received successfully.
+              </p>
+              <dl className="mt-3 space-y-2 text-sm">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt className="text-gray-500">Application number</dt>
+                  <dd className="font-semibold text-gray-900" data-testid="application-number">
+                    {pendingApp.applicationNumber}
+                  </dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt className="text-gray-500">Status</dt>
+                  <dd className="font-semibold text-amber-800" data-testid="membership-status">
+                    {memberStatusLabel('pending_approval')}
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-xs text-gray-500">
+                Please verify your email using the OTP below.
+              </p>
+            </div>
+          )}
 
           {phase === 'success' ? (
             <div className="mt-8 text-center">

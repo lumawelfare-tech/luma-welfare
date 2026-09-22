@@ -480,7 +480,7 @@ export function Dashboard() {
               Complete activation
             </button>
           <p className="mt-3 text-xs text-gray-500">
-            One-time KSh 300 fee. Contact the office if you need an administrator to verify payment.
+            One-time activation fee. Contact the office if you need an administrator to verify payment.
           </p>
           <Link to="/contact" className="mt-2 inline-block text-xs font-medium text-luma-700 hover:underline min-h-[44px] leading-[44px]">
             Contact the welfare office
@@ -495,7 +495,7 @@ export function Dashboard() {
                 <>
                   <div className="px-6 py-5 border-b border-gray-200">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">Pay KSh 300</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">Pay activation fee</h3>
                       <button onClick={() => setShowPayModal(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Close">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
@@ -535,7 +535,7 @@ export function Dashboard() {
               {payStep === 'waiting' && (
                 <PaymentStatusPanel
                   step="waiting"
-                  message="An M-Pesa payment request has been sent to your phone. Enter your M-Pesa PIN to complete the KSh 300 activation payment."
+                  message="An M-Pesa payment request has been sent to your phone. Enter your M-Pesa PIN to complete the activation payment."
                 >
                   {payError && (
                     <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">{payError}</div>
@@ -553,7 +553,7 @@ export function Dashboard() {
                   message={
                     isPaymentsUiMock()
                       ? 'Mock confirmation — membership was not activated.'
-                      : 'Your KSh 300 activation payment was successful. Your Luma Welfare membership is now active.'
+                      : 'Your activation payment was successful. Your Luma Welfare membership is now active.'
                   }
                   primaryLabel="Explore Packages"
                   onPrimary={() => setShowPayModal(false)}

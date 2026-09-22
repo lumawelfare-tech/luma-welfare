@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useHead } from '../lib/seo'
 import { AuthCard } from '../components/PageHero'
+import { clearPendingApplication } from '../lib/pendingApplication'
+import { memberStatusLabel } from '../lib/applicationPrograms'
 
 /**
  * Shown after email verification while membership remains pending_approval.
@@ -10,6 +13,10 @@ import { AuthCard } from '../components/PageHero'
 export function ApplicationStatus() {
   useHead('Application status', undefined, { noindex: true })
   const { member, registrationFeePaid, logout } = useAuth()
+
+  useEffect(() => {
+    clearPendingApplication()
+  }, [])
 
   const appNo = member?.application_number ?? '—'
 
@@ -38,7 +45,7 @@ export function ApplicationStatus() {
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-gray-500">Membership status</dt>
-              <dd className="font-semibold text-amber-800">Pending verification</dd>
+              <dd className="font-semibold text-amber-800">{memberStatusLabel(member?.status ?? 'pending_approval')}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-gray-500">Registration fee</dt>

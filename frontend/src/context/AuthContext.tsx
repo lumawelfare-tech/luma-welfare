@@ -57,7 +57,11 @@ type AuthState = {
   twoFaVerified: boolean
   login: (email: string, password: string) => Promise<LoginResult>
   signInWithGoogle: () => Promise<void>
-  register: (input: Record<string, unknown>) => Promise<{ applicationNumber?: string }>
+  register: (input: Record<string, unknown>) => Promise<{
+    applicationNumber?: string
+    membershipStatus?: string
+    registrationFee?: { amount: number; currency: string }
+  }>
   logout: () => void
   setTwoFaVerified: (v: boolean) => void
   refreshMember: () => Promise<void>
@@ -302,9 +306,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // for admin users.
   }
 
-  async function register(input: Record<string, unknown>): Promise<{ applicationNumber?: string }> {
-    const res = await api<{ applicationNumber?: string }>('/auth/register', { method: 'POST', body: input })
-    return { applicationNumber: res.applicationNumber }
+  async function register(input: Record<string, unknown>): Promise<{
+    applicationNumber?: string
+    membershipStatus?: string
+    registrationFee?: { amount: number; currency: string }
+  }> {
+    const res = await api<{
+      applicationNumber?: string
+      membershipStatus?: string
+      registrationFee?: { amount: number; currency: string }
+    }>('/auth/register', { method: 'POST', body: input })
+    return {
+      applicationNumber: res.applicationNumber,
+      membershipStatus: res.membershipStatus,
+      registrationFee: res.registrationFee,
+    }
   }
 
   async function refreshMember(): Promise<void> {

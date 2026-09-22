@@ -5,6 +5,10 @@ import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { generateOtp, hashOtp, OTP_TTL_MINUTES, OtpConfigError } from '../shared/otp.ts'
 import { parseRegisterBody, ValidationError } from '../shared/validate.ts'
 import { PRIVACY_POLICY_VERSION, TERMS_VERSION } from '../shared/legal-versions.ts'
+import {
+  loadRegistrationFeeConfig,
+  RegistrationFeeConfigError,
+} from '../shared/registration-fee.ts'
 
 /**
  * auth-register — creates the Supabase Auth user, a member application in
@@ -59,6 +63,20 @@ Deno.serve(async (req) => {
 
     const adminClient = createAdminClient()
     const consentAt = new Date().toISOString()
+
+    let registrationFee: { amount: number; currency: 'KES' }
+    try {
+      registrationFee = await loadRegistrationFeeConfig(adminClient)
+    } catch (feeCfgErr) {
+      console.error(
+        'auth-register: registration fee config',
+        feeCfgErr instanceof RegistrationFeeConfigError ? feeCfgErr.code : 'FEE_CONFIG',
+      )
+      return json(503, {
+        message: 'Registration is temporarily unavailable (fee configuration). Please try again later.',
+        code: 'REGISTRATION_FEE_CONFIG',
+      })
+    }
 
     const { data: existingId } = await adminClient
       .from('members')
@@ -216,23 +234,28 @@ Deno.serve(async (req) => {
     const { error: feeError } = await adminClient.from('registration_fees').insert({
       member_id: userId,
       fee_type: 'registration',
-      amount: 300,
-      currency: 'KES',
+      amount: registrationFee.amount,
+      currency: registrationFee.currency,
       status: 'unpaid',
     })
     if (feeError) {
+      await adminClient.auth.admin.deleteUser(userId)
       console.error('Failed to create registration fee record:', feeError.code ?? 'FEE')
+      return json(500, { message: 'Could not create membership. Please try again.', code: 'DB_ERROR' })
     }
 
     return json(201, {
       message: emailSent
         ? 'Application received. We sent a 6-digit verification code to your email. It expires in 10 minutes.'
         : 'Application received. We could not send the verification email right now — use "Resend code" on the next screen.',
-      userId,
       email,
       emailSent,
       applicationNumber,
       membershipStatus: 'pending_verification',
+      registrationFee: {
+        amount: registrationFee.amount,
+        currency: registrationFee.currency,
+      },
     })
   } catch (err) {
     if (err instanceof ValidationError) {
@@ -241,6 +264,12 @@ Deno.serve(async (req) => {
     if (err instanceof OtpConfigError) {
       console.error('auth-register: OTP configuration error')
       return json(503, { message: 'Verification is temporarily unavailable.', code: 'OTP_CONFIG' })
+    }
+    if (err instanceof RegistrationFeeConfigError) {
+      return json(503, {
+        message: 'Registration is temporarily unavailable (fee configuration). Please try again later.',
+        code: 'REGISTRATION_FEE_CONFIG',
+      })
     }
     console.error('auth-register: unexpected', err instanceof Error ? err.name : 'unknown')
     return json(500, { message: 'Internal server error', code: 'INTERNAL' })

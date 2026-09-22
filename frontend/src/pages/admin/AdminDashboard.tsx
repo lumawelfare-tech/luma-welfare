@@ -609,7 +609,7 @@ export function AdminDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Registration Fees</h2>
-              <p className="mt-1 text-xs text-gray-500">KSh 300 one-time activation fees</p>
+              <p className="mt-1 text-xs text-gray-500">One-time activation fees (amount from each fee record)</p>
             </div>
             <ExportButtons onCSV={() => exportRegistrationFeesCSV(data.registration_fees)} onPDF={() => exportRegistrationFeesPDF(data.registration_fees)} />
           </div>
@@ -639,8 +639,8 @@ export function AdminDashboard() {
               <span className="font-semibold text-gray-900">{formatKes(totalContributions - totalVerified)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Registration Revenue</span>
-              <span className="font-semibold text-gray-900">{formatKes(data.registration_fees.paid * 300)}</span>
+              <span className="text-gray-500">Paid activation fees</span>
+              <span className="font-semibold text-gray-900">{data.registration_fees.paid}</span>
             </div>
           </div>
         </div>

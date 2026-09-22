@@ -4,6 +4,10 @@ import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
 import { prepareMemberListRow } from '../shared/pii.ts'
 import { parseImportMemberRow, ValidationError } from '../shared/validate.ts'
+import {
+  loadRegistrationFeeConfig,
+  RegistrationFeeConfigError,
+} from '../shared/registration-fee.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -410,6 +414,18 @@ Deno.serve(async (req) => {
         })
       }
 
+      let importRegistrationFee: { amount: number; currency: 'KES' }
+      try {
+        importRegistrationFee = await loadRegistrationFeeConfig(adminClient)
+      } catch (e) {
+        const message = e instanceof RegistrationFeeConfigError
+          ? 'Registration fee is not configured. Cannot import members.'
+          : 'Could not load registration fee configuration.'
+        return new Response(JSON.stringify({ message, code: 'REGISTRATION_FEE_CONFIG' }), {
+          status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       const results: Array<{ row: number; email: string; status: 'success' | 'error'; message: string; member_id?: string }> = []
 
       for (let i = 0; i < importMembers.length; i++) {
@@ -503,7 +519,13 @@ Deno.serve(async (req) => {
 
           await adminClient
             .from('registration_fees')
-            .insert({ member_id: authUser.user.id, fee_type: 'registration', amount: 300, currency: 'KES', status: 'unpaid' })
+            .insert({
+              member_id: authUser.user.id,
+              fee_type: 'registration',
+              amount: importRegistrationFee.amount,
+              currency: importRegistrationFee.currency,
+              status: 'unpaid',
+            })
 
           results.push({
             row: rowNum,

@@ -94,6 +94,10 @@ Deno.serve(async (req) => {
         })
       }
 
+      const feeAmount = existing.amount != null && Number(existing.amount) > 0
+        ? Number(existing.amount)
+        : null
+
       // Update to paid
       await adminClient
         .from('registration_fees')
@@ -112,14 +116,16 @@ Deno.serve(async (req) => {
         action: 'registration_fee_confirmed',
         resource: 'registration_fee',
         resource_id: memberId,
-        meta: { mpesa_receipt: mpesaReceipt, by: session.display_name, notes },
+        meta: { mpesa_receipt: mpesaReceipt, by: session.display_name, notes, amount: feeAmount },
       })
 
       // Notify member that registration fee is confirmed (respects channel preferences)
       await sendNotification(adminClient, {
         memberId,
         subject: 'Membership Activated',
-        body: 'Your KSh 300 registration fee has been confirmed. You can now explore and join welfare packages.',
+        body: feeAmount != null
+          ? `Your KSh ${feeAmount.toLocaleString('en-KE')} registration fee has been confirmed. You can now explore and join welfare packages.`
+          : 'Your registration fee has been confirmed. You can now explore and join welfare packages.',
         emailButtonText: 'Explore Packages',
         emailButtonUrl: 'https://luma-welfare.vercel.app/join',
       })

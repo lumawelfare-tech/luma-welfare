@@ -108,6 +108,26 @@ describe('Phase 1 — RLS containment migration', () => {
   })
 })
 
+describe('Registration fee platform_settings migration', () => {
+  const feeMigration = read('supabase/migrations/20260922270000_registration_fee_platform_settings.sql')
+
+  it('seeds registration_fee setting at KES 300', () => {
+    expect(feeMigration).toContain("'registration_fee'")
+    expect(feeMigration).toMatch(/"amount"\s*:\s*300/)
+    expect(feeMigration).toMatch(/"currency"\s*:\s*"KES"/)
+  })
+
+  it('replaces fixed amount=300 check with structural monetary guards', () => {
+    expect(feeMigration).toContain('DROP CONSTRAINT IF EXISTS chk_registration_fee_amount')
+    expect(feeMigration).toMatch(/amount > 0/)
+    expect(feeMigration).not.toMatch(/CHECK\s*\(\s*amount\s*=\s*300\s*\)/)
+  })
+
+  it('extends public settings allowlist with registration_fee', () => {
+    expect(feeMigration).toMatch(/key IN \('org_contact', 'stats', 'registration_fee'\)/)
+  })
+})
+
 describe('Production security lockdown migration', () => {
   const migration = read('supabase/migrations/20260919160000_production_security_lockdown.sql')
 

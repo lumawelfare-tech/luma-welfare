@@ -9,6 +9,7 @@ import { MotionSection } from '../components/MotionSection'
 import { legalConfig } from '../config/legal'
 import { lumaPress } from '../lib/lumaMotion'
 import { APPLICATION_PROGRAM_OPTIONS } from '../lib/applicationPrograms'
+import { writePendingApplication } from '../lib/pendingApplication'
 
 type FormState = {
   fullName: string
@@ -118,10 +119,19 @@ export function Register() {
         privacyPolicyVersion: legalConfig.privacyPolicyVersion,
         termsVersion: legalConfig.termsVersion,
       })
+      if (result.applicationNumber) {
+        writePendingApplication({
+          email: form.email.trim(),
+          applicationNumber: result.applicationNumber,
+          registrationFee: result.registrationFee,
+        })
+      }
       navigate('/verify-email', {
         state: {
           email: form.email.trim(),
           applicationNumber: result.applicationNumber,
+          membershipStatus: result.membershipStatus ?? 'pending_verification',
+          registrationFee: result.registrationFee,
         },
       })
     } catch (err) {
