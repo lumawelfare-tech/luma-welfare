@@ -41,7 +41,7 @@ type ClaimDocument = {
 
 const claimTypes = [
   'Burial Support',
-  'Hospital Insurance',
+  'Outpatient Hospital Support',
   'Education Support',
   'Business Support',
   'Building Support',

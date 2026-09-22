@@ -50,7 +50,7 @@ const categories: FAQCategory[] = [
     items: [
       {
         q: 'What are Luma Welfare packages?',
-        a: 'Packages are specific welfare categories you can subscribe to, such as Welfare & Burial Support, Hospital Insurance, Education Support, Business Support, Building Support, Land Purchase Support, Farming Support, Wedding Support, Dowry/Ruracio Support, Disaster Relief, Youth Empowerment, and Senior Citizen Support. Each package has its own contribution amount and rules.',
+        a: 'Packages are specific welfare categories you can subscribe to, such as Welfare & Burial Support, Outpatient Hospital Support, Education Support, Business Support, Building Support, Land Purchase Support, Farming Support, Wedding Support, Dowry/Ruracio Support, Disaster Relief, Youth Empowerment, Senior Citizen Support, and Mission of Mercy. Each package has its own contribution amount and rules.',
       },
       {
         q: 'How do I compare packages?',

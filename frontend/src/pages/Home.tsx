@@ -13,7 +13,7 @@ import { lumaHover, lumaPress } from '../lib/lumaMotion'
 const offerCodes = ['hospital', 'education', 'business', 'building', 'dowry', 'wedding']
 
 const offerNames: Record<string, string> = {
-  hospital: 'Hospital Insurance',
+  hospital: 'Outpatient Hospital Support',
   education: 'Education Support',
   business: 'Business Support',
   building: 'Building Support',
