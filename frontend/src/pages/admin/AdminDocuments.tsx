@@ -130,6 +130,18 @@ export function AdminDocuments() {
     }
   }
 
+  async function reindexKb() {
+    setBusy(true)
+    try {
+      const d = await api<{ chunks: number; kb_documents: number }>('/admin/kb-ingest', { method: 'POST', auth: true })
+      addToast('success', `Assistant index rebuilt (${d.chunks} chunks, ${d.kb_documents} org docs).`)
+    } catch (err) {
+      addToast('error', err instanceof ApiError ? err.message : 'Could not rebuild index (is AI_ASSISTANT_ENABLED set?).')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function lifecycle(id: string, action: 'approve' | 'archive' | 'draft') {
     setBusy(true)
     try {
@@ -184,9 +196,14 @@ export function AdminDocuments() {
             Organization knowledge base — Draft → Approved → Archived. Access: Public / Member / Staff / Admin / Restricted. Files stay private with signed downloads.
           </p>
         </div>
-        <button type="button" onClick={() => setShowForm((v) => !v)} className="min-h-11 rounded-lg bg-luma-700 px-4 text-sm font-semibold text-white hover:bg-luma-800">
-          {showForm ? 'Cancel' : 'Upload document'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => void reindexKb()} disabled={busy} className="min-h-11 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            Rebuild assistant index
+          </button>
+          <button type="button" onClick={() => setShowForm((v) => !v)} className="min-h-11 rounded-lg bg-luma-700 px-4 text-sm font-semibold text-white hover:bg-luma-800">
+            {showForm ? 'Cancel' : 'Upload document'}
+          </button>
+        </div>
       </div>
 
       <FilterBar

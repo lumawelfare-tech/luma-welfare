@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders } from './cors.ts'
 import { extractAdmin2faStepUpToken, verifyAdmin2faStepUpToken } from './admin-2fa-token.ts'
 

@@ -92,6 +92,9 @@ verify_jwt = true
 [functions.member-documents]
 verify_jwt = true
 
+[functions.member-assistant]
+verify_jwt = true
+
 [functions.member-receipts]
 verify_jwt = true
 
@@ -136,6 +139,9 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.admin-documents]
+verify_jwt = true
+
+[functions.admin-kb-ingest]
 verify_jwt = true
 
 [functions.admin-packages]

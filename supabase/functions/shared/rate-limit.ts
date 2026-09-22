@@ -14,7 +14,7 @@
  *   sense of distributed protection across isolates).
  */
 
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders } from './cors.ts'
 import {
   memoryConsume,

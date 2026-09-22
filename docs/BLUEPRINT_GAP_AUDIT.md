@@ -131,7 +131,7 @@ New tables likely only for: applications (if not folded into members), documents
 
 ### F. RAG readiness
 
-**Not ready.** No classified documents, approval status, access levels, or vector store. Block RAG until Phase 6.
+**Phase 7 landed (fail-closed).** `kb_chunks` + hybrid FAQ→approved public/member KB search. Enable only with `AI_ASSISTANT_ENABLED=true`. Vector column present for future embeddings; text/trigram search is the default. Never RAGs private member data; refuses claim/payment approval prompts.
 
 **Related stubs (not RAG):** Web Push subscribe CRUD exists; delivery loop in `shared/notifications.ts` is a stub (no real web-push send). SMS/WhatsApp are placeholders. `auth-oauth-provision` is disabled (410); Google is login-only for existing members.
 
@@ -148,7 +148,7 @@ New tables likely only for: applications (if not folded into members), documents
 | **4** | Admin operations | AdminLayout, RBAC | **DONE in-repo** — Applications nav/detail polish, complaints, community support records | permission E2E; drop routes |
 | **5** | Claims & welfare ops | qualify, claims EFs | **DONE in-repo** — checklist stages; manual payout record + notify | claims E2E; ignore new cols |
 | **6** | Documents + KB | storage-signed patterns | **DONE in-repo** — `kb_documents` ACL + Draft→Approved→Archived; private `kb-documents` bucket | storage RLS; private default |
-| **7** | RAG / hybrid AI | auth + member query EFs | ingest, embeddings, assistant | AI security tests; kill switch |
+| **7** | RAG / hybrid AI | auth + member query EFs | **DONE in-repo** — FAQ→KB hybrid, `kb_chunks`, kill switch `AI_ASSISTANT_ENABLED` | AI security tests; kill switch |
 | **8** | Testing + hardening | Playwright, CI | ENFORCE gate, preview→prod | full suite |
 
 **Per phase:** typecheck, lint, unit, qualify, build, migration check, RLS (when secrets), critical E2E. Preview before production.
@@ -157,6 +157,6 @@ New tables likely only for: applications (if not folded into members), documents
 
 ## STOP
 
-**Phases 1–6** landed in-repo. Phase 6: org KB with ACL + lifecycle; private signed downloads (no RAG).
+**Phases 1–7** landed in-repo. Phase 7: hybrid FAQ→KB assistant with fail-closed `AI_ASSISTANT_ENABLED` (default off). No claim/payment AI actions; no private member RAG.
 
-Await approval before **Phase 7** (RAG / hybrid AI — ingest, embeddings, assistant).
+Await approval before **Phase 8** (testing + hardening: ENFORCE gate, preview→prod).

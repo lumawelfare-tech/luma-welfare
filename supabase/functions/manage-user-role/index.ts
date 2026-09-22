@@ -15,7 +15,7 @@ import {
   type StaffRoleName,
 } from '../shared/validate.ts'
 import { sanitizeSearch, buildIlikeOrFilter } from '../shared/search.ts'
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
 /**
  * Staff & Roles — superadmin-only admin assignment management.

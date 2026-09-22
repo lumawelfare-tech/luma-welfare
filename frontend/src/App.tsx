@@ -47,6 +47,7 @@ const MemberDocuments = lazy(() => import('./pages/member/MemberDocuments').then
 const ReceiptsStatements = lazy(() => import('./pages/member/ReceiptsStatements').then(m => ({ default: m.ReceiptsStatements })))
 const Claims = lazy(() => import('./pages/member/Claims').then(m => ({ default: m.Claims })))
 const MemberComplaints = lazy(() => import('./pages/member/MemberComplaints').then(m => ({ default: m.MemberComplaints })))
+const MemberAssistant = lazy(() => import('./pages/member/MemberAssistant').then(m => ({ default: m.MemberAssistant })))
 const Notifications = lazy(() => import('./pages/member/Notifications').then(m => ({ default: m.Notifications })))
 const NotificationPreferences = lazy(() => import('./pages/member/NotificationPreferences').then(m => ({ default: m.NotificationPreferences })))
 
@@ -128,6 +129,7 @@ export default function App() {
                   <Route path="/receipts-statements" element={<ReceiptsStatements />} />
                   <Route path="/claims" element={<Claims />} />
                   <Route path="/complaints" element={<MemberComplaints />} />
+                  <Route path="/assistant" element={<MemberAssistant />} />
                   <Route path="/notifications" element={<Notifications />} />
                   <Route path="/notification-preferences" element={<NotificationPreferences />} />
                 </Route>

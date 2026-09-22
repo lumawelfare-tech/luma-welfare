@@ -3,7 +3,7 @@
  * Prefer short-lived signed URLs; never rely on getPublicUrl for private buckets.
  */
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
 /** Default TTL for private downloads (15 minutes). */
 export const PRIVATE_SIGNED_URL_TTL_SECONDS = 15 * 60
