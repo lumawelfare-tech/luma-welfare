@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -165,8 +166,13 @@ export function Contributions() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
-          <h1 className="text-lg font-semibold text-gray-900">Registration Fee Required</h1>
-          <p className="mt-2 text-sm text-gray-600">Please pay the one-time KSh 300 registration fee before recording contributions.</p>
+          <h1 className="text-lg font-semibold text-gray-900">Activation fee required</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Complete the one-time KSh 300 activation fee before recording contributions. Online M-Pesa is launching soon; an administrator can verify your fee from the dashboard.
+          </p>
+          <Link to="/dashboard" className="mt-4 inline-block rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-luma-800 min-h-[44px]">
+            Back to Dashboard
+          </Link>
         </div>
       </div>
     )
@@ -177,6 +183,10 @@ export function Contributions() {
       <PageHeader
         title="Contributions"
         description="Track your contribution history and record payments for verification."
+        breadcrumbs={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Contributions' },
+        ]}
         actions={
           !showForm && subscriptions.length > 0 ? (
             <button

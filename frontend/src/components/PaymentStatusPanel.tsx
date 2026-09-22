@@ -32,8 +32,8 @@ const DEFAULTS: Record<Exclude<PaymentFlowStep, 'phone'>, { title: string; messa
     message: 'Payment timed out. Please try again.',
   },
   disabled: {
-    title: 'Payments unavailable',
-    message: 'M-Pesa is not enabled right now. An administrator can verify a manual payment.',
+    title: 'Online payments launching soon',
+    message: 'M-Pesa is not enabled right now. An administrator can verify your activation fee or contribution.',
   },
 }
 

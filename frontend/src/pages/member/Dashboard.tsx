@@ -16,7 +16,14 @@ import {
 } from '../../hooks/usePaymentTracker'
 import { ErrorState } from '../../components/ErrorState'
 import { PaymentStatusPanel } from '../../components/PaymentStatusPanel'
-import { isPaymentsUiMock, PAYMENTS_DISABLED_COPY, PAYMENTS_MOCK_COPY } from '../../lib/paymentsUi'
+import {
+  isPaymentsUiMock,
+  preferStkPaymentUi,
+  PAYMENTS_DISABLED_COPY,
+  PAYMENTS_MOCK_COPY,
+  ACTIVATION_FEE_HONEST_COPY,
+  MANUAL_CONTRIBUTION_HINT,
+} from '../../lib/paymentsUi'
 import { reportLoadError } from '../../lib/userFacingError'
 
 type Qualification = {
@@ -296,9 +303,11 @@ export function Dashboard() {
 
   function openPayModal() {
     setShowPayModal(true)
-    setPayStep('phone')
+    // Lead with honest disabled messaging unless mock STK preview is on.
+    setPayStep(preferStkPaymentUi() ? 'phone' : 'disabled')
     setPayError('')
     setPayPhone(member?.phone ?? '')
+    if (!preferStkPaymentUi()) setPaymentsDisabled(true)
   }
 
   async function submitQuickClaim(e: React.FormEvent) {
@@ -448,7 +457,7 @@ export function Dashboard() {
             {PAYMENTS_MOCK_COPY}
           </div>
         )}
-        {paymentsDisabled && (
+        {!isPaymentsUiMock() && (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
             {PAYMENTS_DISABLED_COPY}
           </div>
@@ -461,18 +470,20 @@ export function Dashboard() {
           </div>
           <h2 className="mt-4 text-xl font-bold text-gray-900">Activate Your Luma Welfare Membership</h2>
           <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
-            Pay the one-time KSh 300 activation fee to activate your membership and access available welfare packages.
+            {ACTIVATION_FEE_HONEST_COPY}
           </p>
           <button
               onClick={openPayModal}
               className="mt-6 inline-flex items-center gap-2 rounded-lg bg-luma-700 px-6 py-3 text-sm font-semibold text-white hover:bg-luma-800 active:bg-luma-900 transition-all min-h-[44px]"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
-              Pay KSh 300
+              Complete activation
             </button>
           <p className="mt-3 text-xs text-gray-500">
-            This is a one-time fee. You will not be charged again.
+            One-time KSh 300 fee. Contact the office if you need an administrator to verify payment.
           </p>
+          <Link to="/contact" className="mt-2 inline-block text-xs font-medium text-luma-700 hover:underline min-h-[44px] leading-[44px]">
+            Contact the welfare office
+          </Link>
         </div>
 
         {/* Payment Modal */}
@@ -574,9 +585,19 @@ export function Dashboard() {
                 <PaymentStatusPanel
                   step="disabled"
                   message={payError || PAYMENTS_DISABLED_COPY}
+                  primaryLabel="Try online payment"
+                  onPrimary={() => { setPayStep('phone'); setPayError('') }}
                   secondaryLabel="Close"
                   onSecondary={() => setShowPayModal(false)}
-                />
+                >
+                  <Link
+                    to="/contact"
+                    className="mt-3 inline-block text-xs font-medium text-luma-700 hover:underline min-h-[44px] leading-[44px]"
+                    onClick={() => setShowPayModal(false)}
+                  >
+                    Contact the office for verification
+                  </Link>
+                </PaymentStatusPanel>
               )}
             </div>
           </div>
@@ -593,14 +614,23 @@ export function Dashboard() {
         description="Here's an overview of your Luma Welfare membership."
         actions={
           activeCards.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => openContribPay()}
-              disabled={pendingBlocked}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-luma-800 disabled:opacity-50 min-h-[44px]"
-            >
-              {pendingBlocked ? 'Payment in progress…' : 'Pay now'}
-            </button>
+            preferStkPaymentUi() ? (
+              <button
+                type="button"
+                onClick={() => openContribPay()}
+                disabled={pendingBlocked}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-luma-800 disabled:opacity-50 min-h-[44px]"
+              >
+                {pendingBlocked ? 'Payment in progress…' : 'Pay now'}
+              </button>
+            ) : (
+              <Link
+                to="/contributions"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-luma-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-luma-800 min-h-[44px]"
+              >
+                Record contribution
+              </Link>
+            )
           ) : undefined
         }
       />
@@ -610,7 +640,12 @@ export function Dashboard() {
           {PAYMENTS_MOCK_COPY}
         </div>
       )}
-      {paymentsDisabled && (
+      {!isPaymentsUiMock() && (
+        <div className="mb-4 rounded-xl border border-luma-200 bg-luma-50 px-4 py-3 text-sm text-luma-900" role="status">
+          {MANUAL_CONTRIBUTION_HINT}
+        </div>
+      )}
+      {paymentsDisabled && isPaymentsUiMock() && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
           {PAYMENTS_DISABLED_COPY}
         </div>

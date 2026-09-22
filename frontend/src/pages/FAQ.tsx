@@ -17,19 +17,19 @@ const categories: FAQCategory[] = [
       },
       {
         q: 'How does Luma Welfare work?',
-        a: 'You register an account and verify your email with a one-time passcode (OTP) sent to your inbox. Once verified, sign in and pay the one-time KSh 300 activation fee, then choose one or more welfare packages. Each package has its own monthly contribution amount and waiting period. Once you qualify, you can submit claims according to the rules of that package.',
+        a: 'You register an account and verify your email with a one-time passcode (OTP) sent to your inbox. Once verified, sign in and complete the one-time KSh 300 activation fee (online M-Pesa is being prepared; administrators can verify the fee meanwhile), then choose one or more welfare packages. Each package has its own monthly contribution amount and waiting period. Once you qualify, you can submit claims according to the rules of that package.',
       },
       {
         q: 'Who can join?',
-        a: 'Anyone can register for a Luma Welfare account. After registration, you verify your email using a one-time passcode (OTP) sent to your inbox. Once verified and after payment of the KSh 300 activation fee, you can explore and subscribe to available welfare packages.',
+        a: 'Anyone can register for a Luma Welfare account. After registration, you verify your email using a one-time passcode (OTP) sent to your inbox. Once verified and after the KSh 300 activation fee is verified, you can explore and subscribe to available welfare packages.',
       },
       {
         q: 'How do I create an account?',
-        a: 'Click "Join Luma" on the website and fill in your name, email, phone number, and create a password. After registering, you will receive a one-time passcode (OTP) via email. Enter this code on the verification page to confirm your address. Once verified, sign in and complete the one-time KSh 300 activation fee to unlock package access.',
+        a: 'Click "Join Luma" on the website and fill in your name, email, phone number, and create a password. After registering, you will receive a one-time passcode (OTP) via email. Enter this code on the verification page to confirm your address. Once verified, sign in and complete the one-time KSh 300 activation fee to unlock package access. Online payment is launching soon; administrators can verify fees in the meantime.',
       },
       {
         q: 'Is registration free?',
-        a: 'Creating an account is free. However, a one-time KSh 300 activation fee is required to activate your membership and access welfare packages. This fee is separate from package contributions.',
+        a: 'Creating an account is free. A one-time KSh 300 activation fee is required to activate your membership and access welfare packages. This fee is separate from package contributions. Online M-Pesa is not live yet — see the Payments section for how fees are verified today.',
       },
       {
         q: 'How do I confirm my email?',
@@ -58,7 +58,7 @@ const categories: FAQCategory[] = [
       },
       {
         q: 'How do I join a package?',
-        a: 'Sign in to your member dashboard, go to "Explore Packages," browse the available options, and click to subscribe to the package(s) you want. You must have paid the KSh 300 activation fee before you can subscribe.',
+        a: 'Sign in to your member dashboard, go to "Explore Packages," browse the available options, and click to subscribe to the package(s) you want. You must have completed the KSh 300 activation fee (verified by an administrator while online M-Pesa is launching) before you can subscribe.',
       },
       {
         q: 'Can I belong to more than one package?',

@@ -1,9 +1,12 @@
 # Luma Welfare — UX Gap Audit (Phase 0)
 
-**Date:** 2026-09-22  
+**Date:** 2026-09-22 (refreshed)  
 **Scope:** Gap assessment only — **no product code changes** in this phase.  
-**Visual identity constraint:** Keep existing brand greens (`luma-*`), glass surfaces, Inter/system stack, and working page layouts unless a later phase finds a specific defect (and layout changes require explicit approval).  
+**Constraint:** IMPROVE, do not redesign. Keep brand greens, logo, typography, and working layouts unless a later phase names a specific defect (layout changes require explicit approval first).  
+**Payments hard rule:** Do not modify Daraja/M-Pesa logic, Edge Functions payment flags, or env vars. UI-only honesty / mock path only.  
 **Status key:** `DONE` | `PARTIAL` | `MISSING`
+
+**Sources:** Live site (`https://luma-welfare.vercel.app`), codebase inspection, prior polish commits on `main`.
 
 ---
 
@@ -11,334 +14,273 @@
 
 | # | Area | Status |
 |---|------|--------|
-| 1 | Design tokens | PARTIAL |
-| 2 | Shared UI kit | PARTIAL |
-| 3 | Motion system | PARTIAL |
-| 4 | Homepage structure | PARTIAL |
-| 5 | Trust & transparency | PARTIAL |
-| 6 | Loading / empty / error | PARTIAL |
-| 7 | Mobile experience | PARTIAL |
-| 8 | Accessibility | PARTIAL |
-| 9 | Performance | PARTIAL |
-| 10 | Observability | PARTIAL |
-| 11 | Receipts | PARTIAL |
-| 12 | Admin search / charts | DONE |
-| 13 | Footer / SEO / social | DONE (brand asset gap) |
-| 14 | PWA | PARTIAL |
-| 15 | Live security verification in CI | PARTIAL |
+| 1 | Payment / trust messaging | **DONE** (Phase A) |
+| 2 | Contact info consistency | **DONE** (Phase A) |
+| 3 | Navigation and user journey | **DONE** (Phase B) |
+| 4 | Mobile UX | **PARTIAL** |
+| 5 | Member portal features | **DONE** (polish gaps only) |
+| 6 | Admin portal features | **DONE** (polish gaps only) |
+| 7 | Loading / empty / error states | **PARTIAL** |
+| 8 | Performance | **DONE** (scores still manual) |
+| 9 | Production hardening / security verification | **PARTIAL** |
+| 10 | Accessibility | **PARTIAL** |
 
-**Overall polish estimate:** ~7.5/10 — strong foundation (central motion tokens, SEO plumbing, admin search/charts, skeletons, RLS/E2E wiring); gaps are shared Button/Input adoption, state coverage, mobile member chrome, receipt share/masking, PWA install/icons, and verified CI secrets / Lighthouse.
-
-_Sources: primary repo inspection plus cross-checks from [Audit design tokens and UI kit](8e44fb31-27f1-46c2-b944-49554041de64), [Audit homepage mobile a11y perf](c0be674d-71b3-4b04-aca0-0a30c385b996), and [Audit receipts SEO PWA security](c06b8437-8ebd-45aa-b43c-bdb024e69e8e)._
+**Overall:** Strong product surface (member + admin portals largely complete). Highest-impact honesty gap is **payment messaging vs STK UI** while M-Pesa is off. Highest-impact ops gap is **CI still soft-skips live RLS/E2E** until secrets + `ENFORCE_LIVE_SECRETS` are set.
 
 ---
 
-## 1. Design tokens
+## 1. Payment / trust messaging
+
+**Status: DONE** (Phase A — marketing + Dashboard lead with honest “launching soon” / admin-verify copy; STK only via mock or explicit “Try online payment”. No Daraja/Edge payment changes.)
+
+---
+
+### Evidence (honest)
+
+| Surface | Quote / behavior |
+|---------|------------------|
+| `frontend/src/lib/paymentsUi.ts` | `"M-Pesa payments are not enabled yet… an admin can verify manual payments."` |
+| `frontend/src/pages/FAQ.tsx` (Payments) | `"Currently, payment processing is being set up…"` / `"M-Pesa integration is being prepared… contributions are recorded manually…"` |
+| `frontend/src/pages/Home.tsx` contributions FAQ | `"Record your payment in your account; administrators verify it."` |
+| `frontend/src/pages/Privacy.tsx` | Notes online M-Pesa collection exists in code but remains disabled |
+| Live home trust block | Speaks to encrypted auth / receipts / RBAC — **not** “live M-Pesa processor” |
+
+### Evidence (overstated / misleading while M-Pesa is off)
+
+| Surface | Issue |
+|---------|--------|
+| `frontend/src/pages/member/Dashboard.tsx` | Default activation / contribution UI: `"Send STK Push"`, `"M-Pesa phone"`, waiting copy implying a PIN prompt was sent — only switches to disabled after API/`paymentsDisabled` |
+| `frontend/src/pages/Home.tsx` FAQ “How do I join?” | `"pay the KSh 300 activation fee"` with no “manual verify / payments launching” caveat (live home confirms this FAQ) |
+| `frontend/src/pages/FAQ.tsx` Getting Started | Multiple answers say pay activation fee as if online payment is the path; Payments section is honest — **internal inconsistency** |
+| Home bottom CTA | Live: `"One-time KSh 300 activation fee after registration"` — true as a fee, silent that online pay is not live |
+| `JoinPackages.tsx` | Fee gate → Dashboard STK without saying admin/manual is current path |
+| `Contact.tsx` (live) | `"For a payment question: the M-Pesa transaction ID"` — implies M-Pesa receipts are the normal path today |
+| `VITE_PAYMENTS_UI_MOCK` | Mock can show success/waiting panels that look live (banner exists; still easy to misread) |
+
+### Gaps (Phase A)
+
+1. Prefer honest CTAs when payments are off (hide STK primary, or lead with disabled / “Payments launching soon” / manual-record path).
+2. Align Home FAQ, FAQ Getting Started, JoinPackages, and Contact ready-list with FAQ Payments honesty.
+3. Do **not** change payment Edge Functions or `PAYMENTS_ENABLED`.
+
+---
+
+## 2. Contact info consistency
+
+**Status: DONE** (Phase A — Contact reads `siteConfig`; About lists the same channels; ready-list no longer assumes M-Pesa IDs.)
+
+---
+
+### Canonical values (aligned where shown)
+
+| Field | Value | Sources |
+|-------|-------|---------|
+| Phone display | `0798 635 024` | `legal.ts` / `siteConfig` / Footer / Contact (live) |
+| Email | `info@lumawelfare.or.ke` | same |
+| WhatsApp | `wa.me/254798635024` | same |
+
+### Gaps
+
+| Gap | Evidence |
+|-----|----------|
+| **About has no contact channels** | `About.tsx` — no phone/email/WhatsApp block (footer excluded per scope) |
+| **Contact hardcodes** | `Contact.tsx` L15–19 duplicates legal/siteConfig — drift risk |
+| **Address** | `PLACEHOLDER_PHYSICAL_ADDRESS` in `legal.ts` — intentionally hidden; Contact/About show none |
+| Website display | Contact shows `www.lumawelfare.or.ke` vs config `https://www.lumawelfare.or.ke` (same host, format drift) |
+
+No conflicting phone/email found between Contact and Footer. Consistency gap is **About omission + Contact not single-sourced**.
+
+---
+
+## 3. Navigation and user journey
 
 **Status: PARTIAL**
 
-**Evidence**
-- Brand palette and semantics live in `frontend/src/index.css` `@theme`: `--color-luma-50…950`, `--color-brand-blue*`, gold, welfare muted, `--color-status-*`, `--radius-card` / `--radius-control`, `--shadow-card`, glass tokens, motion CSS vars.
-- Font: `--font-sans: 'Inter', …` with `font-display: swap` local `@font-face`.
-- Motion tokens synced with `frontend/src/lib/lumaMotion.ts` (`150/200/300/450/600/1000ms`).
+### Journey (exists)
 
-**Gaps**
-- No documented full spacing scale (4/8/12/16/24/32/48/64) as named tokens — pages use ad-hoc Tailwind (`p-7`, `gap-5`, `py-16`).
-- `--radius-card` / `--radius-control` / `--shadow-card` are **defined but barely referenced** in TSX; glass helpers hard-code rem radii.
-- `--color-status-*` unused by `StatusBadge` (still Tailwind emerald/amber/red).
-- Hard-coded hex still in CSS body background and several files (`#f3f8f5`, `#1f2937`; ~80+ `#…` matches). Charts/admin often use **`#6D9B3A`**, not `luma-700` `#006B2E`.
-- `manifest.json` `theme_color` `#6D9B3A` ≠ primary `luma-700`.
-- Arbitrary utilities (`min-h-[44px]`, etc.) ~200+ hits — many intentional touch targets.
-- No `docs/DESIGN_SYSTEM.md`.
+```
+Home / Packages → Join Now → /register → /verify-email → /login
+  → /dashboard → activation fee → /join (packages) → contribute
+  → claims when eligible
+```
 
-**Note:** Extract tokens **from current styles** in Phase A — do not invent a new palette.
+Live home CTAs: **Join Luma**, **View packages**, bottom **Join Luma** again; nav **Join Now**; footer **How It Works** / **FAQ** (not in primary nav).
+
+### Gaps (Phase B)
+
+1. **Dual pay paths:** Dashboard `"Pay now"` / STK vs Contributions `"Record Payment"` / mobile bottom nav `"Pay"` → `/contributions` — confusing while STK is off.
+2. **Redundant Join CTAs** on hero, mid-page, bottom, nav, footer, package cards (works, but noisy).
+3. **No UI step chrome / breadcrumbs** on join or claim submit (`PageHeader` supports breadcrumbs; Join/Claims don’t use them).
+4. **How It Works / FAQ** only in footer — discoverability of the honest payment story is weak.
+5. Guest **Dashboard** nav → auth gate can feel like a dead end vs Join.
+6. VerifyEmail → Login hop (no direct Dashboard handoff) — extra step, not a dead end.
+
+**Layout note:** Adding breadcrumbs/step UI is a light chrome change — confirm before implementing.
 
 ---
 
-## 2. Shared UI kit
+## 4. Mobile UX
 
 **Status: PARTIAL**
 
-| Component | Status | Evidence |
-|-----------|--------|----------|
-| Button | PARTIAL | CSS `.luma-btn` / `.luma-btn-primary` exist; **no** `Button.tsx`; used sparsely (`HomeHero`, Dashboard); most screens raw classes |
-| Input | PARTIAL | `fieldClass` in `PageHero.tsx`; glass-input CSS; admin forms often inline borders; no shared error/label API |
-| Card | PARTIAL | `.glass-card` / `.glass-panel` / `.luma-card-interactive`; no `Card.tsx` variant API |
-| Badge | PARTIAL | `StatusBadge.tsx` (~10 importers); many hand-rolled pills remain |
-| Table | PARTIAL | `DataTable.tsx` (admin); `MobileCardTable.tsx` (**only** member Contributions) |
-| Modal / Dialog | PARTIAL | `ConfirmDialog`, `ExportDialog`, ad-hoc overlays (e.g. pay UI); no generic Modal |
-| Toast | DONE | `Toast.tsx` + `lumaToast` |
-| Skeleton | PARTIAL | Component set good; many screens still `animate-pulse` / `"Loading…"` |
-| EmptyState | PARTIAL | ~10 pages; Family/Notifications/most admin lists custom |
-| ErrorState | PARTIAL | Retry API exists; **only** Claims, Contributions, JoinPackages |
+### Evidence (done)
 
-**Note:** Highest leverage = React `Button`/`Input` wrapping existing `.luma-btn`/`fieldClass` + migrate ErrorState/EmptyState/Skeleton onto remaining data views.
+- Member bottom nav (`MemberLayout.tsx`) — Home / Pay / Claims / Profile; `lg:hidden`
+- `MobileCardTable` + admin `DataTable` card split at `sm`
+- Widespread `min-h-[44px]` / `.touch-target`; `e2e/member-mobile.spec.ts` overflow smoke
 
----
+### Gaps (Phase E)
 
-## 3. Motion system
-
-**Status: PARTIAL** (central system strong; adoption uneven — not a rebuild)
-
-**Evidence**
-- Central `frontend/src/lib/lumaMotion.ts` + CSS `--motion-*` / `--luma-ease-out` (150/200/300/450/600/1000ms).
-- Primitives: `MotionSection`, `MotionReveal`, `MotionPage`, `MotionFade`, `MotionList`, `MotionItem`, `MotionImage`, `MotionCard`.
-- `PageTransition` on public `Layout` + `MemberLayout` — **not** on `AdminLayout`.
-- StatBar count-up, ProgressBar, Toast/ConfirmDialog Framer presets; reduced-motion CSS + `useReducedMotion`.
-- Unit tests: `lumaMotion.test.ts`.
-
-**Gaps**
-- Framer consumers concentrated on marketing/public; admin mostly static.
-- Widespread `animate-spin` / `animate-pulse` (~28 files) outside luma durations.
-- Buttons often `transition-colors` without `duration-[var(--motion-*)]`.
-- Framer Motion already installed — **reuse; do not add another animation library**.
-
-**Phase B scope:** cleanup/adoption only, not a new motion architecture.
+| Gap | Detail |
+|-----|--------|
+| MobileCardTable underused | Member **Contributions** only; Dashboard payment history + **Receipts** still horizontal scroll tables |
+| Breakpoint mismatch | Shell at **`lg` (1024)**; tables at **`sm` (640)** → tablets get bottom nav + desktop tables |
+| Touch targets | Receipts export strip; some admin action buttons `py-1.5` |
+| Bottom nav IA | Receipts / Family / Notifications / Join only via drawer |
 
 ---
 
-## 4. Homepage structure
+## 5. Member portal
+
+**Status: DONE** (features present; polish only)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| Contribution history | DONE | `/contributions` → `member-contributions` |
+| Receipts view / share | DONE | `/receipts-statements`; share + PII mask |
+| Receipt “PDF” | PARTIAL polish | Print-HTML blob, not binary PDF |
+| Claims status | DONE | `/claims` + `ClaimTimeline` + realtime |
+| Notifications + prefs | DONE | `/notifications`, `/notification-preferences` |
+| Profile | DONE | `/profile` (avatar, password, export, deletion request) |
+| Financial summary | DONE / light polish | Dashboard: total contributed, next due, package cards; summary `package_name` is singular amid multi-package |
+
+**Phase C implication:** No greenfield member features required. Optional polish only if you expand C beyond “missing.”
+
+---
+
+## 6. Admin portal
+
+**Status: DONE** (features present; polish only)
+
+| Capability | Status | Evidence |
+|------------|--------|----------|
+| Member management | DONE | `AdminMembers.tsx` |
+| Contribution monitoring | DONE | `AdminContributions.tsx` |
+| Claims management | DONE | `AdminClaims.tsx` |
+| Reports / export | DONE | `AdminReports.tsx`, scheduled reports, per-page exports |
+| Analytics | DONE | `AdminDashboard.tsx` + Recharts (`DashboardCharts.tsx`) — already ≥3–4 charts |
+
+**Phase D implication:** No missing admin modules. Optional: mobile table polish / touch targets only.
+
+---
+
+## 7. Loading / empty / error states
 
 **Status: PARTIAL**
 
-**Evidence (`Home.tsx`, `HomeHero.tsx`)**
-| Section | Present? |
-|---------|----------|
-| Hero (what / who / CTA) | Yes — brand, headline, copy, Join + packages |
-| Stats | Yes — `StatBar` (confirmed numbers only; nulls omitted) |
-| Programs / packages | Yes — “What We Offer” grid |
-| How it works | Yes — four steps |
-| Why Luma | Yes |
-| Trust & security | Yes |
-| FAQ teaser | Yes |
-| Closing CTA | Yes |
-| Stories | **No dedicated homepage stories block** (News/Gallery are separate routes) |
+### Done
 
-**Gaps**
-- Hero is strong; trust copy is capability-based (good). Split 2-column hero (not full-bleed) — keep unless approved to change layout.
-- Home “What We Offer” shows **6** packages while copy cites **12** — consistency gap (link to `/packages` for full set).
-- No “stories” section on home — omit or empty-state only if CMS content exists (do not invent).
-- Keep existing sections; Phase E may only refine gaps, not remove working blocks.
+- Shared `Skeleton*`, `EmptyState`, `ErrorState`, `userFacingError`, Sentry PII scrub (`sentry.ts` + tests)
+- Most member data views + major admin lists use `ErrorState` + `reportLoadError` on load
+
+### Gaps (Phase F)
+
+| Gap | Evidence |
+|-----|----------|
+| Public CMS raw `e.message` | `Packages.tsx`, `News.tsx`, `Gallery.tsx`, `Media.tsx` |
+| Mutation toasts / banners use raw `ApiError.message` | Widespread admin + member mutations |
+| Weaker ErrorState coverage | `AdminReconciliation`, `AdminScheduledReports`, `AdminSettings`, `AdminReports`, `Profile` |
+| Scrub gaps | `UNSAFE_MESSAGE` does not explicitly catch JWT / PGRST strings |
+
+Blank screens are not systemic on major dashboards.
 
 ---
 
-## 5. Trust and transparency
+## 8. Performance
+
+**Status: DONE** (verification still manual)
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| Route code-splitting | DONE | `App.tsx` `React.lazy` for packages/news/gallery/media + member + admin |
+| Image lazy-load | DONE | Gallery/Media/admin grids `loading="lazy"`; hero `fetchPriority="high"` |
+| Font | DONE | Local Inter + `font-display: swap` |
+| Vendor chunks | DONE | react / recharts / jspdf in `vite.config.ts` |
+| Lighthouse recipe | DONE | `docs/LIGHTHOUSE.md`, `npm run lighthouse:smoke` |
+| Recorded scores in CI | MISSING | Manual only |
+| Framer in `manualChunks` | residual risk | Eager Home/motion path |
+
+**Phase G:** Measure + optional Framer chunk; do not chase invented homepage stats.
+
+---
+
+## 9. Production hardening and security verification
 
 **Status: PARTIAL**
 
-**Evidence**
-- Home trust section: account security, audit trail, data protection, verified claims (`trustFeatures` in `Home.tsx`) — grounded in real product capabilities.
-- FAQ/About reinforce encryption, audit logs, Privacy Policy.
-- Receipts mentioned in FAQ; not heavily linked from trust cards.
+| Item | Status | Evidence |
+|------|--------|----------|
+| RLS live suite wired | PARTIAL | `ci.yml` `npm run test:rls` — **self-skips** without secrets |
+| Authenticated E2E wired | PARTIAL | Playwright env + `test.skip` without `E2E_*` |
+| Live Secrets Gate | DONE soft | Canonical repo job warns; fails only if `vars.ENFORCE_LIVE_SECRETS=true` |
+| Sentry (FE + Edge) + scrub | DONE | `frontend/src/lib/sentry.ts`, `supabase/functions/shared/sentry.ts` |
+| Health check | DONE | `supabase/functions/health` + `AdminHealthCheck.tsx` |
+| Backup / restore docs | DONE | `docs/BACKUP_RESTORE.md` (operator drills unchecked by design) |
+| Role isolation evidence | PARTIAL | Specs exist; **not proven green-live** until secrets populated |
 
-**Gaps**
-- Trust section does not explicitly call out **contribution receipts** or **role-based staff access** as user-facing bullets (capabilities exist in product).
-- Avoid absolute claims (“100% secure”) — current copy is appropriately cautious.
+**Phase H:** Populate dedicated **test** Supabase project secrets, enable enforce var, verify role matrix, finish remaining a11y from §10.
 
 ---
 
-## 6. Loading / empty / error states
+## 10. Accessibility
 
 **Status: PARTIAL**
 
-**Evidence**
-- Skeletons: packages, news, gallery, media, admin dashboard chunks, StatBar, member receipts list.
-- EmptyState on Packages, News, Gallery, Media, Claims, Contributions, JoinPackages, Receipts, several admin CMS pages.
-- ErrorState + Retry on member Claims / Contributions / JoinPackages.
-- Toasts for many failures; `ErrorBoundary` present.
-
-**Gaps**
-- Widespread `animate-pulse` / `"Loading…"` vs layout-matched skeletons (Dashboard, Notifications, Family, many admin lists).
-- Admin data views rarely use `ErrorState` (raw toast / inline text common).
-- Widespread `e.message` / `ApiError.message` into banners — needs user-safe mapping + Sentry for real errors.
-- Not every data view has Retry.
+| Item | Status | Evidence |
+|------|--------|----------|
+| ConfirmDialog focus trap | DONE | `useFocusTrap` in `ConfirmDialog.tsx` |
+| axe smoke | DONE narrow | `e2e/a11y.spec.ts` — home + login, serious/critical |
+| Form ARIA | PARTIAL | Shared `ui/Input` underused; Login partial; admin forms ad-hoc |
+| Contrast | PARTIAL / unverified | Muted `text-gray-400` / glass footers — needs pass |
+| Headings | MOSTLY DONE | Home FAQ has `aria-expanded` / `aria-controls`; not full-site audited |
 
 ---
 
-## 7. Mobile experience
+## Ordered work list (PARTIAL / MISSING only)
 
-**Status: PARTIAL**
-
-**Evidence**
-- `min-h-11` / 44px patterns in layouts and ErrorState.
-- `pt-safe` / `safe-area-inset` on public + member headers (`Layout.tsx`, `MemberLayout.tsx`).
-- Member: collapsible drawer nav (not bottom tabs).
-- `MobileCardTable` used on member Contributions; admin relies on `DataTable` (desktop-oriented).
-- Public nav has mobile menu with focus trap.
-
-**Gaps**
-- **No member bottom tab bar** (Home / Contributions / Claims / Profile).
-- Admin tables not systematically card-ified at ≤640px.
-- Member dashboard still dense “desktop-ish” in places.
-- Horizontal overflow risks need QA sweep at 320–414px (NOT VERIFIED this pass).
-
----
-
-## 8. Accessibility
-
-**Status: PARTIAL**
-
-**Evidence**
-- Skip link in `Layout.tsx`.
-- `useFocusTrap` on mobile drawers; ConfirmDialog Escape + focus.
-- `aria-expanded`, `role="alert"`, `aria-modal` on key components.
-- Reduced motion support for motion system.
-
-**Gaps**
-- No automated axe Playwright suite found.
-- `ConfirmDialog` has Escape + initial focus but **no `useFocusTrap`** (Tab can leave dialog).
-- Form error ↔ `aria-describedby` / `aria-invalid` inconsistent across auth and admin forms.
-- Soft text (`text-white/70`, `text-gray-400` on glass) — WCAG AA contrast NOT VERIFIED.
-- Heading hierarchy / `aria-controls` on home FAQ accordion incomplete.
-
----
-
-## 9. Performance
-
-**Status: DONE** (Lighthouse scores still manual — see `docs/LIGHTHOUSE.md`)
-
-**Evidence**
-- Route-level `React.lazy` for packages, news, gallery, media, all member + admin pages (`App.tsx`).
-- Framer Motion / Recharts / jsPDF code-split into vendor chunks.
-- Gallery / Media / admin media grids: `loading="lazy"` + `decoding="async"` (hero keeps `fetchPriority="high"`).
-- Brand assets: `frontend/public/brand/` (`luma-logo`, `luma-icon`, `og-default`) + PWA icons under `frontend/public/icons/`.
-- Font: local Inter + `font-display: swap`.
-- Smoke script: `npm run lighthouse:smoke` (requires local preview).
-
-**Gaps**
-- Heavy admin PDF/chart bundles; keep lazy imports.
-- Record Lighthouse numbers before release (not invent homepage stats to chase scores).
-
----
-
-## 10. Observability
-
-**Status: DONE** (alerting runbooks still optional)
-
-**Evidence**
-- Frontend Sentry + PII scrubbing: `frontend/src/lib/sentry.ts` (+ tests).
-- Edge Sentry/logging: `supabase/functions/shared/sentry.ts`, `logging.ts`, `observability.ts` (`withTiming`).
-- Health: `health` Edge Function, cron health-check, `AdminHealthCheck.tsx`, `health_check_history`.
-- Admin monitoring: `admin-monitoring` SLO / security status consumption.
-- `auth-login` writes `audit_logs.action = 'auth_failed'` (email **domain** only + IP); migration `20260922100000_align_auth_failed_security_status.sql` aligns `get_security_status()`.
-
-**Gaps**
-- Alerting runbooks for error / auth-failure spikes may be incomplete.
-- Pair ErrorState migration with scrubbed Sentry capture on every user-facing catch.
-
----
-
-## 11. Receipts
-
-**Status: PARTIAL**
-
-**Evidence**
-- `ReceiptsStatements.tsx` + `member-receipts` Edge Function; numbers `RF-…` / `CTR-…`.
-- View + “Download PDF” (HTML blob + `window.open`, not jsPDF binary).
-
-**Gaps**
-- **Share** missing (`navigator.share` absent).
-- **Masking missing** — full email/phone in modal/PDF; `frontend/src/lib/pii.ts` not applied on receipts.
-- Polish PDF branding optional; numbering backend is DONE.
-
----
-
-## 12. Admin search / filters / dashboard charts
-
-**Status: DONE**
-
-**Evidence**
-- Members / Contributions / Claims: `FilterBar` + `SearchInput` + debounced `q`.
-- `DashboardCharts.tsx` (pie / funnel / area / bar) on `AdminDashboard`.
-- Shared `FilterBar.tsx`, `SearchInput.tsx`.
-
-**Optional polish (not blocking DONE)**
-- Chart empty/skeleton consistency; keep at ≤4 charts; confirm all filters stay server-side + injection-safe.
-
----
-
-## 13. Footer / SEO / social
-
-**Status: DONE** (content asset gap noted)
-
-**Evidence**
-- `SiteFooter` + tests; `useHead` / `seo.ts` (title, description, canonical, OG, Twitter, noindex, breadcrumbs).
-- `OrganizationJsonLd`; sitemap/robots generators; prerender; `og-default.png` present.
-
-**Gaps (content, not plumbing)**
-- Brand assets present under `public/brand/` (`luma-logo`, `luma-icon`, `og-default`).
-- Live WhatsApp/Facebook preview QA NOT VERIFIED.
-
----
-
-## 14. PWA
-
-**Status: DONE**
-
-**Evidence**
-- Manifest + `sw.js` + `pwa.ts` + `SWUpdateBanner`.
-- Icons via build + `frontend/public/icons/`; brand sources under `frontend/public/brand/`.
-- `PWAInstallBanner` listens for `beforeinstallprompt` (dismissible 14 days; hidden in standalone).
-- Financial paths `networkOnly` in SW.
-
-**Gaps**
-- Never imply offline payment success (policy OK in SW comments; needs QA on device).
-
----
-
-## 15. Live security verification (CI)
-
-**Status: DONE** (hard-fail optional via repo variable)
-
-**Evidence (`.github/workflows/ci.yml`)**
-- `test:rls` + E2E secrets wired; suites **self-skip** when secrets empty; scheduled-security workflow also has RLS job.
-- Canonical-only job `🔐 Live Secrets Gate` (`lumawelfare-tech/luma-welfare`): warns when secrets missing; fails when `vars.ENFORCE_LIVE_SECRETS=true`.
-- Docs: `docs/BRANCH_PROTECTION.md`.
-
-**Gaps**
-- Coverage step uses `continue-on-error: true` (informational only).
-- Manual: populate test-project secrets, then enable `ENFORCE_LIVE_SECRETS`.
-
-**Payments note:** `PAYMENTS_ENABLED` fail-closed on `payments-initiate` / `payments-callback` / `member-registration-fee`. Phase G = UI mocks only.
-
----
-
-## Ordered work list (PARTIAL + MISSING only)
-
-Preserve identity; extract tokens from current CSS; keep homepage sections.
+Maps to your phases. **Skip redesign.** Member/Admin feature builds are largely unnecessary.
 
 | Order | Phase | Focus | Why |
 |-------|-------|-------|-----|
-| 1 | **A** | Design system: document tokens from `index.css`; wire radius/shadow/status; React **Button**/`Input` on `.luma-btn`/`fieldClass`; `docs/DESIGN_SYSTEM.md` | Consistency without redesign |
-| 2 | **B** | Motion cleanup: pulse→skeleton, token durations, optional AdminLayout PageTransition | System exists — adoption only |
-| 3 | **C** | States: Skeleton/Empty/Error + safe errors + Sentry on all major data views | Highest UX gap |
-| 4 | **D** | Mobile: bottom nav **if approved**, MobileCardTable ≤640px, dashboard density | Mobile first-class |
-| 5 | **E** | Homepage: keep sections; fix 6-vs-12 copy; trust bullets for receipts/RBAC; stories only if real data | No section removal |
-| 6 | **F** | Receipts share + `pii` masking; light chart empty-state polish | Trust |
-| 7 | **G** | Payment UI states only behind flag / mocks | No Daraja changes |
-| 8 | **H** | A11y: ConfirmDialog focus trap, forms ARIA, axe Playwright, contrast soft spots | AA path |
-| 9 | **I** | Perf (Lighthouse, lazy images) + observability (`auth_failed` writer) + brand assets | Evidence |
-| 10 | **J** | CI secrets enforcement + SEO/PWA install QA | Production readiness |
+| 1 | **A** | Payment honesty + Contact consistency | STK/M-Pesa UI and marketing overstate live pay; About/Contact single-source |
+| 2 | **B** | Journey clarity (labels, dual Pay paths, light breadcrumbs if approved) | Reduce confusion while payments stay off |
+| 3 | **C** | Member polish only if needed (receipt PDF label clarity; multi-package summary wording) | Features DONE — no greenfield |
+| 4 | **D** | Admin polish only if needed (touch targets / dense tables) | Features + charts DONE |
+| 5 | **E** | Mobile: MobileCardTable on Dashboard payments + Receipts; 44px export actions | Named mobile gaps |
+| 6 | **F** | Route remaining errors through `reportLoadError` / safe toasts; JWT/PGRST scrub | Leak + consistency |
+| 7 | **G** | Record Lighthouse; optional Framer vendor chunk | Already mostly done |
+| 8 | **H** | CI secrets + enforce gate + role verification report + remaining a11y | Soft-skip → real gates |
 
-**Explicitly deferred / skipped**
-- Payment backend, M-Pesa enablement, schema/RLS rewrites.
-- Full visual redesign / new color palette / new font.
-- Inventing impact stats or testimonials.
+### Explicitly deferred / skipped
+
+- All real M-Pesa / Daraja enablement and payment Edge Function changes
+- Invented stats, testimonials, member counts, impact numbers
+- Physical address / registration numbers until you supply non-placeholder values
+- Full visual redesign, new palette, new fonts
+- Treating CI as “secure” while secrets are unset
+
+### Manual actions for you
+
+1. Create/configure a **dedicated test** Supabase project; set GitHub Actions secrets (`SUPABASE_*`, `E2E_*`).
+2. After secrets work: set repo variable `ENFORCE_LIVE_SECRETS=true`.
+3. Approve or supply real Stories/testimonials — or approve omitting those blocks forever.
+4. Approve before any page **layout** change (e.g. breadcrumbs on join/claims, About contact block placement).
+5. Independent security review before onboarding real members at scale.
 
 ---
 
-## Manual actions for product owner (later)
+## Stop — awaiting approval
 
-1. Confirm GitHub Actions secrets for a **dedicated test** Supabase project.
-2. Approve or supply real OG image and social URLs.
-3. Provide real stories/impact numbers **or** approve omitting those blocks.
-4. Approve member bottom-nav IA before Phase D implements it.
-5. Independent security review before real member onboarding.
+Phase 0 complete. **No code changes** in this phase.
 
----
-
-## Phase 0 gate
-
-**STOP — awaiting approval to proceed.**
-
-Suggested next step after approval: **Phase A (design system gaps only)**, then Phase B motion cleanup; pause again after A+B per “stop every two phases.”
+Suggested next step after your approval: **Phase A** (payment messaging honesty + contact consistency), then **Phase B** (journey), then pause again after A+B per your “stop every two phases” rule.

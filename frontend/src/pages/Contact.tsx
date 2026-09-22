@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useHead } from '../lib/seo'
 import {
@@ -11,12 +11,7 @@ import { MotionSection } from '../components/MotionSection'
 import { Icon } from '../components/Icon'
 import { api, ApiError } from '../lib/api'
 import { safeHref } from '../lib/sanitize'
-
-const PHONE_DISPLAY = '0798 635 024'
-const PHONE_TEL = '0798635024'
-const EMAIL = 'info@lumawelfare.or.ke'
-const WHATSAPP = 'https://wa.me/254798635024'
-const WEBSITE = 'https://www.lumawelfare.or.ke'
+import { siteConfig } from '../config/siteConfig'
 
 function WhatsAppGlyph({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -28,50 +23,75 @@ function WhatsAppGlyph({ className = 'h-4 w-4' }: { className?: string }) {
 
 type ChannelIcon = 'phone' | 'mail' | 'globe' | 'whatsapp'
 
-const channels: {
+function buildChannels(): {
   label: string
   value: string
   href: string | null
   icon: ChannelIcon
   hint: string
   external?: boolean
-}[] = [
-  {
-    label: 'WhatsApp',
-    value: PHONE_DISPLAY,
-    href: WHATSAPP,
-    icon: 'whatsapp',
-    hint: 'Primary contact — fastest for quick questions',
-    external: true,
-  },
-  {
-    label: 'Phone',
-    value: PHONE_DISPLAY,
-    href: `tel:${PHONE_TEL}`,
-    icon: 'phone',
-    hint: 'Office line',
-  },
-  {
-    label: 'Email',
-    value: EMAIL,
-    href: `mailto:${EMAIL}`,
-    icon: 'mail',
-    hint: 'Membership & documentation',
-  },
-  {
-    label: 'Website',
-    value: 'www.lumawelfare.or.ke',
-    href: WEBSITE,
-    icon: 'globe',
-    hint: 'Official site',
-    external: true,
-  },
-]
+}[] {
+  const phone = siteConfig.phoneDisplay
+  const phoneTel = siteConfig.phoneTel
+  const email = siteConfig.email
+  const whatsapp = siteConfig.whatsappUrl
+  const website = siteConfig.websiteUrl
+  const websiteDisplay = website?.replace(/^https?:\/\//, '') ?? null
+
+  const list: {
+    label: string
+    value: string
+    href: string | null
+    icon: ChannelIcon
+    hint: string
+    external?: boolean
+  }[] = []
+
+  if (whatsapp && phone) {
+    list.push({
+      label: 'WhatsApp',
+      value: phone,
+      href: whatsapp,
+      icon: 'whatsapp',
+      hint: 'Primary contact — fastest for quick questions',
+      external: true,
+    })
+  }
+  if (phone && phoneTel) {
+    list.push({
+      label: 'Phone',
+      value: phone,
+      href: `tel:${phoneTel}`,
+      icon: 'phone',
+      hint: 'Office line',
+    })
+  }
+  if (email) {
+    list.push({
+      label: 'Email',
+      value: email,
+      href: `mailto:${email}`,
+      icon: 'mail',
+      hint: 'Membership & documentation',
+    })
+  }
+  if (website && websiteDisplay) {
+    list.push({
+      label: 'Website',
+      value: websiteDisplay,
+      href: website,
+      icon: 'globe',
+      hint: 'Official site',
+      external: true,
+    })
+  }
+  return list
+}
 
 const readyItems = [
   'Your full name as registered',
   'Your membership number, if you have one',
-  'For a payment question: the M-Pesa transaction ID',
+  'For a payment question: your receipt or transaction reference (if you have one)',
 ]
 
 type FormState = {
@@ -100,6 +120,7 @@ export function Contact() {
     ],
   })
 
+  const channels = useMemo(() => buildChannels(), [])
   const [form, setForm] = useState<FormState>(emptyForm)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)

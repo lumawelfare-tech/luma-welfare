@@ -1,7 +1,10 @@
+import { Link } from 'react-router-dom'
 import { useHead } from '../lib/seo'
 import { PageHero } from '../components/PageHero'
 import { MotionSection, MotionCard } from '../components/MotionSection'
 import { Icon } from '../components/Icon'
+import { siteConfig } from '../config/siteConfig'
+import { safeHref } from '../lib/sanitize'
 
 const values = [
   { name: 'Integrity', text: 'We do what we say, and we keep records members can check.', icon: 'check-circle' as const },
@@ -61,6 +64,46 @@ export function About() {
             ))}
           </div>
         </section>
+
+        {(siteConfig.phoneDisplay || siteConfig.email || siteConfig.whatsappUrl) && (
+          <section className="glass-card mt-12 max-w-3xl p-8">
+            <h2 className="text-2xl font-bold text-gray-900">Contact</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Reach the welfare office with the same channels listed on our Contact page.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-gray-700">
+              {siteConfig.phoneDisplay && siteConfig.phoneTel && (
+                <li>
+                  <a className="font-medium text-luma-700 hover:underline" href={`tel:${siteConfig.phoneTel}`}>
+                    {siteConfig.phoneDisplay}
+                  </a>
+                </li>
+              )}
+              {siteConfig.email && (
+                <li>
+                  <a className="font-medium text-luma-700 hover:underline" href={`mailto:${siteConfig.email}`}>
+                    {siteConfig.email}
+                  </a>
+                </li>
+              )}
+              {siteConfig.whatsappUrl && (
+                <li>
+                  <a
+                    className="font-medium text-luma-700 hover:underline"
+                    href={safeHref(siteConfig.whatsappUrl) ?? undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    WhatsApp
+                  </a>
+                </li>
+              )}
+            </ul>
+            <Link to="/contact" className="mt-4 inline-flex min-h-[44px] items-center text-sm font-semibold text-luma-700 hover:underline">
+              Full contact options →
+            </Link>
+          </section>
+        )}
       </MotionSection>
     </div>
   )

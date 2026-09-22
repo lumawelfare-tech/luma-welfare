@@ -66,7 +66,7 @@ export function JoinPackages() {
         auth: true,
         body: { packageId: p.id, packageTierId: tierId || undefined },
       })
-      setNotice(`${p.name} added. Your subscription is pending activation.`)
+      setNotice(`${p.name} added. Your subscription is pending activation. Next: record your first contribution under Contributions.`)
       reloadSubscriptions()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not join this package.')
@@ -108,12 +108,21 @@ export function JoinPackages() {
   if (!registrationFeePaid) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
+        <PageHeader
+          title="Activation fee required"
+          breadcrumbs={[
+            { label: 'Dashboard', to: '/dashboard' },
+            { label: 'Explore Packages' },
+          ]}
+        />
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
-          <h1 className="text-lg font-semibold text-gray-900">Registration Fee Required</h1>
+          <h2 className="text-lg font-semibold text-gray-900">Complete your KSh 300 activation fee</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Please pay the one-time KSh 300 registration fee to activate your membership and access welfare packages.
+            Online M-Pesa is not live yet. An administrator can verify your fee, or you can try online payment from the dashboard if it has been enabled.
           </p>
-          <Link to="/dashboard" className="mt-4 inline-block rounded-lg bg-luma-700 px-4 py-2 text-sm font-medium text-white hover:bg-luma-800">Go to Dashboard</Link>
+          <Link to="/dashboard" className="mt-4 inline-block rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-luma-800 min-h-[44px]">
+            Back to Dashboard
+          </Link>
         </div>
       </div>
     )
@@ -124,6 +133,10 @@ export function JoinPackages() {
       <PageHeader
         title="Explore Packages"
         description="Choose welfare packages available to you. Each package is tracked separately with its own contributions and qualification rules."
+        breadcrumbs={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Explore Packages' },
+        ]}
       />
 
       {notice && (
