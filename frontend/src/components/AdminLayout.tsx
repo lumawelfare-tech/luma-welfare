@@ -7,6 +7,7 @@ import { AdminNotificationBell } from './AdminNotificationBell'
 import { ShortcutHelp } from './ShortcutHelp'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { lumaDrawer, lumaDropdown, lumaModal } from '../lib/lumaMotion'
+import { PageTransition } from './PageTransition'
 
 const navSections = [
   {
@@ -54,7 +55,7 @@ function SidebarLink({ to, label, icon, onNavigate }: { to: string; label: strin
       to={to}
       onClick={onNavigate}
       className={({ isActive }) =>
-        `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+        `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-[var(--motion-fast)] ${
           isActive
             ? 'bg-luma-50/90 text-luma-800 shadow-sm'
             : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
@@ -237,7 +238,9 @@ export function AdminLayout() {
         </header>
 
         <main id="admin-main" className="min-w-0 flex-1 overflow-y-auto overflow-x-clip p-4 pb-safe lg:p-6" role="main">
-          <Outlet />
+          <PageTransition>
+            <Outlet />
+          </PageTransition>
         </main>
       </div>
     </div>

@@ -290,7 +290,7 @@ function OrphanPaymentsTab() {
 
       {loading ? (
         <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-2xl bg-gray-100" />)}
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 luma-skeleton rounded-2xl" />)}
         </div>
       ) : payments.length === 0 ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-12 text-center">
@@ -431,7 +431,7 @@ function UnmatchedContributionsTab() {
 
       {loading ? (
         <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-2xl bg-gray-100" />)}
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 luma-skeleton rounded-2xl" />)}
         </div>
       ) : contributions.length === 0 ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-12 text-center">
@@ -538,7 +538,7 @@ function StalePendingTab() {
 
       {loading ? (
         <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-2xl bg-gray-100" />)}
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 luma-skeleton rounded-2xl" />)}
         </div>
       ) : payments.length === 0 ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-12 text-center">
@@ -651,7 +651,7 @@ function ExceptionsTab() {
 
       {loading ? (
         <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-2xl bg-gray-100" />)}
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 luma-skeleton rounded-2xl" />)}
         </div>
       ) : exceptions.length === 0 ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center">
@@ -765,9 +765,9 @@ export function AdminReconciliation() {
   if (loading && !summary) {
     return (
       <div className="container-luma py-10">
-        <div className="h-8 w-64 animate-pulse rounded bg-gray-200" />
+        <div className="h-8 w-64 luma-skeleton rounded" />
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-2xl bg-gray-100" />)}
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 luma-skeleton rounded-2xl" />)}
         </div>
       </div>
     )

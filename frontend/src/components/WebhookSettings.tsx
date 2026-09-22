@@ -213,7 +213,7 @@ export function WebhookSettings() {
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100" />
+            <div key={i} className="h-16 luma-skeleton rounded-xl" />
           ))}
         </div>
       ) : webhooks.length === 0 ? (

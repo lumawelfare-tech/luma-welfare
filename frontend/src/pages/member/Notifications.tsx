@@ -138,7 +138,7 @@ export function Notifications() {
       {loading && (
         <div className="mt-8 space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" />
+            <div key={i} className="h-20 rounded-xl luma-skeleton" />
           ))}
         </div>
       )}

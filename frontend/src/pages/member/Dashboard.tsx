@@ -124,7 +124,7 @@ function daysUntil(dateStr: string | null): number | null {
 
 function SkeletonCard() {
   return (
-    <div className="glass-panel p-5 animate-pulse">
+    <div className="glass-panel p-5 luma-skeleton">
       <div className="flex items-start justify-between">
         <div className="h-5 w-32 rounded bg-gray-200" />
         <div className="h-6 w-20 rounded-full bg-gray-200" />
@@ -696,7 +696,7 @@ export function Dashboard() {
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="glass-panel p-4 animate-pulse">
+              <div key={i} className="glass-panel p-4 luma-skeleton">
                 <div className="h-3 w-20 rounded bg-gray-100" />
                 <div className="mt-2 h-7 w-16 rounded bg-gray-200" />
               </div>

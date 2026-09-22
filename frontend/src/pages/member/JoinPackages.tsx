@@ -165,7 +165,7 @@ export function JoinPackages() {
       {loading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-64 animate-pulse rounded-xl bg-gray-100" />
+            <div key={i} className="h-64 luma-skeleton rounded-xl" />
           ))}
         </div>
       )}

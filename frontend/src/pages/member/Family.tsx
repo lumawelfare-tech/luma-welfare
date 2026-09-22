@@ -95,7 +95,7 @@ export function Family() {
         <div className="lg:col-span-2">
           {loading && (
             <div className="space-y-3">
-              {[1, 2].map((i) => <div key={i} className="h-16 rounded-lg bg-gray-100 animate-pulse" />)}
+              {[1, 2].map((i) => <div key={i} className="h-16 rounded-lg luma-skeleton" />)}
             </div>
           )}
 

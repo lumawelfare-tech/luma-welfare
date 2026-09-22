@@ -385,7 +385,7 @@ export function Claims() {
       {loading && (
         <div className="mt-8 space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 rounded-lg bg-gray-100 animate-pulse" />
+            <div key={i} className="h-14 rounded-lg luma-skeleton" />
           ))}
         </div>
       )}

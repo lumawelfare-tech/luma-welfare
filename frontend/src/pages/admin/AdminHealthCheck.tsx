@@ -282,13 +282,13 @@ export function AdminHealthCheck() {
             {loading && checks.length === 0 ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-gray-100">
-                  <td className="px-4 py-3"><div className="h-4 w-32 animate-pulse rounded bg-gray-200" /></td>
-                  <td className="px-4 py-3"><div className="h-5 w-20 animate-pulse rounded bg-gray-200" /></td>
-                  <td className="px-4 py-3"><div className="h-4 w-16 animate-pulse rounded bg-gray-200" /></td>
-                  <td className="px-4 py-3"><div className="h-4 w-20 animate-pulse rounded bg-gray-200" /></td>
-                  <td className="px-4 py-3"><div className="h-4 w-20 animate-pulse rounded bg-gray-200" /></td>
-                  <td className="px-4 py-3"><div className="h-4 w-20 animate-pulse rounded bg-gray-200" /></td>
-                  <td className="px-4 py-3"><div className="h-4 w-8 animate-pulse rounded bg-gray-200" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-32 luma-skeleton rounded" /></td>
+                  <td className="px-4 py-3"><div className="h-5 w-20 luma-skeleton rounded" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-16 luma-skeleton rounded" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-20 luma-skeleton rounded" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-20 luma-skeleton rounded" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-20 luma-skeleton rounded" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-8 luma-skeleton rounded" /></td>
                   <td className="px-4 py-3"></td>
                 </tr>
               ))

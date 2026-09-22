@@ -295,26 +295,26 @@ export function AdminDashboard() {
       <div className="container-luma py-10">
         <div className="flex items-center justify-between">
           <div>
-            <div className="h-8 w-48 animate-pulse rounded bg-gray-200" />
-            <div className="mt-2 h-4 w-64 animate-pulse rounded bg-gray-200" />
+            <div className="h-8 w-48 luma-skeleton rounded" />
+            <div className="mt-2 h-4 w-64 luma-skeleton rounded" />
           </div>
         </div>
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="glass-panel p-5 space-y-2">
-              <div className="h-8 w-16 animate-pulse rounded bg-gray-200" />
-              <div className="h-3 w-24 animate-pulse rounded bg-gray-200" />
+              <div className="h-8 w-16 luma-skeleton rounded" />
+              <div className="h-3 w-24 luma-skeleton rounded" />
             </div>
           ))}
         </div>
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
           <div className="glass-panel p-6 lg:col-span-2">
-            <div className="h-5 w-40 animate-pulse rounded bg-gray-200" />
-            <div className="mt-4 h-64 animate-pulse rounded bg-gray-100" />
+            <div className="h-5 w-40 luma-skeleton rounded" />
+            <div className="mt-4 h-64 luma-skeleton rounded" />
           </div>
           <div className="glass-panel p-6">
-            <div className="h-5 w-32 animate-pulse rounded bg-gray-200" />
-            <div className="mt-4 h-64 animate-pulse rounded bg-gray-100" />
+            <div className="h-5 w-32 luma-skeleton rounded" />
+            <div className="mt-4 h-64 luma-skeleton rounded" />
           </div>
         </div>
       </div>

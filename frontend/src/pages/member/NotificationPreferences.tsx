@@ -173,12 +173,12 @@ export function NotificationPreferences() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-2xl mx-auto">
         <div className="mb-8">
-          <div className="h-8 w-64 rounded bg-gray-200 animate-pulse" />
-          <div className="mt-2 h-4 w-48 rounded bg-gray-100 animate-pulse" />
+          <div className="h-8 w-64 rounded luma-skeleton" />
+          <div className="mt-2 h-4 w-48 rounded luma-skeleton" />
         </div>
         <div className="space-y-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" />
+            <div key={i} className="h-20 rounded-xl luma-skeleton" />
           ))}
         </div>
       </div>

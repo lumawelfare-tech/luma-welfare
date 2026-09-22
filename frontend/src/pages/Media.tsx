@@ -185,7 +185,7 @@ export function Media() {
         {loading && (
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="glass-card animate-pulse overflow-hidden">
+              <div key={i} className="glass-card luma-skeleton overflow-hidden">
                 <div className="aspect-square bg-luma-100/80" />
                 <div className="p-4 space-y-2">
                   <div className="h-4 bg-luma-100/80 rounded w-2/3" />

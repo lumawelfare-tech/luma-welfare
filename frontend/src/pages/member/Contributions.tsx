@@ -210,7 +210,7 @@ export function Contributions() {
       {loading && (
         <div className="mt-8 space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-16 rounded-lg bg-gray-100 animate-pulse" />
+            <div key={i} className="h-16 rounded-lg luma-skeleton" />
           ))}
         </div>
       )}
