@@ -312,14 +312,14 @@ export function AdminContributions() {
                 <button
                   disabled={busyId === c.id}
                   onClick={() => verify(c.id)}
-                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-xs min-h-[44px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                 >
                   {busyId === c.id ? 'Processing…' : 'Verify'}
                 </button>
                 <button
                   disabled={busyId === c.id}
                   onClick={() => { setRejectTarget(c); setRejectNotes('') }}
-                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-2.5 text-xs min-h-[44px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
                 >
                   Reject
                 </button>
@@ -526,8 +526,8 @@ export function AdminContributions() {
                 {c.payments?.mpesa_receipt && <div className="text-xs text-gray-400 font-mono">{c.payments.mpesa_receipt}</div>}
                 {c.status === 'Pending' && (
                   <div className="flex gap-2 pt-1">
-                    <button disabled={busyId === c.id} onClick={() => verify(c.id)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Verify</button>
-                    <button disabled={busyId === c.id} onClick={() => { setRejectTarget(c); setRejectNotes('') }} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Reject</button>
+                    <button disabled={busyId === c.id} onClick={() => verify(c.id)} className="rounded-lg bg-emerald-600 px-3 py-2.5 text-xs min-h-[44px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Verify</button>
+                    <button disabled={busyId === c.id} onClick={() => { setRejectTarget(c); setRejectNotes('') }} className="rounded-lg border border-red-200 px-3 py-2.5 text-xs min-h-[44px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Reject</button>
                   </div>
                 )}
               </div>
@@ -601,14 +601,14 @@ export function AdminContributions() {
             <button
               disabled={page <= 1}
               onClick={() => load(page - 1)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               Previous
             </button>
             <button
               disabled={page >= totalPages}
               onClick={() => load(page + 1)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               Next
             </button>

@@ -374,21 +374,21 @@ export function AdminClaims() {
                 <button
                   disabled={busyId === cl.id}
                   onClick={() => { setApproveTarget(cl); setApproveAmount(cl.amount_requested != null ? String(cl.amount_requested) : ''); setApproveNotes('') }}
-                  className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  className="rounded-lg bg-emerald-600 px-2.5 py-2.5 text-xs min-h-[44px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                 >
                   Approve
                 </button>
                 <button
                   disabled={busyId === cl.id}
                   onClick={() => { setInfoTarget(cl); setInfoMessage('') }}
-                  className="rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                  className="rounded-lg border border-amber-200 px-2.5 py-2.5 text-xs min-h-[44px] font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
                 >
                   Info
                 </button>
                 <button
                   disabled={busyId === cl.id}
                   onClick={() => { setRejectTarget(cl); setRejectNotes('') }}
-                  className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  className="rounded-lg border border-red-200 px-2.5 py-2.5 text-xs min-h-[44px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
                 >
                   Reject
                 </button>
@@ -522,14 +522,14 @@ export function AdminClaims() {
                     <button
                       disabled={busyId === cl.id}
                       onClick={() => { setApproveTarget(cl); setApproveAmount(cl.amount_requested != null ? String(cl.amount_requested) : ''); setApproveNotes('') }}
-                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      className="rounded-lg bg-emerald-600 px-3 py-2.5 text-xs min-h-[44px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
                       Approve
                     </button>
                     <button
                       disabled={busyId === cl.id}
                       onClick={() => { setRejectTarget(cl); setRejectNotes('') }}
-                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      className="rounded-lg border border-red-200 px-3 py-2.5 text-xs min-h-[44px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >
                       Reject
                     </button>
@@ -780,14 +780,14 @@ export function AdminClaims() {
             <button
               disabled={page <= 1}
               onClick={() => load(page - 1)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               Previous
             </button>
             <button
               disabled={page >= totalPages}
               onClick={() => load(page + 1)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               Next
             </button>
