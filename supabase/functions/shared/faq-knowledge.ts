@@ -34,22 +34,29 @@ export const ABOUT_BLURB = {
     'Luma Welfare is a community welfare organisation. Members contribute to packages and may claim support for eligible life events according to package rules. For official policy text, use approved organization documents in the member portal.',
 }
 
-/** Queries we must refuse — no claim/payment decisions, no PII fishing. */
+/** Queries we must refuse — no claim/payment decisions, no PII fishing, no private account RAG. */
 const REFUSE_PATTERNS: RegExp[] = [
   /\b(approve|reject|verify)\b.*\b(claim|payment|contribution|payout)\b/i,
   /\b(claim|payment|contribution|payout)\b.*\b(approve|reject|verify)\b/i,
   /\b(show|list|export|dump)\b.*\b(member|members|phone|email|id number|national id|password)\b/i,
   /\b(my|their)\b.*\b(balance|mpesa|daraja|stk)\b/i,
+  /\bmy\b.*\b(membership number|claim status|contribution|payment|payout|id number)\b/i,
+  /\bwhat (is|are) my\b/i,
   /\bservice[_\s-]?role\b/i,
   /\b(ignore|bypass)\b.*\b(policy|security|rls)\b/i,
 ]
+
+const PERSONAL_DATA_REDIRECT =
+  'I can only help with general Luma Welfare information from approved organization knowledge. ' +
+  'For your personal membership number, contributions, payments, or claim status, use Profile, Contributions, Claims, or contact support. ' +
+  'I cannot approve claims or payments or access another member\'s private data.'
 
 export function shouldRefuseQuery(query: string): string | null {
   const q = query.trim()
   if (!q) return 'Please ask a question about Luma Welfare membership, packages, contributions, or claims process.'
   for (const re of REFUSE_PATTERNS) {
     if (re.test(q)) {
-      return 'I can only help with general Luma Welfare information. I cannot approve claims or payments, access private member data, or change account status. Use Claims, Contributions, or contact support for account-specific actions.'
+      return PERSONAL_DATA_REDIRECT
     }
   }
   return null

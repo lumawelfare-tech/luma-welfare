@@ -10,19 +10,35 @@ import {
 } from '../shared/supabase.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { FAQ_KNOWLEDGE, ABOUT_BLURB, isAiAssistantEnabled } from '../shared/faq-knowledge.ts'
+import { KB_DOC_BUCKET } from '../shared/storage-signed.ts'
+import {
+  chunkKbText,
+  embedTexts,
+  extractPdfText,
+  getOpenAiApiKey,
+  hashContent,
+  normalizeKbText,
+} from '../shared/kb-rag.ts'
 
 /**
  * Admin KB ingest — rebuild safe chunks from FAQ + approved public/member documents.
+ * Downloads private Storage PDFs server-side, extracts text, chunks, optionally embeds.
  * Never ingests staff/admin/restricted KB, claims, or member PII.
  *
  * POST /admin-kb-ingest
  */
 
-function hashContent(s: string): string {
-  // Lightweight non-crypto fingerprint for change detection
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0
-  return `h${(h >>> 0).toString(16)}`
+type DocRow = {
+  id: string
+  title: string
+  summary: string | null
+  category: string | null
+  access_level: string
+  status: string
+  storage_path: string
+  mime_type: string | null
+  version: number
+  version_label: string | null
 }
 
 Deno.serve(async (req) => {
@@ -63,10 +79,12 @@ Deno.serve(async (req) => {
     const rl = await rateLimitAsync(req, 'admin-kb-ingest', { userId: session.id, adminClient })
     if (!rl.ok) return rl.response!
 
-    // Clear prior FAQ/About + kb_document chunks (safe sources only)
+    // Clear prior FAQ/About + kb_document chunks (safe sources only) — idempotent rebuild
     await adminClient.from('kb_chunks').delete().in('source_type', ['faq', 'about', 'kb_document'])
 
     const rows: Record<string, unknown>[] = []
+    const warnings: string[] = []
+    const openaiKey = getOpenAiApiKey()
 
     for (const faq of FAQ_KNOWLEDGE) {
       const content = `Q: ${faq.question}\nA: ${faq.answer}`
@@ -78,6 +96,7 @@ Deno.serve(async (req) => {
         content,
         chunk_index: 0,
         content_hash: hashContent(content),
+        metadata: { category: faq.category },
       })
     }
 
@@ -89,30 +108,99 @@ Deno.serve(async (req) => {
       content: ABOUT_BLURB.content,
       chunk_index: 0,
       content_hash: hashContent(ABOUT_BLURB.content),
+      metadata: { category: 'about' },
     })
 
-    // Only approved public/member KB metadata (title + summary) — never private paths/PII
+    // Only approved public/member KB — never staff/admin/restricted
     const { data: docs, error: docsErr } = await adminClient
       .from('kb_documents')
-      .select('id, title, summary, category, access_level, status')
+      .select('id, title, summary, category, access_level, status, storage_path, mime_type, version, version_label')
       .eq('status', 'approved')
       .in('access_level', ['public', 'member'])
     if (docsErr) throw new Error(docsErr.message)
 
-    for (const doc of docs ?? []) {
-      const parts = [doc.title, doc.category ? `Category: ${doc.category}` : '', doc.summary ?? '']
-        .filter(Boolean)
-        .join('\n')
-      if (parts.length < 3) continue
-      rows.push({
-        source_type: 'kb_document',
-        source_id: doc.id,
-        access_level: doc.access_level,
-        title: doc.title,
-        content: parts.slice(0, 8000),
-        chunk_index: 0,
-        content_hash: hashContent(parts),
+    let pdfExtracted = 0
+    let pdfFailed = 0
+
+    for (const doc of (docs ?? []) as DocRow[]) {
+      const meta = {
+        category: doc.category,
+        version: doc.version,
+        version_label: doc.version_label,
+        // Never put storage_path in member-facing answers; keep internal-only flags
+        has_pdf: Boolean(doc.storage_path),
+      }
+
+      let bodyText = ''
+      const mime = (doc.mime_type ?? '').toLowerCase()
+      const isPdf = mime.includes('pdf') || doc.storage_path.toLowerCase().endsWith('.pdf')
+
+      if (isPdf && doc.storage_path) {
+        try {
+          const { data: file, error: dlErr } = await adminClient.storage
+            .from(KB_DOC_BUCKET)
+            .download(doc.storage_path)
+          if (dlErr || !file) {
+            throw new Error(dlErr?.message ?? 'download failed')
+          }
+          const bytes = new Uint8Array(await file.arrayBuffer())
+          bodyText = await extractPdfText(bytes)
+          if (bodyText.length < 40) {
+            throw new Error('extracted text too short')
+          }
+          pdfExtracted++
+        } catch (err) {
+          pdfFailed++
+          const msg = err instanceof Error ? err.message : 'extract failed'
+          console.error('[admin-kb-ingest] PDF extract failed', doc.id, msg)
+          warnings.push(`pdf_extract_failed:${doc.id}`)
+        }
+      }
+
+      if (!bodyText) {
+        const parts = [doc.title, doc.category ? `Category: ${doc.category}` : '', doc.summary ?? '']
+          .filter(Boolean)
+          .join('\n')
+        bodyText = normalizeKbText(parts)
+      }
+
+      if (bodyText.length < 3) continue
+
+      const pieces = chunkKbText(bodyText)
+      pieces.forEach((content, chunkIndex) => {
+        rows.push({
+          source_type: 'kb_document',
+          source_id: doc.id,
+          access_level: doc.access_level,
+          title: doc.title,
+          content,
+          chunk_index: chunkIndex,
+          content_hash: hashContent(`${doc.id}:${doc.version}:${chunkIndex}:${content}`),
+          metadata: meta,
+        })
       })
+    }
+
+    // Optional embeddings — skip when OPENAI_API_KEY unset (trigram search still works)
+    let embedded = 0
+    if (openaiKey && rows.length > 0) {
+      try {
+        const texts = rows.map((r) => String(r.content ?? ''))
+        const vectors = await embedTexts(texts, openaiKey)
+        if (vectors.length !== rows.length) {
+          throw new Error(`embedding count mismatch ${vectors.length}!=${rows.length}`)
+        }
+        for (let i = 0; i < rows.length; i++) {
+          rows[i].embedding = JSON.stringify(vectors[i])
+        }
+        embedded = vectors.length
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'embed failed'
+        console.error('[admin-kb-ingest] embedding failed — inserting text-only chunks', msg)
+        warnings.push('embedding_failed')
+        // Strip any partial embedding fields
+        for (const r of rows) delete r.embedding
+      }
     }
 
     if (rows.length > 0) {
@@ -130,6 +218,10 @@ Deno.serve(async (req) => {
         about: 1,
         kb_documents: (docs ?? []).length,
         total_chunks: rows.length,
+        embedded,
+        pdf_extracted: pdfExtracted,
+        pdf_failed: pdfFailed,
+        embeddings_enabled: Boolean(openaiKey),
       },
     })
 
@@ -138,7 +230,13 @@ Deno.serve(async (req) => {
       chunks: rows.length,
       faq: FAQ_KNOWLEDGE.length,
       kb_documents: (docs ?? []).length,
-      note: 'Embeddings are optional; text search is used. Never ingested staff/restricted/claim/member data.',
+      embedded,
+      pdf_extracted: pdfExtracted,
+      pdf_failed: pdfFailed,
+      warnings,
+      note: openaiKey
+        ? 'PDF text chunked; embeddings stored for vector search.'
+        : 'PDF text chunked; OPENAI_API_KEY unset — trigram search only. Never ingested staff/restricted/claim/member data.',
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

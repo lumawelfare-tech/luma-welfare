@@ -32,11 +32,13 @@ describe('AI never touches claims/payments/PII tables for RAG', () => {
     expect(assistant).toContain(".from('members')")
     expect(assistant).toContain(".select('status')")
     expect(assistant).toContain('search_kb_chunks')
+    expect(assistant).toContain('match_kb_chunks')
   })
 
   it('ingest only allows public/member approved KB', () => {
     expect(ingest).toContain(".in('access_level', ['public', 'member'])")
     expect(ingest).toContain(".eq('status', 'approved')")
+    expect(ingest).toContain('extractPdfText')
     expect(ingest).not.toMatch(/\.from\(['"]claims['"]\)/)
     expect(ingest).not.toMatch(/\.from\(['"]payments['"]\)/)
   })

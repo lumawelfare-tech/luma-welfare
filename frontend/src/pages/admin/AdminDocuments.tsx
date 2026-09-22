@@ -68,7 +68,7 @@ function fileToBase64(file: File): Promise<string> {
 
 /**
  * Admin org knowledge-base documents — ACL + Draft→Approved→Archived.
- * Private storage; downloads use signed URLs. No RAG.
+ * Private storage; downloads use signed URLs. Rebuild index runs secure KB ingest (approved public/member only).
  */
 export function AdminDocuments() {
   useHead('Documents', undefined, { noindex: true })
