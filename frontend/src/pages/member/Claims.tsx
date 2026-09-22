@@ -241,6 +241,10 @@ export function Claims() {
       <PageHeader
         title="Claims"
         description="Submit and track your welfare claims through each review stage."
+        breadcrumbs={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Claims' },
+        ]}
         actions={
           !showForm ? (
             <button
@@ -251,7 +255,15 @@ export function Claims() {
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
               New Claim
             </button>
-          ) : undefined
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]"
+            >
+              Back to claims
+            </button>
+          )
         }
       />
 

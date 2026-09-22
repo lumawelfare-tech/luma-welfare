@@ -94,7 +94,9 @@ No conflicting phone/email found between Contact and Footer. Consistency gap is 
 
 ## 3. Navigation and user journey
 
-**Status: PARTIAL**
+**Status: DONE** (Phase B — public nav: How It Works instead of guest Dashboard; member bottom nav “Contribute”; breadcrumbs + back on join/claims/contributions. Light chrome only.)
+
+---
 
 ### Journey (exists)
 
