@@ -3,6 +3,7 @@ import { api } from '../../lib/api'
 import { useToast } from '../../components/Toast'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
+import { MobileCardTable } from '../../components/MobileCardTable'
 import { SkeletonRow } from '../../components/Skeleton'
 import { reportLoadError } from '../../lib/userFacingError'
 import { maskEmail, maskPhone } from '../../lib/pii'
@@ -348,44 +349,78 @@ export function ReceiptsStatements() {
       )}
 
       {!loading && !error && (
-        <div className="mt-6 overflow-x-auto glass-panel">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3 hidden sm:table-cell">Package</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 hidden md:table-cell">Reference</th>
-                <th className="px-4 py-3 text-right">Receipt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((t) => (
-                <tr key={t.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td className="px-4 py-3 text-xs text-gray-500">{new Date(t.date).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{t.type}</td>
-                  <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{t.package ?? '—'}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">KSh {t.amount.toLocaleString('en-KE')}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusColors[t.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>{t.status}</span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-500 hidden md:table-cell">{t.reference ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">
-                    {(t.status === 'paid' || t.status === 'Paid' || t.status === 'Verified') && (
-                      <button onClick={() => viewReceipt(t.id)} className="text-xs font-medium text-luma-600 hover:text-luma-700 hover:underline">View Receipt</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
+        <div className="mt-6">
+          {filtered.length === 0 ? (
             <EmptyState
               icon="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
               title="No transactions found"
               message="Your financial transactions will appear here."
+            />
+          ) : (
+            <MobileCardTable
+              data={filtered}
+              keyFn={(t) => t.id}
+              columns={[
+                {
+                  key: 'type',
+                  header: 'Type',
+                  render: (t) => <span className="font-medium text-gray-900">{t.type}</span>,
+                },
+                {
+                  key: 'date',
+                  header: 'Date',
+                  mobileLabel: 'Date',
+                  render: (t) => (
+                    <span className="text-xs text-gray-500">{new Date(t.date).toLocaleDateString()}</span>
+                  ),
+                },
+                {
+                  key: 'package',
+                  header: 'Package',
+                  mobileLabel: 'Package',
+                  render: (t) => <span className="text-gray-600">{t.package ?? '—'}</span>,
+                  hideOnMobile: true,
+                },
+                {
+                  key: 'amount',
+                  header: 'Amount',
+                  render: (t) => (
+                    <span className="font-medium text-gray-900">KSh {t.amount.toLocaleString('en-KE')}</span>
+                  ),
+                },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  render: (t) => (
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusColors[t.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                      {t.status}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'reference',
+                  header: 'Reference',
+                  mobileLabel: 'Ref',
+                  render: (t) => <span className="text-xs text-gray-500">{t.reference ?? '—'}</span>,
+                  hideOnMobile: true,
+                },
+                {
+                  key: 'receipt',
+                  header: 'Receipt',
+                  render: (t) =>
+                    (t.status === 'paid' || t.status === 'Paid' || t.status === 'Verified') ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); void viewReceipt(t.id) }}
+                        className="min-h-[44px] text-xs font-medium text-luma-600 hover:text-luma-700 hover:underline"
+                      >
+                        View Receipt
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    ),
+                },
+              ]}
             />
           )}
         </div>

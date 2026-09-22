@@ -15,6 +15,7 @@ import {
   type PaymentUiStatus,
 } from '../../hooks/usePaymentTracker'
 import { ErrorState } from '../../components/ErrorState'
+import { MobileCardTable } from '../../components/MobileCardTable'
 import { PaymentStatusPanel } from '../../components/PaymentStatusPanel'
 import {
   isPaymentsUiMock,
@@ -731,36 +732,45 @@ export function Dashboard() {
         <div className="mb-6 overflow-hidden glass-panel shadow-sm">
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
             <h2 className="text-sm font-semibold text-gray-900">Contribution payments</h2>
-            <Link to="/contributions" className="text-xs font-medium text-luma-700 hover:underline">View all</Link>
+            <Link to="/contributions" className="text-xs font-medium text-luma-700 hover:underline min-h-[44px] inline-flex items-center">View all</Link>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Date</th>
-                  <th className="px-4 py-2 font-medium">Amount</th>
-                  <th className="px-4 py-2 font-medium">M-Pesa receipt</th>
-                  <th className="px-4 py-2 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentPayments.slice(0, 8).map((p) => {
-                  const ui = p.ui_status ?? mapPaymentUiStatus(p.status, p.created_at)
-                  return (
-                    <tr key={p.id} className="border-t border-gray-50">
-                      <td className="px-4 py-2.5 whitespace-nowrap text-gray-600">
-                        {new Date(p.created_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </td>
-                      <td className="px-4 py-2.5 font-medium text-gray-900">{money(p.amount)}</td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{p.mpesa_receipt ?? '—'}</td>
-                      <td className="px-4 py-2.5">
-                        <StatusBadge status={ui}>{ui}</StatusBadge>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+          <div className="p-3 sm:p-0 sm:[&_.rounded-xl]:rounded-none sm:[&_.border]:border-0">
+            <MobileCardTable
+              data={recentPayments.slice(0, 8)}
+              keyFn={(p) => p.id}
+              emptyMessage="No recent payments."
+              columns={[
+                {
+                  key: 'date',
+                  header: 'Date',
+                  render: (p) => (
+                    <span className="text-gray-600">
+                      {new Date(p.created_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'amount',
+                  header: 'Amount',
+                  render: (p) => <span className="font-medium text-gray-900">{money(p.amount)}</span>,
+                },
+                {
+                  key: 'receipt',
+                  header: 'Receipt',
+                  mobileLabel: 'Receipt',
+                  render: (p) => <span className="font-mono text-xs text-gray-600">{p.mpesa_receipt ?? '—'}</span>,
+                  hideOnMobile: true,
+                },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  render: (p) => {
+                    const ui = p.ui_status ?? mapPaymentUiStatus(p.status, p.created_at)
+                    return <StatusBadge status={ui}>{ui}</StatusBadge>
+                  },
+                },
+              ]}
+            />
           </div>
         </div>
       )}
