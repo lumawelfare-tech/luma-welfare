@@ -22,10 +22,10 @@ const SUPPORT_LINKS = [
 ] as const
 
 const linkClass =
-  'inline-flex min-h-11 items-center text-sm text-luma-200 transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] hover:text-white hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 rounded-sm motion-reduce:transition-none'
+  'inline-flex min-h-11 items-center text-sm text-luma-100 transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] hover:text-white hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 rounded-sm motion-reduce:transition-none'
 
 const socialBtnClass =
-  'inline-flex h-11 w-11 items-center justify-center rounded-xl text-luma-200 transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 motion-reduce:transition-none'
+  'inline-flex h-11 w-11 items-center justify-center rounded-xl text-luma-100 transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 motion-reduce:transition-none'
 
 function SocialIcon({ name }: { name: SiteSocialKey }) {
   const common = 'h-5 w-5'
@@ -74,7 +74,7 @@ function FooterNavGroup({
 }) {
   return (
     <div className="min-w-0">
-      <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-luma-300">{title}</h3>
+      <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-luma-100">{title}</h3>
       <nav aria-label={title}>
         <ul className="space-y-1">
           {links.map((l) => (
@@ -145,12 +145,12 @@ export function SiteFooter() {
               </span>
               <div>
                 <span className="block text-lg font-bold tracking-tight text-white">{cfg.name}</span>
-                <span className="block text-[10px] font-medium uppercase tracking-[0.16em] text-luma-300">
+                <span className="block text-[10px] font-medium uppercase tracking-[0.16em] text-luma-100">
                   {cfg.tagline}
                 </span>
               </div>
             </div>
-            <p className="mt-4 max-w-sm text-sm leading-relaxed text-luma-200">{cfg.description}</p>
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-luma-100">{cfg.description}</p>
             {social.length > 0 && (
               <ul className="mt-5 flex flex-wrap items-center gap-2" aria-label="Social links">
                 {social.map((s) => (
@@ -171,7 +171,7 @@ export function SiteFooter() {
           </div>
 
           <div className="order-2 min-w-0 lg:order-4">
-            <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-luma-300">
+            <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-luma-100">
               Contact
             </h3>
             <nav aria-label="Contact">
@@ -204,10 +204,10 @@ export function SiteFooter() {
                   </li>
                 )}
                 {cfg.address && (
-                  <li className="pt-2 leading-relaxed text-luma-200">{cfg.address}</li>
+                  <li className="pt-2 leading-relaxed text-luma-100">{cfg.address}</li>
                 )}
                 {cfg.officeHours && (
-                  <li className="leading-relaxed text-luma-300">{cfg.officeHours}</li>
+                  <li className="leading-relaxed text-luma-100">{cfg.officeHours}</li>
                 )}
               </ul>
             </nav>
@@ -223,11 +223,11 @@ export function SiteFooter() {
         </div>
 
         <div className="flex flex-col gap-4 border-t border-white/10 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 space-y-1.5 text-xs text-luma-300">
+          <div className="min-w-0 space-y-1.5 text-xs text-luma-100">
             <p>
               © {year} {cfg.name}. All rights reserved.
             </p>
-            {legalLine && <p className="text-luma-400">{legalLine}</p>}
+            {legalLine && <p className="text-luma-200">{legalLine}</p>}
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <Link to="/privacy" className={`${linkClass} !min-h-0 py-1`}>
                 Privacy Policy
@@ -241,7 +241,7 @@ export function SiteFooter() {
           <button
             type="button"
             onClick={scrollWindowToTop}
-            className="inline-flex min-h-11 items-center justify-center self-start rounded-lg border border-white/15 px-3 text-xs font-medium text-luma-200 transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] hover:border-white/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 motion-reduce:transition-none sm:self-auto"
+            className="inline-flex min-h-11 items-center justify-center self-start rounded-lg border border-white/15 px-3 text-xs font-medium text-luma-100 transition-colors duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] hover:border-white/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-300 focus-visible:ring-offset-2 focus-visible:ring-offset-luma-950 motion-reduce:transition-none sm:self-auto"
           >
             Back to top
           </button>

@@ -27,4 +27,24 @@ test.describe('Accessibility (axe)', () => {
     const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([])
   })
+
+  test('contact page has no serious axe violations', async ({ page }) => {
+    await page.goto(`${BASE}/contact`)
+    await page.waitForSelector('main, #root', { timeout: 15000 })
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze()
+    const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([])
+  })
+
+  test('register page has no serious axe violations', async ({ page }) => {
+    await page.goto(`${BASE}/register`)
+    await page.waitForSelector('form, main, #root', { timeout: 15000 })
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze()
+    const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([])
+  })
 })

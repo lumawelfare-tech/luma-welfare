@@ -1,6 +1,6 @@
 # Security verification notes
 
-Last updated: 2026-09-21 (Phase 5 testing quality)
+Last updated: 2026-09-22 (Phase H — role matrix checklist + ENFORCE gate docs)
 
 ## Automated coverage
 
@@ -47,4 +47,22 @@ Branch protection checklist: `docs/BRANCH_PROTECTION.md`.
 
 ## Manual actions
 
-Configure branch protection + CI secrets per `docs/BRANCH_PROTECTION.md`. Run live RLS against staging/preview before go-live.
+1. Configure branch protection + CI secrets per `docs/BRANCH_PROTECTION.md`.
+2. After secrets are populated on the canonical repo, set `ENFORCE_LIVE_SECRETS=true` so the Live Secrets Gate fails instead of soft-skipping.
+3. Run live RLS against staging/preview before go-live (`npm run test:rls`).
+4. Complete the **role matrix checklist** below and attach evidence (CI run URL or local log) before onboarding real members at scale.
+
+## Role matrix checklist (operator)
+
+Mark each row after a green live run (or document intentional skip). Do not treat soft-skipped CI as proof.
+
+| Check | Command / surface | Pass? | Evidence |
+|-------|-------------------|-------|----------|
+| Member A cannot read Member B rows | `npm run test:rls` | ☐ | |
+| Member JWT denied on `admin-claims` | `npm run test:rls` + edge case | ☐ | |
+| Anon cannot read private tables | `npm run test:rls` | ☐ | |
+| Member E2E login + dashboard | Playwright with `E2E_MEMBER_*` | ☐ | |
+| Admin E2E login + claims queue | Playwright with `E2E_ADMIN_*` (non-2FA test admin) | ☐ | |
+| Live Secrets Gate hard mode | `vars.ENFORCE_LIVE_SECRETS=true` + required check | ☐ | |
+
+Staff role matrix beyond member/admin (e.g. fine-grained admin permissions) remains a product decision — current automated suite covers member isolation + admin edge denial, not every staff permission pair.

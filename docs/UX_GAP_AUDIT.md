@@ -1,8 +1,8 @@
 # Luma Welfare — UX Gap Audit (Phase 0)
 
-**Date:** 2026-09-22 (refreshed)  
-**Scope:** Gap assessment only — **no product code changes** in this phase.  
-**Constraint:** IMPROVE, do not redesign. Keep brand greens, logo, typography, and working layouts unless a later phase names a specific defect (layout changes require explicit approval first).  
+**Date:** 2026-09-22 (Phases A–H complete)  
+**Scope:** IMPROVE gap audit + phased fixes. Phase 0 was assessment-only; A–H are code/docs.  
+**Constraint:** IMPROVE, do not redesign. Keep brand greens, logo, typography, and working layouts.  
 **Payments hard rule:** Do not modify Daraja/M-Pesa logic, Edge Functions payment flags, or env vars. UI-only honesty / mock path only.  
 **Status key:** `DONE` | `PARTIAL` | `MISSING`
 
@@ -21,11 +21,11 @@
 | 5 | Member portal features | **DONE** (Phase C polish) |
 | 6 | Admin portal features | **DONE** (Phase D polish) |
 | 7 | Loading / empty / error states | **DONE** (Phase F — public CMS + admin recon/settings/scheduled use reportLoadError; JWT/PGRST scrub) |
-| 8 | Performance | **DONE** (scores still manual) |
-| 9 | Production hardening / security verification | **PARTIAL** |
-| 10 | Accessibility | **PARTIAL** |
+| 8 | Performance | **DONE** (Phase G — Framer vendor chunk + recorded sizes in `docs/LIGHTHOUSE.md`) |
+| 9 | Production hardening / security verification | **PARTIAL** (Phase H docs/checklists; live secrets still operator) |
+| 10 | Accessibility | **DONE** (Phase H — axe contact/register; Login password describedby; footer contrast) |
 
-**Overall:** Strong product surface (member + admin portals largely complete). Highest-impact honesty gap is **payment messaging vs STK UI** while M-Pesa is off. Highest-impact ops gap is **CI still soft-skips live RLS/E2E** until secrets + `ENFORCE_LIVE_SECRETS` are set.
+**Overall:** Product IMPROVE phases A–H complete in-repo. Remaining go-live blockers are **operator**: dedicated test Supabase secrets, `ENFORCE_LIVE_SECRETS=true`, role-matrix evidence, legal placeholders, and independent security review. Payments stay honest/disabled (no Daraja changes).
 
 ---
 
@@ -200,25 +200,23 @@ Blank screens are not systemic on major dashboards.
 
 ## 8. Performance
 
-**Status: DONE** (verification still manual)
+**Status: DONE** (Phase G — Lighthouse scores still manual)
 
 | Item | Status | Evidence |
 |------|--------|----------|
 | Route code-splitting | DONE | `App.tsx` `React.lazy` for packages/news/gallery/media + member + admin |
 | Image lazy-load | DONE | Gallery/Media/admin grids `loading="lazy"`; hero `fetchPriority="high"` |
 | Font | DONE | Local Inter + `font-display: swap` |
-| Vendor chunks | DONE | react / recharts / jspdf in `vite.config.ts` |
+| Vendor chunks | DONE | react / framer / recharts / jspdf / html2canvas in `vite.config.ts` |
 | Lighthouse recipe | DONE | `docs/LIGHTHOUSE.md`, `npm run lighthouse:smoke` |
-| Recorded scores in CI | MISSING | Manual only |
-| Framer in `manualChunks` | residual risk | Eager Home/motion path |
-
-**Phase G:** Measure + optional Framer chunk; do not chase invented homepage stats.
+| Recorded bundle sizes | DONE | `docs/LIGHTHOUSE.md` table (2026-09-22); `vendor-framer` ~135 kB / ~44 kB gzip |
+| Recorded Lighthouse scores in CI | MISSING | Manual only by design |
 
 ---
 
 ## 9. Production hardening and security verification
 
-**Status: PARTIAL**
+**Status: PARTIAL** (docs + soft gate DONE; live proof MISSING until secrets)
 
 | Item | Status | Evidence |
 |------|--------|----------|
@@ -228,40 +226,37 @@ Blank screens are not systemic on major dashboards.
 | Sentry (FE + Edge) + scrub | DONE | `frontend/src/lib/sentry.ts`, `supabase/functions/shared/sentry.ts` |
 | Health check | DONE | `supabase/functions/health` + `AdminHealthCheck.tsx` |
 | Backup / restore docs | DONE | `docs/BACKUP_RESTORE.md` (operator drills unchecked by design) |
-| Role isolation evidence | PARTIAL | Specs exist; **not proven green-live** until secrets populated |
-
-**Phase H:** Populate dedicated **test** Supabase project secrets, enable enforce var, verify role matrix, finish remaining a11y from §10.
+| Role isolation evidence | PARTIAL | Specs + checklist in `docs/SECURITY_VERIFICATION.md`; **not proven green-live** until secrets populated |
+| Branch protection docs | DONE | `docs/BRANCH_PROTECTION.md` (soft → hard ENFORCE path) |
 
 ---
 
 ## 10. Accessibility
 
-**Status: PARTIAL**
+**Status: DONE** (Phase H polish; full-site audit still optional)
 
 | Item | Status | Evidence |
 |------|--------|----------|
 | ConfirmDialog focus trap | DONE | `useFocusTrap` in `ConfirmDialog.tsx` |
-| axe smoke | DONE narrow | `e2e/a11y.spec.ts` — home + login, serious/critical |
-| Form ARIA | PARTIAL | Shared `ui/Input` underused; Login partial; admin forms ad-hoc |
-| Contrast | PARTIAL / unverified | Muted `text-gray-400` / glass footers — needs pass |
+| axe smoke | DONE | `e2e/a11y.spec.ts` — home, login, contact, register (serious/critical) |
+| Form ARIA (Login) | DONE | Email `Input` error id; password `aria-describedby` → `login-email-error` |
+| Footer contrast | DONE | Dark footer body/links use `text-luma-100` (was 200/300/400) |
 | Headings | MOSTLY DONE | Home FAQ has `aria-expanded` / `aria-controls`; not full-site audited |
 
 ---
 
-## Ordered work list (PARTIAL / MISSING only)
+## Ordered work list (status after A–H)
 
-Maps to your phases. **Skip redesign.** Member/Admin feature builds are largely unnecessary.
-
-| Order | Phase | Focus | Why |
-|-------|-------|-------|-----|
-| 1 | **A** | Payment honesty + Contact consistency | STK/M-Pesa UI and marketing overstate live pay; About/Contact single-source |
-| 2 | **B** | Journey clarity (labels, dual Pay paths, light breadcrumbs if approved) | Reduce confusion while payments stay off |
-| 3 | **C** | Member polish only if needed (receipt PDF label clarity; multi-package summary wording) | Features DONE — no greenfield |
-| 4 | **D** | Admin polish only if needed (touch targets / dense tables) | Features + charts DONE |
-| 5 | **E** | Mobile: MobileCardTable on Dashboard payments + Receipts; 44px export actions | Named mobile gaps |
-| 6 | **F** | Route remaining errors through `reportLoadError` / safe toasts; JWT/PGRST scrub | Leak + consistency |
-| 7 | **G** | Record Lighthouse; optional Framer vendor chunk | Already mostly done |
-| 8 | **H** | CI secrets + enforce gate + role verification report + remaining a11y | Soft-skip → real gates |
+| Order | Phase | Focus | Status |
+|-------|-------|-------|--------|
+| 1 | **A** | Payment honesty + Contact consistency | **DONE** |
+| 2 | **B** | Journey clarity | **DONE** |
+| 3 | **C** | Member polish | **DONE** |
+| 4 | **D** | Admin polish | **DONE** |
+| 5 | **E** | MobileCardTable + 44px | **DONE** |
+| 6 | **F** | reportLoadError / JWT scrub | **DONE** |
+| 7 | **G** | Framer chunk + Lighthouse evidence | **DONE** |
+| 8 | **H** | CI/docs + a11y polish | **DONE** (live secrets still manual) |
 
 ### Explicitly deferred / skipped
 
@@ -275,14 +270,22 @@ Maps to your phases. **Skip redesign.** Member/Admin feature builds are largely 
 
 1. Create/configure a **dedicated test** Supabase project; set GitHub Actions secrets (`SUPABASE_*`, `E2E_*`).
 2. After secrets work: set repo variable `ENFORCE_LIVE_SECRETS=true`.
-3. Approve or supply real Stories/testimonials — or approve omitting those blocks forever.
-4. Approve before any page **layout** change (e.g. breadcrumbs on join/claims, About contact block placement).
+3. Complete the role matrix checklist in `docs/SECURITY_VERIFICATION.md` with CI/local evidence.
+4. Approve or supply real Stories/testimonials — or approve omitting those blocks forever.
 5. Independent security review before onboarding real members at scale.
 
 ---
 
-## Stop — awaiting approval
+## Final deliverables (IMPROVE complete)
 
-Phase 0 complete. **No code changes** in this phase.
+| Deliverable | Location |
+|-------------|----------|
+| Gap audit + scorecard | `docs/UX_GAP_AUDIT.md` (this file) |
+| Lighthouse + bundle evidence | `docs/LIGHTHOUSE.md` |
+| Branch protection / ENFORCE gate | `docs/BRANCH_PROTECTION.md` |
+| Security verification + role checklist | `docs/SECURITY_VERIFICATION.md` |
+| Payment honesty helpers | `frontend/src/lib/paymentsUi.ts` |
+| Framer vendor chunk | `frontend/vite.config.ts` → `vendor-framer` |
+| Expanded axe smoke | `e2e/a11y.spec.ts` |
 
-Suggested next step after your approval: **Phase A** (payment messaging honesty + contact consistency), then **Phase B** (journey), then pause again after A+B per your “stop every two phases” rule.
+**Stop.** Phases A–H committed locally. Push / enable live secrets only when you ask.

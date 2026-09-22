@@ -207,6 +207,7 @@ export function Login() {
                     onChange={(e) => { setPassword(e.target.value); setError(null) }}
                     placeholder="••••••••"
                     aria-invalid={error && !needsVerification ? true : undefined}
+                    aria-describedby={error && !needsVerification ? 'login-email-error' : undefined}
                   />
                 </div>
 
