@@ -187,8 +187,9 @@ export function Login() {
                   required
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); setError(null) }}
                   placeholder="you@example.com"
+                  error={error && !needsVerification ? error : undefined}
                 />
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">
@@ -203,8 +204,9 @@ export function Login() {
                     required
                     autoComplete="current-password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => { setPassword(e.target.value); setError(null) }}
                     placeholder="••••••••"
+                    aria-invalid={error && !needsVerification ? true : undefined}
                   />
                 </div>
 
@@ -233,12 +235,6 @@ export function Login() {
                     >
                       Verify your email →
                     </button>
-                  </div>
-                )}
-
-                {error && !needsVerification && (
-                  <div className={alertErrorClass} role="alert">
-                    {error}
                   </div>
                 )}
 

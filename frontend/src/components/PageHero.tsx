@@ -56,7 +56,7 @@ export function PageHero({ eyebrow, title, description, meta }: PageHeroProps) {
         />
         {meta && (
           <motion.div
-            className="mt-4 text-sm text-white/60"
+            className="mt-4 text-sm text-white/80"
             initial={reduceMotion ? false : lumaHero.initial}
             animate={lumaHero.animate}
             transition={t(lumaStagger.step * 4)}

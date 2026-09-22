@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Icon } from './Icon'
 import { lumaModal } from '../lib/lumaMotion'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 type ConfirmDialogProps = {
   open: boolean
@@ -50,8 +51,10 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const panelRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
   const reduceMotion = useReducedMotion()
+  useFocusTrap(panelRef, open)
 
   useEffect(() => {
     if (open) {
@@ -75,9 +78,7 @@ export function ConfirmDialog({
       {open && (
         <motion.div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-title"
+          role="presentation"
           initial={reduceMotion ? false : lumaModal.backdrop.initial}
           animate={lumaModal.backdrop.animate}
           exit={reduceMotion ? undefined : lumaModal.backdrop.exit}
@@ -85,7 +86,11 @@ export function ConfirmDialog({
           onClick={onCancel}
         >
           <motion.div
+            ref={panelRef}
             className="glass-modal w-full max-w-md"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-title"
             onClick={(e) => e.stopPropagation()}
             initial={reduceMotion ? false : lumaModal.panel.initial}
             animate={lumaModal.panel.animate}

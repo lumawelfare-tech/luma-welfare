@@ -90,6 +90,7 @@ const faqItems = [
 
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false)
+  const panelId = `home-faq-${q.slice(0, 24).replace(/\W+/g, '-').toLowerCase()}`
   return (
     <div className="border-b border-gray-200/80 last:border-0">
       <button
@@ -97,13 +98,19 @@ function FaqItem({ q, a }: { q: string; a: string }) {
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between py-4 text-left"
         aria-expanded={open}
+        aria-controls={panelId}
+        id={`${panelId}-btn`}
       >
         <span className="text-sm font-semibold text-gray-900 pr-4">{q}</span>
-        <svg className={`h-5 w-5 flex-shrink-0 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <svg className={`h-5 w-5 flex-shrink-0 text-gray-600 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {open && <p className="pb-4 text-sm leading-relaxed text-gray-600">{a}</p>}
+      {open && (
+        <p id={panelId} role="region" aria-labelledby={`${panelId}-btn`} className="pb-4 text-sm leading-relaxed text-gray-600">
+          {a}
+        </p>
+      )}
     </div>
   )
 }
@@ -294,7 +301,7 @@ export function Home() {
               Explore packages
             </Link>
           </div>
-          <p className="mt-4 text-xs text-white/70">One-time KSh 300 activation fee after registration</p>
+          <p className="mt-4 text-xs text-white/85">One-time KSh 300 activation fee after registration</p>
         </div>
       </MotionSection>
     </div>
