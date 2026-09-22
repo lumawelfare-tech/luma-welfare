@@ -309,10 +309,10 @@ export function ReceiptsStatements() {
           <h1 className="text-2xl font-bold text-gray-900">Receipts & Statements</h1>
           <p className="mt-1 text-sm text-gray-500">{transactions.length} transaction{transactions.length !== 1 ? 's' : ''}</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => downloadCSV(filtered, 'luma-statement.csv')} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">CSV</button>
-          <button onClick={() => downloadExcel(filtered, 'luma-statement.xls')} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">Excel</button>
-          <button onClick={() => downloadPDFStatement(filtered, 'luma-statement.pdf')} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">PDF</button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => downloadCSV(filtered, 'luma-statement.csv')} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]">CSV</button>
+          <button type="button" onClick={() => downloadExcel(filtered, 'luma-statement.xls')} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]">Excel</button>
+          <button type="button" onClick={() => downloadPDFStatement(filtered, 'luma-statement.pdf')} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]" title="Opens a printable statement you can save as PDF">Print statement</button>
         </div>
       </div>
 
@@ -417,7 +417,7 @@ export function ReceiptsStatements() {
             </div>
             <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap justify-end gap-2">
               <button type="button" onClick={handleShare} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]">Share</button>
-              <button type="button" onClick={() => downloadReceiptPDF(receipt)} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 min-h-[44px]">Download PDF</button>
+              <button type="button" onClick={() => downloadReceiptPDF(receipt)} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800 min-h-[44px]" title="Opens a printable receipt you can save as PDF">Print / save</button>
               <button type="button" onClick={() => setReceipt(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]">Close</button>
             </div>
           </div>

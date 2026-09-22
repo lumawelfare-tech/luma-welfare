@@ -666,10 +666,25 @@ export function Dashboard() {
             <p className="mt-1.5 text-xs text-gray-500">{summary.current_period}</p>
           </div>
           <div className="glass-panel p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Package</p>
-            <p className="mt-1 text-lg font-bold text-gray-900 truncate">{summary.package_name ?? '—'}</p>
-            {summary.monthly_amount != null && summary.monthly_amount > 0 && (
-              <p className="mt-0.5 text-xs text-gray-500">{money(summary.monthly_amount)} / month</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              {activeCards.length > 1 ? 'Packages' : 'Package'}
+            </p>
+            {activeCards.length > 1 ? (
+              <>
+                <p className="mt-1 text-lg font-bold text-gray-900">{activeCards.length} active</p>
+                <p className="mt-0.5 text-xs text-gray-500 truncate" title={activeCards.map(packageName).join(', ')}>
+                  {activeCards.map(packageName).join(' · ')}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-lg font-bold text-gray-900 truncate">
+                  {summary.package_name ?? (activeCards[0] ? packageName(activeCards[0]) : '—')}
+                </p>
+                {summary.monthly_amount != null && summary.monthly_amount > 0 && (
+                  <p className="mt-0.5 text-xs text-gray-500">{money(summary.monthly_amount)} / month</p>
+                )}
+              </>
             )}
           </div>
         </div>

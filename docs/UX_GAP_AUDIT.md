@@ -18,8 +18,8 @@
 | 2 | Contact info consistency | **DONE** (Phase A) |
 | 3 | Navigation and user journey | **DONE** (Phase B) |
 | 4 | Mobile UX | **PARTIAL** |
-| 5 | Member portal features | **DONE** (polish gaps only) |
-| 6 | Admin portal features | **DONE** (polish gaps only) |
+| 5 | Member portal features | **DONE** (Phase C polish) |
+| 6 | Admin portal features | **DONE** (Phase D polish) |
 | 7 | Loading / empty / error states | **PARTIAL** |
 | 8 | Performance | **DONE** (scores still manual) |
 | 9 | Production hardening / security verification | **PARTIAL** |
