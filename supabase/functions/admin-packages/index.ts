@@ -111,8 +111,13 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && pkgId && action === 'tiers') {
       requirePermission(session, 'packages', 'update')
       const body = await req.json()
-      const minAge = body.minAge != null && body.minAge !== '' ? Number(body.minAge) : null
-      const maxAge = body.maxAge != null && body.maxAge !== '' ? Number(body.maxAge) : null
+      const parseOptionalAge = (raw: unknown): number | null => {
+        if (raw == null || raw === '') return null
+        const n = Number(raw)
+        return Number.isFinite(n) ? n : null
+      }
+      const minAge = parseOptionalAge(body.minAge)
+      const maxAge = parseOptionalAge(body.maxAge)
       const { data: existing } = await adminClient.from('package_tiers').select('name, min_age, max_age').eq('package_id', pkgId)
       const overlap = validateTierAgeOverlaps([
         ...(existing ?? []).map((t) => ({ name: t.name, min_age: t.min_age, max_age: t.max_age })),
@@ -138,15 +143,33 @@ Deno.serve(async (req) => {
     if (req.method === 'PUT' && pkgId && action === 'tiers') {
       requirePermission(session, 'packages', 'update')
       const body = await req.json()
-      const rows = Array.isArray(body.tiers) ? body.tiers : []
-      const normalized = rows.map((t: { name?: string; amount?: number; description?: string; minAge?: number | null; maxAge?: number | null; sortOrder?: number }, i: number) => ({
-        name: String(t.name ?? '').trim(),
-        amount: Number(t.amount),
-        description: t.description ?? null,
-        min_age: t.minAge != null && t.minAge !== '' ? Number(t.minAge) : null,
-        max_age: t.maxAge != null && t.maxAge !== '' ? Number(t.maxAge) : null,
-        sort_order: t.sortOrder ?? i + 1,
-      }))
+      type TierInput = {
+        name?: unknown
+        amount?: unknown
+        description?: unknown
+        minAge?: unknown
+        maxAge?: unknown
+        sortOrder?: unknown
+      }
+      const parseOptionalAge = (raw: unknown): number | null => {
+        if (raw == null || raw === '') return null
+        const n = Number(raw)
+        return Number.isFinite(n) ? n : null
+      }
+      const rows: unknown[] = Array.isArray(body.tiers) ? body.tiers : []
+      const normalized = rows.map((raw, i) => {
+        const t = (raw && typeof raw === 'object' ? raw : {}) as TierInput
+        const sortRaw = t.sortOrder
+        const sortOrder = typeof sortRaw === 'number' && Number.isFinite(sortRaw) ? sortRaw : i + 1
+        return {
+          name: String(t.name ?? '').trim(),
+          amount: Number(t.amount),
+          description: t.description == null ? null : String(t.description),
+          min_age: parseOptionalAge(t.minAge),
+          max_age: parseOptionalAge(t.maxAge),
+          sort_order: sortOrder,
+        }
+      })
       if (normalized.some((t) => !t.name || !Number.isFinite(t.amount) || t.amount < 0)) {
         return new Response(JSON.stringify({ message: 'Each tier needs a name and a non-negative amount.', code: 'VALIDATION' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }

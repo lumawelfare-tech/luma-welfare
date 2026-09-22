@@ -23,6 +23,8 @@ describe('package catalog foundation (migration contract)', () => {
     expect(sql).toContain('Age 80+')
     expect(sql).toContain('min_age = 0')
     expect(sql).toContain('max_age = 79')
-    expect(sql).toContain('min_age = 80')
+    // Age 80+ INSERT lists min_age/max_age columns and seeds 80 / unbounded
+    expect(sql).toContain('min_age, max_age, is_active')
+    expect(sql).toContain('2, 80, NULL, true')
   })
 })

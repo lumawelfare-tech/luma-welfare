@@ -539,10 +539,18 @@ jobs:
                 ;;
               skipped)
                 # Live secrets gate skips on forks; E2E / Edge check skip on develop-only pushes.
+                # Tests/Build skip when typecheck (or other upstream) failed — expected, not a second root cause.
                 if [ "$name" = "Live Secrets Gate" ] || [ "$name" = "E2E" ] || [ "$name" = "Edge Check" ]; then
                   echo "⚠️  $name skipped (expected on forks or some branch push events)"
-                elif [ "$name" = "Build" ] && { [ "$TYPECHECK" != "success" ] || [ "$LINT" != "success" ] || [ "$TESTS" != "success" ]; }; then
-                  echo "⚠️  $name skipped (upstream typecheck/lint/tests did not succeed)"
+                elif [ "$name" = "Build" ] || [ "$name" = "Tests" ]; then
+                  if [ "$TYPECHECK" != "success" ] || [ "$LINT" != "success" ]; then
+                    echo "⚠️  $name skipped (upstream typecheck/lint did not succeed)"
+                  elif [ "$name" = "Build" ] && [ "$TESTS" != "success" ]; then
+                    echo "⚠️  $name skipped (upstream tests did not succeed)"
+                  else
+                    echo "❌ $name skipped unexpectedly — deployment blocked"
+                    FAILED=1
+                  fi
                 else
                   echo "❌ $name skipped unexpectedly — deployment blocked"
                   FAILED=1
