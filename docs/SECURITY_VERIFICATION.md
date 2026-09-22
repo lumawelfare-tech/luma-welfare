@@ -1,6 +1,6 @@
 # Security verification notes
 
-Last updated: 2026-09-22 (Phase H — role matrix checklist + ENFORCE gate docs)
+Last updated: 2026-09-22 (Phase 1 blueprint — schema foundation migration)
 
 ## Automated coverage
 
@@ -65,4 +65,22 @@ Mark each row after a green live run (or document intentional skip). Do not trea
 | Admin E2E login + claims queue | Playwright with `E2E_ADMIN_*` (non-2FA test admin) | ☐ | |
 | Live Secrets Gate hard mode | `vars.ENFORCE_LIVE_SECRETS=true` + required check | ☐ | |
 
-Staff role matrix beyond member/admin (e.g. fine-grained admin permissions) remains a product decision — current automated suite covers member isolation + admin edge denial, not every staff permission pair.
+Staff role matrix beyond member/admin (e.g. fine-grained admin permissions) remains a product decision — current automated suite covers member isolation + admin edge denial, not every staff permission pair. UI route map is unit-tested in `frontend/src/lib/__tests__/adminPermissions.test.ts`.
+
+## Phase 1 schema foundation (2026-09-22)
+
+Migration `supabase/migrations/20260922140000_phase1_schema_foundation.sql`:
+
+| Item | Change |
+|------|--------|
+| `get_membership_funnel` | No longer reads missing `members.email_verified`; joins `auth.users.email_confirmed_at`. `SECURITY DEFINER`, `EXECUTE` → `service_role` only |
+| `scheduled_reports` / `report_history` / `saved_reports` | `CREATE TABLE IF NOT EXISTS` + RLS enabled (no member policies) |
+| `report-files` bucket | Private bucket upsert (50MB, spreadsheet/CSV/PDF/JSON MIME allowlist) |
+
+After deploy: `supabase db push --linked` then spot-check admin dashboard funnel + scheduled reports page.
+
+### Operator still required (not automatable here)
+
+1. Populate GitHub Actions secrets for the dedicated **test** Supabase project.
+2. Set `ENFORCE_LIVE_SECRETS=true` on the canonical repo.
+3. Tick the role matrix checklist above with CI evidence.
