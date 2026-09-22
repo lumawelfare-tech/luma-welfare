@@ -1,5 +1,10 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
+import {
+  ageFromDateOfBirth,
+  assertTierAllowedForAge,
+  tierHasAgeBounds,
+} from '../shared/package-tiers.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -60,7 +65,11 @@ Deno.serve(async (req) => {
     if (!packageId) return new Response(JSON.stringify({ message: 'packageId is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
     // Verify member exists and is not suspended/closed
-    const { data: member } = await adminClient.from('members').select('status').eq('id', user.id).single()
+    const { data: member } = await adminClient
+      .from('members')
+      .select('status, date_of_birth')
+      .eq('id', user.id)
+      .single()
     if (!member) {
       return new Response(JSON.stringify({ message: 'Member account not found.', code: 'NOT_FOUND' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
@@ -79,13 +88,68 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ message: 'You must pay the KSh 300 registration fee before subscribing to packages.', code: 'REGISTRATION_FEE_REQUIRED' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    const { data: pkg } = await adminClient
+      .from('packages')
+      .select('id, is_active, parent_package_id')
+      .eq('id', packageId)
+      .maybeSingle()
+    if (!pkg || !pkg.is_active) {
+      return new Response(JSON.stringify({ message: 'Package not found or inactive.', code: 'PACKAGE_NOT_FOUND' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    // Parent packages with children are groupings — join a specific sub-category
+    const { count: childCount } = await adminClient
+      .from('packages')
+      .select('id', { count: 'exact', head: true })
+      .eq('parent_package_id', packageId)
+      .eq('is_active', true)
+    if ((childCount ?? 0) > 0) {
+      return new Response(JSON.stringify({
+        message: 'Choose a specific Mission of Mercy sub-category (or nested option) rather than the parent package.',
+        code: 'JOIN_SUBCATEGORY',
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    const { data: tiers } = await adminClient
+      .from('package_tiers')
+      .select('id, name, amount, min_age, max_age, is_active, package_id')
+      .eq('package_id', packageId)
+      .eq('is_active', true)
+
+    const age = ageFromDateOfBirth(member.date_of_birth as string | null)
+    let resolvedTierId: string | null = packageTierId ?? null
+
+    if (resolvedTierId) {
+      const selected = (tiers ?? []).find((t) => t.id === resolvedTierId) ?? null
+      if (!selected) {
+        return new Response(JSON.stringify({ message: 'Invalid contribution tier for this package.', code: 'INVALID_TIER' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const tierErr = assertTierAllowedForAge(selected, tiers ?? [], age)
+      if (tierErr) {
+        return new Response(JSON.stringify({ message: tierErr, code: 'TIER_AGE_MISMATCH' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    } else if ((tiers ?? []).length === 1) {
+      const only = tiers![0]
+      const tierErr = assertTierAllowedForAge(only, tiers ?? [], age)
+      if (tierErr) {
+        return new Response(JSON.stringify({ message: tierErr, code: 'TIER_AGE_MISMATCH' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      resolvedTierId = only.id
+    } else if ((tiers ?? []).some((t) => tierHasAgeBounds(t))) {
+      return new Response(JSON.stringify({
+        message: age == null
+          ? 'Add your date of birth on your profile before joining a package with age-based pricing.'
+          : 'Select a contribution tier for this package.',
+        code: age == null ? 'DOB_REQUIRED' : 'TIER_REQUIRED',
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     // Check for existing subscription
     const { data: existing } = await adminClient
       .from('subscriptions').select('id').eq('member_id', user.id).eq('package_id', packageId).maybeSingle()
     if (existing) return new Response(JSON.stringify({ message: 'You are already in this package.', code: 'ALREADY_SUBSCRIBED' }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
     const { data, error } = await adminClient
-      .from('subscriptions').insert({ member_id: user.id, package_id: packageId, package_tier_id: packageTierId ?? null, status: 'pending' }).select().single()
+      .from('subscriptions').insert({ member_id: user.id, package_id: packageId, package_tier_id: resolvedTierId, status: 'pending' }).select().single()
     if (error) throw new Error(error.message)
 
     await logAudit(adminClient, { actor_id: user.id, action: 'requested_subscription', resource: 'subscription', resource_id: data.id })

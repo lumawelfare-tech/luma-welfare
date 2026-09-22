@@ -8,8 +8,9 @@ import { SkeletonPackageGrid } from '../components/Skeleton'
 import { EmptyState } from '../components/EmptyState'
 import { lumaDistance, lumaDuration, lumaStaggerDelay, lumaTransition } from '../lib/lumaMotion'
 import { reportLoadError } from '../lib/userFacingError'
+import { formatPackageTiersSummary } from '../lib/packageTiers'
 
-type Tier = { id: string; package_id: string; name: string; amount: number }
+type Tier = { id: string; package_id: string; name: string; amount: number; min_age?: number | null; max_age?: number | null }
 type RuleMap = Record<string, unknown>
 
 type Package = {
@@ -20,6 +21,7 @@ type Package = {
   coverage: string[]
   waiting_period_months: number | null
   sort_order: number
+  parent_package_id?: string | null
   tiers: Tier[]
   rules: RuleMap
 }
@@ -74,6 +76,19 @@ export function PackagesPage() {
     [packages, q],
   )
 
+  const displayPackages = useMemo(() => {
+    const parents = filtered.filter((p) => !p.parent_package_id)
+    // Top-level only for cards; children render nested under parent
+    const orphanChildren = filtered.filter(
+      (p) => p.parent_package_id && !packages.some((x) => x.id === p.parent_package_id),
+    )
+    return [...parents, ...orphanChildren]
+  }, [filtered, packages])
+
+  function childrenOf(id: string) {
+    return filtered.filter((c) => c.parent_package_id === id)
+  }
+
   return (
     <MotionSection className="container-luma py-14" as="div">
       <p className="text-sm font-semibold uppercase tracking-wider text-luma-700">Welfare packages</p>
@@ -117,7 +132,9 @@ export function PackagesPage() {
       {!loading && !error && (
         <>
           <div className="mt-10 grid gap-6 lg:grid-cols-2">
-            {filtered.map((p, i) => (
+            {displayPackages.map((p, i) => {
+              const kids = childrenOf(p.id)
+              return (
               <MotionCard key={p.id}>
                 <motion.div
                   className="glass-card flex h-full flex-col p-6"
@@ -138,7 +155,11 @@ export function PackagesPage() {
 
                   <div className="mt-4">
                     <div className="text-sm font-medium text-luma-900">Contribution</div>
-                    {p.tiers.length === 1 ? (
+                    {kids.length > 0 ? (
+                      <p className="mt-1 text-sm text-gray-600">
+                        Nested options below — each {formatPackageTiersSummary(kids[0]?.tiers ?? p.tiers)}
+                      </p>
+                    ) : p.tiers.length === 1 ? (
                       <div className="mt-1 text-2xl font-bold text-luma-700">
                         {formatAmount(p.tiers[0].amount)}
                         <span className="text-sm font-medium text-gray-500"> /month</span>
@@ -155,7 +176,23 @@ export function PackagesPage() {
                     )}
                   </div>
 
-                  {p.coverage.length > 0 && (
+                  {kids.length > 0 && (
+                    <ul className="mt-4 space-y-2 border-t border-white/50 pt-4">
+                      {kids.map((c) => (
+                        <li key={c.id} className="flex items-start justify-between gap-3 text-sm">
+                          <div>
+                            <div className="font-semibold text-luma-900">{c.name}</div>
+                            {c.description && <p className="mt-0.5 text-xs text-gray-500 line-clamp-2">{c.description}</p>}
+                          </div>
+                          <span className="shrink-0 font-semibold text-luma-700">
+                            {formatPackageTiersSummary(c.tiers)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {p.coverage.length > 0 && kids.length === 0 && (
                     <div className="mt-4">
                       <div className="text-sm font-medium text-luma-900">Covers</div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -178,7 +215,8 @@ export function PackagesPage() {
                   </div>
                 </motion.div>
               </MotionCard>
-            ))}
+              )
+            })}
           </div>
 
           {filtered.length === 0 && (

@@ -1,6 +1,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
+import { validateTierAgeOverlaps } from '../shared/package-tiers.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -25,15 +26,15 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url)
-    const resourceId = url.searchParams.get("resource_id")
-    const action = url.searchParams.get("action")
+    const resourceId = url.searchParams.get('resource_id')
+    const action = url.searchParams.get('action')
     const pkgId = resourceId
 
     // GET /admin-packages — list all packages with tiers and rules
     if (req.method === 'GET' && !pkgId) {
       requirePermission(session, 'packages', 'read')
       const { data: packages } = await adminClient.from('packages').select('*').order('sort_order')
-      const { data: tiers } = await adminClient.from('package_tiers').select('*')
+      const { data: tiers } = await adminClient.from('package_tiers').select('*').order('sort_order')
       const { data: rules } = await adminClient.from('package_rules').select('*')
       return new Response(JSON.stringify({
         packages: (packages ?? []).map((p) => ({
@@ -48,12 +49,28 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && !pkgId) {
       requirePermission(session, 'packages', 'create')
       const body = await req.json()
-      const { code, name, description, coverage, waitingPeriodMonths, sortOrder, payoutRule } = body
+      const { code, name, description, coverage, waitingPeriodMonths, sortOrder, payoutRule, parentPackageId } = body
       if (!code || !name) {
         return new Response(JSON.stringify({ message: 'Code and name are required', code: 'VALIDATION' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
+      if (parentPackageId) {
+        const { data: parent } = await adminClient.from('packages').select('id, parent_package_id').eq('id', parentPackageId).maybeSingle()
+        if (!parent) {
+          return new Response(JSON.stringify({ message: 'Parent package not found', code: 'VALIDATION' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+        if (parent.parent_package_id) {
+          return new Response(JSON.stringify({ message: 'Cannot nest under a sub-category (max one nesting level).', code: 'VALIDATION' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+      }
       const { data, error } = await adminClient.from('packages').insert({
-        code, name, description: description || null, coverage: Array.isArray(coverage) ? coverage : null, waiting_period_months: waitingPeriodMonths != null ? Number(waitingPeriodMonths) : null, sort_order: sortOrder ?? 0, payout_rule: payoutRule || null,
+        code,
+        name,
+        description: description || null,
+        coverage: Array.isArray(coverage) ? coverage : null,
+        waiting_period_months: waitingPeriodMonths != null ? Number(waitingPeriodMonths) : null,
+        sort_order: sortOrder ?? 0,
+        payout_rule: payoutRule || null,
+        parent_package_id: parentPackageId || null,
       }).select().single()
       if (error) throw new Error(error.message)
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'created_package', resource: 'package', resource_id: data.id })
@@ -64,21 +81,89 @@ Deno.serve(async (req) => {
     if (req.method === 'PATCH' && pkgId) {
       requirePermission(session, 'packages', 'update')
       const body = await req.json()
-      const { data, error } = await adminClient.from('packages').update({
-        name: body.name, description: body.description, coverage: body.coverage, waiting_period_months: body.waitingPeriodMonths, sort_order: body.sortOrder, payout_rule: body.payoutRule,
-      }).eq('id', pkgId).select().single()
+      if (body.parentPackageId === pkgId) {
+        return new Response(JSON.stringify({ message: 'A package cannot be its own parent.', code: 'VALIDATION' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      if (body.parentPackageId) {
+        const { data: parent } = await adminClient.from('packages').select('id, parent_package_id').eq('id', body.parentPackageId).maybeSingle()
+        if (!parent || parent.parent_package_id) {
+          return new Response(JSON.stringify({ message: 'Invalid parent package (must be top-level).', code: 'VALIDATION' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+      }
+      const patch: Record<string, unknown> = {
+        name: body.name,
+        description: body.description,
+        coverage: body.coverage,
+        waiting_period_months: body.waitingPeriodMonths,
+        sort_order: body.sortOrder,
+        payout_rule: body.payoutRule,
+      }
+      if ('parentPackageId' in body) {
+        patch.parent_package_id = body.parentPackageId || null
+      }
+      const { data, error } = await adminClient.from('packages').update(patch).eq('id', pkgId).select().single()
       if (error) throw new Error('Package not found')
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'updated_package', resource: 'package', resource_id: pkgId })
       return new Response(JSON.stringify({ package: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // POST /admin-packages?id=xxx&action=tiers — add tier
+    // POST /admin-packages?resource_id=xxx&action=tiers — add tier
     if (req.method === 'POST' && pkgId && action === 'tiers') {
       requirePermission(session, 'packages', 'update')
       const body = await req.json()
-      const { data, error } = await adminClient.from('package_tiers').insert({ package_id: pkgId, name: body.name, amount: body.amount, description: body.description }).select().single()
+      const minAge = body.minAge != null && body.minAge !== '' ? Number(body.minAge) : null
+      const maxAge = body.maxAge != null && body.maxAge !== '' ? Number(body.maxAge) : null
+      const { data: existing } = await adminClient.from('package_tiers').select('name, min_age, max_age').eq('package_id', pkgId)
+      const overlap = validateTierAgeOverlaps([
+        ...(existing ?? []).map((t) => ({ name: t.name, min_age: t.min_age, max_age: t.max_age })),
+        { name: body.name, min_age: minAge, max_age: maxAge },
+      ])
+      if (overlap) {
+        return new Response(JSON.stringify({ message: overlap, code: 'VALIDATION' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const { data, error } = await adminClient.from('package_tiers').insert({
+        package_id: pkgId,
+        name: body.name,
+        amount: body.amount,
+        description: body.description,
+        min_age: minAge,
+        max_age: maxAge,
+      }).select().single()
       if (error) throw new Error(error.message)
+      await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'added_package_tier', resource: 'package', resource_id: pkgId })
       return new Response(JSON.stringify({ tier: data }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // PUT /admin-packages?resource_id=xxx&action=tiers — replace all tiers
+    if (req.method === 'PUT' && pkgId && action === 'tiers') {
+      requirePermission(session, 'packages', 'update')
+      const body = await req.json()
+      const rows = Array.isArray(body.tiers) ? body.tiers : []
+      const normalized = rows.map((t: { name?: string; amount?: number; description?: string; minAge?: number | null; maxAge?: number | null; sortOrder?: number }, i: number) => ({
+        name: String(t.name ?? '').trim(),
+        amount: Number(t.amount),
+        description: t.description ?? null,
+        min_age: t.minAge != null && t.minAge !== '' ? Number(t.minAge) : null,
+        max_age: t.maxAge != null && t.maxAge !== '' ? Number(t.maxAge) : null,
+        sort_order: t.sortOrder ?? i + 1,
+      }))
+      if (normalized.some((t) => !t.name || !Number.isFinite(t.amount) || t.amount < 0)) {
+        return new Response(JSON.stringify({ message: 'Each tier needs a name and a non-negative amount.', code: 'VALIDATION' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const overlap = validateTierAgeOverlaps(normalized.map((t) => ({ name: t.name, min_age: t.min_age, max_age: t.max_age })))
+      if (overlap) {
+        return new Response(JSON.stringify({ message: overlap, code: 'VALIDATION' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      await adminClient.from('package_tiers').delete().eq('package_id', pkgId)
+      if (normalized.length > 0) {
+        const { error } = await adminClient.from('package_tiers').insert(
+          normalized.map((t) => ({ ...t, package_id: pkgId, is_active: true })),
+        )
+        if (error) throw new Error(error.message)
+      }
+      await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'replaced_package_tiers', resource: 'package', resource_id: pkgId })
+      const { data: tiers } = await adminClient.from('package_tiers').select('*').eq('package_id', pkgId).order('sort_order')
+      return new Response(JSON.stringify({ tiers: tiers ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // PUT /admin-packages?id=xxx&action=rules — replace rules

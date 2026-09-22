@@ -26,6 +26,7 @@ export type Member = {
   county: string | null
   location: string | null
   occupation: string | null
+  date_of_birth?: string | null
   created_at: string | null
   updated_at: string | null
   privacy_accepted_at?: string | null

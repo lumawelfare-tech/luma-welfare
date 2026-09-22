@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
@@ -8,14 +8,21 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { reportLoadError } from '../../lib/userFacingError'
+import {
+  ageFromDateOfBirth,
+  eligibleTiersForAge,
+  packageRequiresDateOfBirth,
+  resolveAgeTier,
+} from '../../lib/packageTiers'
 
-type Tier = { id: string; name: string; amount: number }
+type Tier = { id: string; name: string; amount: number; min_age?: number | null; max_age?: number | null }
 type Package = {
   id: string
   code: string
   name: string
   description: string
   waiting_period_months: number | null
+  parent_package_id?: string | null
   tiers: Tier[]
 }
 type Subscription = { id: string; package_id: string; status: string; packages?: { name: string }[] }
@@ -32,6 +39,11 @@ export function JoinPackages() {
   const [notice, setNotice] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const memberAge = useMemo(
+    () => ageFromDateOfBirth(member?.date_of_birth),
+    [member?.date_of_birth],
+  )
+
   function reloadSubscriptions() {
     api<{ subscriptions: Subscription[] }>('/auth/me', { auth: true })
       .then((d) => setMine(d.subscriptions ?? []))
@@ -45,12 +57,39 @@ export function JoinPackages() {
       api<{ subscriptions: Subscription[] }>('/auth/me', { auth: true }).catch(() => ({ subscriptions: [] as Subscription[] })),
     ])
       .then(([pkgData, meData]) => {
-        setPackages(pkgData.packages ?? [])
+        const pkgs = pkgData.packages ?? []
+        setPackages(pkgs)
         setMine(meData.subscriptions ?? [])
+        const age = ageFromDateOfBirth(member?.date_of_birth)
+        const auto: Record<string, string> = {}
+        for (const p of pkgs) {
+          const ageTier = resolveAgeTier(p.tiers, age)
+          if (ageTier) auto[p.id] = ageTier.id
+        }
+        setTierChoice((prev) => ({ ...auto, ...prev }))
       })
       .catch((e) => setError(reportLoadError(e, { page: 'member-join-packages' }, 'Could not load packages.')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [member?.date_of_birth])
+
+  const parentIdsWithChildren = useMemo(() => {
+    const ids = new Set<string>()
+    for (const p of packages) {
+      if (p.parent_package_id) ids.add(p.parent_package_id)
+    }
+    return ids
+  }, [packages])
+
+  const joinablePackages = useMemo(
+    () => packages.filter((p) => !parentIdsWithChildren.has(p.id)),
+    [packages, parentIdsWithChildren],
+  )
+
+  const parentNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const p of packages) m.set(p.id, p.name)
+    return m
+  }, [packages])
 
   const joinedIds = new Set(mine.filter((s) => s.status !== 'cancelled').map((s) => s.package_id))
   const activeSubs = mine.filter((s) => s.status !== 'cancelled')
@@ -58,9 +97,21 @@ export function JoinPackages() {
   async function join(p: Package) {
     setError(null)
     setNotice(null)
+
+    if (packageRequiresDateOfBirth(p.tiers) && memberAge == null) {
+      setError('Add your date of birth on Profile before joining a package with age-based pricing.')
+      return
+    }
+
+    const eligible = eligibleTiersForAge(p.tiers, memberAge)
+    const tierId = tierChoice[p.id] || (eligible.length === 1 ? eligible[0].id : '')
+    if (p.tiers.length > 1 && !tierId) {
+      setError('Select a contribution tier for this package.')
+      return
+    }
+
     setBusyId(p.id)
     try {
-      const tierId = tierChoice[p.id]
       await api('/member/subscriptions', {
         method: 'POST',
         auth: true,
@@ -184,7 +235,7 @@ export function JoinPackages() {
         </div>
       )}
 
-      {!loading && packages.length === 0 && !error && (
+      {!loading && joinablePackages.length === 0 && !error && (
         <EmptyState
           title="No packages available"
           message="Welfare packages will appear here when they are published."
@@ -192,12 +243,15 @@ export function JoinPackages() {
         />
       )}
 
-      {!loading && packages.length > 0 && (
+      {!loading && joinablePackages.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {packages.map((p) => {
+          {joinablePackages.map((p) => {
             const joined = joinedIds.has(p.id)
-            const minAmount = p.tiers.length > 0 ? Math.min(...p.tiers.map((t) => t.amount)) : 0
-            const maxAmount = p.tiers.length > 0 ? Math.max(...p.tiers.map((t) => t.amount)) : 0
+            const eligible = eligibleTiersForAge(p.tiers, memberAge)
+            const needsDob = packageRequiresDateOfBirth(p.tiers) && memberAge == null
+            const parentLabel = p.parent_package_id ? parentNameById.get(p.parent_package_id) : null
+            const minAmount = eligible.length > 0 ? Math.min(...eligible.map((t) => t.amount)) : 0
+            const maxAmount = eligible.length > 0 ? Math.max(...eligible.map((t) => t.amount)) : 0
             return (
               <article
                 key={p.id}
@@ -206,15 +260,25 @@ export function JoinPackages() {
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="font-semibold text-gray-900">{p.name}</h2>
+                  <div>
+                    {parentLabel && (
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-luma-700">{parentLabel}</p>
+                    )}
+                    <h2 className="font-semibold text-gray-900">{p.name}</h2>
+                  </div>
                   {joined && <StatusBadge tone="success">Joined</StatusBadge>}
                 </div>
                 <p className="mt-2 flex-1 text-sm text-gray-500 line-clamp-3">{p.description}</p>
 
                 <div className="mt-4 rounded-lg bg-gray-50/80 p-3">
-                  {p.tiers.length === 1 ? (
+                  {needsDob ? (
+                    <p className="text-sm text-amber-800">
+                      Date of birth required for age-based pricing.{' '}
+                      <Link to="/profile" className="font-medium underline">Update profile</Link>
+                    </p>
+                  ) : eligible.length === 1 ? (
                     <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold text-luma-700">KSh {p.tiers[0].amount.toLocaleString('en-KE')}</span>
+                      <span className="text-2xl font-bold text-luma-700">KSh {eligible[0].amount.toLocaleString('en-KE')}</span>
                       <span className="text-sm text-gray-500">/month</span>
                     </div>
                   ) : (
@@ -226,7 +290,7 @@ export function JoinPackages() {
                         )}
                         <span className="text-sm text-gray-500">/month</span>
                       </div>
-                      <p className="mt-1 text-xs text-gray-400">Multiple contribution tiers available</p>
+                      <p className="mt-1 text-xs text-gray-400">Select a contribution option below</p>
                     </div>
                   )}
                 </div>
@@ -237,18 +301,18 @@ export function JoinPackages() {
                     Monthly welfare contributions
                   </li>
                   <li className="flex items-center gap-2 text-xs text-gray-600">
-                    {p.waiting_period_months != null && p.waiting_period_months > 0 ? (
+                    {p.waiting_period_months != null && Number(p.waiting_period_months) > 0 ? (
                       <svg className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     ) : (
                       <svg className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     )}
-                    {p.waiting_period_months != null && p.waiting_period_months > 0
+                    {p.waiting_period_months != null && Number(p.waiting_period_months) > 0
                       ? `${p.waiting_period_months}-month waiting period before claims`
                       : 'No fixed waiting period — stay current on contributions'}
                   </li>
                 </ul>
 
-                {p.tiers.length > 1 && (
+                {eligible.length > 1 && !needsDob && (
                   <select
                     value={tierChoice[p.id] ?? ''}
                     onChange={(e) => setTierChoice((t) => ({ ...t, [p.id]: e.target.value }))}
@@ -257,7 +321,7 @@ export function JoinPackages() {
                     disabled={joined}
                   >
                     <option value="" disabled>Choose your contribution tier</option>
-                    {p.tiers.map((t) => (
+                    {eligible.map((t) => (
                       <option key={t.id} value={t.id}>{t.name} — KSh {t.amount.toLocaleString('en-KE')}/month</option>
                     ))}
                   </select>
@@ -266,7 +330,7 @@ export function JoinPackages() {
                 <button
                   type="button"
                   onClick={() => join(p)}
-                  disabled={joined || busyId === p.id || (p.tiers.length > 1 && !tierChoice[p.id])}
+                  disabled={joined || busyId === p.id || needsDob || (eligible.length > 1 && !tierChoice[p.id])}
                   className={`mt-4 w-full rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed min-h-[44px] ${
                     joined
                       ? 'bg-gray-100 text-gray-400'

@@ -21,9 +21,15 @@ Deno.serve(async (req) => {
 
     if (resource === 'packages') {
       const { data: packages } = await adminClient
-        .from('packages').select('id, code, name, description, coverage, waiting_period_months, sort_order')
-        .eq('is_active', true).order('sort_order')
-      const { data: tiers } = await adminClient.from('package_tiers').select('id, package_id, name, amount').eq('is_active', true)
+        .from('packages')
+        .select('id, code, name, description, coverage, waiting_period_months, sort_order, parent_package_id')
+        .eq('is_active', true)
+        .order('sort_order')
+      const { data: tiers } = await adminClient
+        .from('package_tiers')
+        .select('id, package_id, name, amount, min_age, max_age, sort_order')
+        .eq('is_active', true)
+        .order('sort_order')
       const { data: rules } = await adminClient.from('package_rules').select('package_id, key, value')
 
       const rulesByPackage = new Map<string, Record<string, unknown>>()
@@ -35,7 +41,8 @@ Deno.serve(async (req) => {
 
       return new Response(JSON.stringify({
         packages: (packages ?? []).map((p) => ({
-          ...p, tiers: (tiers ?? []).filter((t) => t.package_id === p.id),
+          ...p,
+          tiers: (tiers ?? []).filter((t) => t.package_id === p.id),
           rules: rulesByPackage.get(p.id) ?? {},
         })),
       }), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } })
