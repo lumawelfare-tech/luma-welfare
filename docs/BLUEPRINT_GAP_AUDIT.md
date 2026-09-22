@@ -110,7 +110,7 @@ Formal membership applications entity/admin Applications queue; application numb
 
 | Area | Notes |
 |------|--------|
-| Live RLS proof | Suites exist; need test Supabase secrets + ENFORCE |
+| Live RLS proof | Suite extended (complaints/kb_*); still needs test Supabase secrets + `ENFORCE_LIVE_SECRETS=true` |
 | Staff role matrix E2E | Partial vs all permission pairs |
 | Input validation | Shared `validate.ts` uneven across admin bodies |
 | Payments | Must stay disabled until dedicated go-live audit |
@@ -149,7 +149,7 @@ New tables likely only for: applications (if not folded into members), documents
 | **5** | Claims & welfare ops | qualify, claims EFs | **DONE in-repo** — checklist stages; manual payout record + notify | claims E2E; ignore new cols |
 | **6** | Documents + KB | storage-signed patterns | **DONE in-repo** — `kb_documents` ACL + Draft→Approved→Archived; private `kb-documents` bucket | storage RLS; private default |
 | **7** | RAG / hybrid AI | auth + member query EFs | **DONE in-repo** — FAQ→KB hybrid, `kb_chunks`, kill switch `AI_ASSISTANT_ENABLED` | AI security tests; kill switch |
-| **8** | Testing + hardening | Playwright, CI | ENFORCE gate, preview→prod | full suite |
+| **8** | Testing + hardening | Playwright, CI | **DONE in-repo** — `REQUIRED_FUNCTIONS` Phase 4–7, `verify:phase8`, `e2e/phase8-critical-paths.spec.ts`, RLS complaints/kb_*; soft→hard `ENFORCE_LIVE_SECRETS` remains operator | set ENFORCE; full live suite |
 
 **Per phase:** typecheck, lint, unit, qualify, build, migration check, RLS (when secrets), critical E2E. Preview before production.
 
@@ -157,6 +157,13 @@ New tables likely only for: applications (if not folded into members), documents
 
 ## STOP
 
-**Phases 1–7** landed in-repo. Phase 7: hybrid FAQ→KB assistant with fail-closed `AI_ASSISTANT_ENABLED` (default off). No claim/payment AI actions; no private member RAG.
+**Phases 1–8 complete in-repo.** Product IMPROVE blueprint phases landed. Remaining work is **operator / go-live**, not more feature phases:
 
-Await approval before **Phase 8** (testing + hardening: ENFORCE gate, preview→prod).
+1. Populate GitHub Actions secrets for the dedicated **test** Supabase project (`docs/BRANCH_PROTECTION.md`).
+2. Set repository variable `ENFORCE_LIVE_SECRETS=true` on the canonical repo (hard Live Secrets Gate).
+3. Tick role-matrix evidence in `docs/SECURITY_VERIFICATION.md`.
+4. Keep `PAYMENTS_ENABLED` / Daraja off until a dedicated payments go-live; keep `AI_ASSISTANT_ENABLED` false until FAQ/KB content is reviewed.
+
+Local smoke: `npm run verify:phase8`. Optional with secrets: `npm run test:rls` && `npm run test:e2e`.
+
+No further blueprint phases queued — approve only ops / payments / AI enablement when ready.

@@ -116,6 +116,10 @@ ALL_FUNCTIONS=(
   admin-subscriptions
   admin-exports
   admin-exports-worker
+  admin-complaints
+  admin-community
+  admin-documents
+  admin-kb-ingest
   auth-google-authorize
   auth-login
   auth-me
@@ -125,8 +129,11 @@ ALL_FUNCTIONS=(
   contact
   health
   member-claims
+  member-complaints
   member-contributions
   member-dashboard
+  member-documents
+  member-assistant
   member-family
   member-notification-prefs
   member-notifications

@@ -84,7 +84,8 @@ describe('Phase 2 — claim documents use signed URLs', () => {
 
   it('storage-signed helper defaults to 15-minute TTL', () => {
     const src = read('supabase/functions/shared/storage-signed.ts')
-    expect(src).toContain('CLAIM_DOC_SIGNED_URL_TTL_SECONDS = 15 * 60')
+    expect(src).toContain('PRIVATE_SIGNED_URL_TTL_SECONDS = 15 * 60')
+    expect(src).toContain('CLAIM_DOC_SIGNED_URL_TTL_SECONDS = PRIVATE_SIGNED_URL_TTL_SECONDS')
     expect(src).toContain('createSignedUrl')
   })
 })

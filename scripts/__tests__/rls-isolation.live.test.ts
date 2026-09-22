@@ -4,7 +4,8 @@
  * Coverage (when secrets are set):
  *   Tables: members, claims, contributions, subscriptions, family_members,
  *           notifications, registration_fees, data_deletion_requests,
- *           member_legal_acceptances, financial_ledger, admins, audit_logs
+ *           member_legal_acceptances, financial_ledger, admins, audit_logs,
+ *           complaints, community_support_records, kb_documents, kb_chunks
  *   Edge:   admin-claims (member JWT → 401/403)
  *
  * Actors: anonymous · member A · member B · (admin tables denied to members)
@@ -67,6 +68,11 @@ describeLive('RLS isolation (live)', () => {
   let regFeeA = ''
   let deletionA = ''
   let legalA = ''
+  let complaintA = ''
+  let kbDocDraftId = ''
+  let kbDocApprovedId = ''
+  let kbChunkId = ''
+  let communityRecordId = ''
   let packageId: string | null = null
 
   beforeAll(async () => {
@@ -177,11 +183,71 @@ describeLive('RLS isolation (live)', () => {
     }).select('id').single()
     if (legalErr) console.warn('[rls] member_legal_acceptances fixture skipped:', legalErr.message)
     else legalA = legal.id
+
+    const ref = `LUMA-CMP-RLS-${randomUUID().slice(0, 8)}`
+    const { data: complaint, error: complaintErr } = await a.from('complaints').insert({
+      member_id: idA,
+      reference_number: ref,
+      subject: 'RLS complaint subject',
+      body: 'RLS isolation complaint body text',
+      status: 'submitted',
+    }).select('id').single()
+    if (complaintErr) console.warn('[rls] complaints fixture skipped:', complaintErr.message)
+    else complaintA = complaint.id
+
+    const { data: community, error: communityErr } = await a.from('community_support_records').insert({
+      record_date: '2026-09-22',
+      location: 'RLS test location',
+      purpose: 'RLS isolation community record',
+    }).select('id').single()
+    if (communityErr) console.warn('[rls] community_support_records fixture skipped:', communityErr.message)
+    else communityRecordId = community.id
+
+    const { data: draftDoc, error: draftErr } = await a.from('kb_documents').insert({
+      title: 'RLS Draft Doc',
+      summary: 'Should not be visible to members',
+      access_level: 'member',
+      status: 'draft',
+      storage_path: `rls/draft-${randomUUID().slice(0, 8)}.pdf`,
+      file_name: 'draft.pdf',
+      mime_type: 'application/pdf',
+    }).select('id').single()
+    if (draftErr) console.warn('[rls] kb_documents draft fixture skipped:', draftErr.message)
+    else kbDocDraftId = draftDoc.id
+
+    const { data: approvedDoc, error: approvedErr } = await a.from('kb_documents').insert({
+      title: 'RLS Approved Member Doc',
+      summary: 'Visible metadata for members',
+      access_level: 'member',
+      status: 'approved',
+      storage_path: `rls/approved-${randomUUID().slice(0, 8)}.pdf`,
+      file_name: 'approved.pdf',
+      mime_type: 'application/pdf',
+      approved_at: new Date().toISOString(),
+    }).select('id').single()
+    if (approvedErr) console.warn('[rls] kb_documents approved fixture skipped:', approvedErr.message)
+    else kbDocApprovedId = approvedDoc.id
+
+    const { data: chunk, error: chunkErr } = await a.from('kb_chunks').insert({
+      source_type: 'faq',
+      source_id: `rls-${randomUUID().slice(0, 8)}`,
+      access_level: 'member',
+      title: 'RLS chunk',
+      content: 'RLS isolation knowledge chunk content',
+      chunk_index: 0,
+    }).select('id').single()
+    if (chunkErr) console.warn('[rls] kb_chunks fixture skipped:', chunkErr.message)
+    else kbChunkId = chunk.id
   }, 90_000)
 
   afterAll(async () => {
     if (!live) return
     const a = admin()
+    if (kbChunkId) await a.from('kb_chunks').delete().eq('id', kbChunkId)
+    if (kbDocDraftId) await a.from('kb_documents').delete().eq('id', kbDocDraftId)
+    if (kbDocApprovedId) await a.from('kb_documents').delete().eq('id', kbDocApprovedId)
+    if (communityRecordId) await a.from('community_support_records').delete().eq('id', communityRecordId)
+    if (complaintA) await a.from('complaints').delete().eq('id', complaintA)
     if (legalA) await a.from('member_legal_acceptances').delete().eq('id', legalA)
     if (deletionA) await a.from('data_deletion_requests').delete().eq('id', deletionA)
     if (regFeeA) await a.from('registration_fees').delete().eq('id', regFeeA)
@@ -210,9 +276,20 @@ describeLive('RLS isolation (live)', () => {
       'financial_ledger',
       'admins',
       'audit_logs',
+      'complaints',
+      'community_support_records',
+      'kb_chunks',
     ] as const) {
       const res = await c.from(table).select('id').limit(5)
       expect(res.data ?? [], `${table} should be empty for anon`).toEqual([])
+    }
+
+    // Anon may only see approved+public kb_documents metadata — never drafts / member-only
+    if (kbDocDraftId) {
+      expect((await c.from('kb_documents').select('id').eq('id', kbDocDraftId)).data ?? []).toEqual([])
+    }
+    if (kbDocApprovedId) {
+      expect((await c.from('kb_documents').select('id').eq('id', kbDocApprovedId)).data ?? []).toEqual([])
     }
   })
 
@@ -243,6 +320,18 @@ describeLive('RLS isolation (live)', () => {
     if (legalA) {
       expect((await b.from('member_legal_acceptances').select('id').eq('id', legalA)).data ?? []).toEqual([])
     }
+    if (complaintA) {
+      expect((await b.from('complaints').select('id').eq('id', complaintA)).data ?? []).toEqual([])
+    }
+    if (communityRecordId) {
+      expect((await b.from('community_support_records').select('id').eq('id', communityRecordId)).data ?? []).toEqual([])
+    }
+    if (kbChunkId) {
+      expect((await b.from('kb_chunks').select('id').eq('id', kbChunkId)).data ?? []).toEqual([])
+    }
+    if (kbDocDraftId) {
+      expect((await b.from('kb_documents').select('id').eq('id', kbDocDraftId)).data ?? []).toEqual([])
+    }
 
     const own = await b.from('members').select('id').eq('id', idB).maybeSingle()
     expect(own.data?.id).toBe(idB)
@@ -260,6 +349,21 @@ describeLive('RLS isolation (live)', () => {
     }
     if (familyA) {
       expect((await a.from('family_members').select('id').eq('id', familyA)).data?.[0]?.id).toBe(familyA)
+    }
+    if (complaintA) {
+      expect((await a.from('complaints').select('id').eq('id', complaintA)).data?.[0]?.id).toBe(complaintA)
+    }
+    if (kbDocApprovedId) {
+      expect((await a.from('kb_documents').select('id').eq('id', kbDocApprovedId)).data?.[0]?.id).toBe(kbDocApprovedId)
+    }
+    if (kbDocDraftId) {
+      expect((await a.from('kb_documents').select('id').eq('id', kbDocDraftId)).data ?? []).toEqual([])
+    }
+    if (kbChunkId) {
+      expect((await a.from('kb_chunks').select('id').eq('id', kbChunkId)).data ?? []).toEqual([])
+    }
+    if (communityRecordId) {
+      expect((await a.from('community_support_records').select('id').eq('id', communityRecordId)).data ?? []).toEqual([])
     }
 
     const upd = await a.from('members').update({ full_name: 'Hacked' }).eq('id', idB).select()

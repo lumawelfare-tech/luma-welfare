@@ -28,31 +28,43 @@ describe('parseLoginBody', () => {
 })
 
 describe('parseRegisterBody', () => {
+  const validBase = {
+    email: 'Member@Example.com',
+    password: 'Secret12',
+    fullName: 'Jane Doe',
+    phone: '0712345678',
+    idNumber: '12345678',
+    dateOfBirth: '1990-05-15',
+    gender: 'female',
+    maritalStatus: 'single',
+    county: 'Nairobi',
+    location: 'Westlands',
+    residentialAddress: '123 Example Street',
+    emergencyContactName: 'John Doe',
+    emergencyContactRelationship: 'spouse',
+    emergencyContactPhone: '0798765432',
+    acceptedPrivacy: true,
+    acceptedTerms: true,
+    acceptedConstitution: true,
+    confirmSelfSubmission: true,
+    privacyPolicyVersion: '2026-09-21.1',
+    termsVersion: '2026-09-21.1',
+  }
+
   it('accepts a valid Kenyan registration payload', () => {
-    const r = parseRegisterBody({
-      email: 'Member@Example.com',
-      password: 'Secret12',
-      fullName: 'Jane Doe',
-      phone: '0712345678',
-      idNumber: '12345678',
-      acceptedPrivacy: true,
-      acceptedTerms: true,
-      privacyPolicyVersion: '2026-09-21.1',
-      termsVersion: '2026-09-21.1',
-    })
+    const r = parseRegisterBody(validBase)
     expect(r.email).toBe('member@example.com')
     expect(r.phone).toBe('0712345678')
+    expect(r.dateOfBirth).toBe('1990-05-15')
     expect(r.acceptedPrivacy).toBe(true)
   })
 
   it('rejects missing privacy/terms consent', () => {
     expect(() =>
       parseRegisterBody({
-        email: 'a@b.co',
-        password: 'Secret12',
-        fullName: 'A',
-        phone: '0712345678',
-        idNumber: '12345678',
+        ...validBase,
+        acceptedPrivacy: false,
+        acceptedTerms: false,
       }),
     ).toThrow(/Privacy Policy/)
   })
@@ -60,28 +72,14 @@ describe('parseRegisterBody', () => {
   it('rejects weak passwords and bad phones', () => {
     expect(() =>
       parseRegisterBody({
-        email: 'a@b.co',
+        ...validBase,
         password: 'short',
-        fullName: 'A',
-        phone: '0712345678',
-        idNumber: '12345678',
-        acceptedPrivacy: true,
-        acceptedTerms: true,
-        privacyPolicyVersion: '2026-09-21.1',
-        termsVersion: '2026-09-21.1',
       }),
     ).toThrow(/8 characters/)
     expect(() =>
       parseRegisterBody({
-        email: 'a@b.co',
-        password: 'Secret12',
-        fullName: 'A',
+        ...validBase,
         phone: '123',
-        idNumber: '12345678',
-        acceptedPrivacy: true,
-        acceptedTerms: true,
-        privacyPolicyVersion: '2026-09-21.1',
-        termsVersion: '2026-09-21.1',
       }),
     ).toThrow(/Kenyan phone/)
   })

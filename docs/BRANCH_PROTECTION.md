@@ -52,5 +52,13 @@ npm test
 npm run test:qualify
 npm run test:rls          # needs SUPABASE_* 
 npm run build
+npm run verify:phase8     # typecheck → lint → unit → qualify → build → scan → guard
 npx playwright test       # needs BASE_URL + optional E2E_* 
+# Phase 8 critical paths: e2e/phase8-critical-paths.spec.ts
 ```
+
+## Phase 8 hardening notes
+
+- Soft → hard: leave `ENFORCE_LIVE_SECRETS` unset until secrets exist; then set `true` and optionally require `🔐 Live Secrets Gate`.
+- CI `📡 Edge Function Check` inventory includes Phase 4–7 functions (`admin-complaints`, `admin-community`, `admin-documents`, `admin-kb-ingest`, `member-claims`, `member-complaints`, `member-documents`, `member-assistant`).
+- Live RLS suite covers `complaints`, `community_support_records`, `kb_documents`, `kb_chunks` isolation in addition to core member tables.

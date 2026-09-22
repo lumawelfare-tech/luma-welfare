@@ -61,9 +61,12 @@ Mark each row after a green live run (or document intentional skip). Do not trea
 | Member A cannot read Member B rows | `npm run test:rls` | ☐ | |
 | Member JWT denied on `admin-claims` | `npm run test:rls` + edge case | ☐ | |
 | Anon cannot read private tables | `npm run test:rls` | ☐ | |
+| Complaints / KB isolation (Phase 4–7) | `npm run test:rls` (complaints, kb_documents, kb_chunks) | ☐ | |
 | Member E2E login + dashboard | Playwright with `E2E_MEMBER_*` | ☐ | |
+| Phase 8 critical paths | `e2e/phase8-critical-paths.spec.ts` | ☐ | |
 | Admin E2E login + claims queue | Playwright with `E2E_ADMIN_*` (non-2FA test admin) | ☐ | |
 | Live Secrets Gate hard mode | `vars.ENFORCE_LIVE_SECRETS=true` + required check | ☐ | |
+| Local Phase 8 smoke | `npm run verify:phase8` | ☐ | |
 
 Staff role matrix beyond member/admin (e.g. fine-grained admin permissions) remains a product decision — current automated suite covers member isolation + admin edge denial, not every staff permission pair. UI route map is unit-tested in `frontend/src/lib/__tests__/adminPermissions.test.ts`.
 

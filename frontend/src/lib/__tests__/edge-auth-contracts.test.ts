@@ -20,6 +20,10 @@ const ADMIN_FNS = [
   'admin-subscriptions',
   'admin-reports',
   'admin-exports',
+  'admin-complaints',
+  'admin-community',
+  'admin-documents',
+  'admin-kb-ingest',
 ]
 
 const MEMBER_FNS = [
@@ -27,6 +31,9 @@ const MEMBER_FNS = [
   'member-profile',
   'member-claims',
   'member-receipts',
+  'member-complaints',
+  'member-documents',
+  'member-assistant',
 ]
 
 function readFn(name: string): string {
