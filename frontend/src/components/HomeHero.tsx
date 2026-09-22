@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Icon } from './Icon'
 import { lumaHero, lumaDuration, lumaTransition, lumaDistance } from '../lib/lumaMotion'
 import { MotionImage } from './MotionSection'
+import { buttonClassName } from './ui'
 
 const HERO_COPY =
   'Affordable welfare packages for key life events — hospital, education, business, building, and more. Track contributions and eligibility in one place.'
@@ -51,7 +52,11 @@ export function HomeHero() {
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <Link
               to="/register"
-              className="luma-btn luma-btn-primary px-6 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-luma-600 focus-visible:ring-offset-2"
+              className={buttonClassName({
+                variant: 'primary',
+                size: 'lg',
+                className: 'px-6 font-bold',
+              })}
             >
               Join Luma
               <Icon name="arrow-right" className="h-4 w-4" />

@@ -87,8 +87,8 @@ export function AuthCard({ children }: { children: ReactNode }) {
   )
 }
 
-export const fieldClass =
-  'glass-input w-full rounded-xl px-4 py-3 text-sm text-gray-800 placeholder:text-gray-500'
+/** @deprecated Prefer `import { fieldClass } from './ui'` — kept for existing auth/forms. */
+export { fieldClass } from './ui/Input'
 
 export const alertErrorClass =
   'rounded-xl border border-red-200/80 bg-red-50/90 px-4 py-3 text-sm text-red-800'

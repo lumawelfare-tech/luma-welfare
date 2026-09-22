@@ -30,9 +30,33 @@
   --color-status-info: #006B2E;
   --color-status-neutral: #374151;
 
-  --radius-card: 1rem;
-  --radius-control: 0.75rem;
+  /* Surfaces / text extracted from current body styles (do not invent new hues) */
+  --color-surface-page: #f3f8f5;
+  --color-surface-page-mid: #eef6f2;
+  --color-text-primary: #1f2937;
+
+  /* Spacing scale (4–64) — prefer these over one-off arbitrary values */
+  --space-1: 0.25rem;  /* 4 */
+  --space-2: 0.5rem;   /* 8 */
+  --space-3: 0.75rem;  /* 12 */
+  --space-4: 1rem;     /* 16 */
+  --space-5: 1.5rem;   /* 24 */
+  --space-6: 2rem;     /* 32 */
+  --space-7: 3rem;     /* 48 */
+  --space-8: 4rem;     /* 64 */
+
+  /* Radius ladder — matches existing glass / control look */
+  --radius-sm: 0.5rem;   /* 8 — buttons */
+  --radius-control: 0.75rem; /* 12 */
+  --radius-card: 1rem;   /* 16 */
+  --radius-lg: 1.25rem;  /* 20 — modals */
+  --radius-xl: 1.5rem;   /* 24 */
+
+  /* Shadow ladder — extracted from glass-card / panel / modal */
+  --shadow-subtle: 0 4px 20px rgba(2, 46, 19, 0.06);
   --shadow-card: 0 8px 28px rgba(2, 46, 19, 0.08);
+  --shadow-elevated: 0 8px 28px rgba(2, 46, 19, 0.12);
+  --shadow-modal: 0 20px 50px rgba(2, 46, 19, 0.14);
 
   /* Luma Motion System — keep in sync with frontend/src/lib/lumaMotion.ts */
   --motion-micro: 150ms;
@@ -83,15 +107,15 @@ body {
   overflow-x: clip;
   max-width: 100%;
   /* Soft green/blue atmosphere so glass surfaces read clearly */
-  background-color: #f3f8f5;
+  background-color: var(--color-surface-page);
   background-image:
     radial-gradient(ellipse 90% 55% at 8% -5%, rgba(174, 227, 201, 0.55), transparent 55%),
     radial-gradient(ellipse 70% 45% at 92% 0%, rgba(238, 244, 255, 0.65), transparent 50%),
     radial-gradient(ellipse 50% 35% at 50% 100%, rgba(126, 205, 170, 0.18), transparent 60%),
-    linear-gradient(180deg, #f5faf7 0%, #eef6f2 45%, #f7faf8 100%);
+    linear-gradient(180deg, #f5faf7 0%, var(--color-surface-page-mid) 45%, #f7faf8 100%);
   background-attachment: fixed;
   min-height: 100dvh;
-  color: #1f2937;
+  color: var(--color-text-primary);
 }
 
 #root {
@@ -135,20 +159,20 @@ body {
 .glass-card {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--shadow-card);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
 }
 
 /* Denser panels for member/admin dashboards — readable over tables */
 .glass-panel {
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 4px 20px rgba(2, 46, 19, 0.06);
+  box-shadow: var(--shadow-subtle);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-radius: 0.875rem;
+  border-radius: var(--radius-control);
 }
 
 .glass-sidebar {
@@ -162,10 +186,10 @@ body {
 .glass-modal {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--glass-border);
-  box-shadow: 0 20px 50px rgba(2, 46, 19, 0.14);
+  box-shadow: var(--shadow-modal);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-radius: 1.25rem;
+  border-radius: var(--radius-lg);
 }
 
 .glass-input {
@@ -274,7 +298,7 @@ a, button {
   justify-content: center;
   gap: 0.5rem;
   min-height: 2.75rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-sm);
   font-weight: 600;
   transition:
     background-color var(--motion-micro) var(--luma-ease-out),
@@ -307,6 +331,56 @@ a, button {
 .luma-btn-primary:hover:not(:disabled) {
   background-color: var(--color-luma-800);
   box-shadow: 0 4px 12px rgba(0, 107, 46, 0.22);
+}
+
+.luma-btn-secondary {
+  background-color: rgba(255, 255, 255, 0.75);
+  color: var(--color-luma-800);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+}
+
+.luma-btn-secondary:hover:not(:disabled) {
+  background-color: #fff;
+}
+
+.luma-btn-ghost {
+  background-color: transparent;
+  color: var(--color-luma-700);
+}
+
+.luma-btn-ghost:hover:not(:disabled) {
+  background-color: rgba(0, 107, 46, 0.08);
+}
+
+.luma-btn-danger {
+  background-color: var(--color-status-error);
+  color: #fff;
+}
+
+.luma-btn-danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.luma-btn-sm {
+  min-height: 2.25rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.luma-btn-md {
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+}
+
+.luma-btn-lg {
+  min-height: 3rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  border-radius: var(--radius-control);
+}
+
+.luma-btn-block {
+  width: 100%;
 }
 
 /* Interactive cards — lift + shadow; no essential info on hover only */
