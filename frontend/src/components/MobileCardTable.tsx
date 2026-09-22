@@ -35,8 +35,8 @@ export function MobileCardTable<T>({ data, columns, keyFn, emptyMessage = 'No da
 
   return (
     <>
-      {/* Desktop table — hidden on mobile */}
-      <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      {/* Desktop table — from 640px up */}
+      <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="w-full min-w-[32rem] text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
@@ -62,7 +62,7 @@ export function MobileCardTable<T>({ data, columns, keyFn, emptyMessage = 'No da
       </div>
 
       {/* Mobile cards — hidden on desktop */}
-      <div className="md:hidden space-y-3">
+      <div className="sm:hidden space-y-3">
         {data.map((row) => (
           <div
             key={keyFn(row)}

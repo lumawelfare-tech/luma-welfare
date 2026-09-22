@@ -107,8 +107,8 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white">
-      {/* Desktop Table */}
-      <div className="hidden md:block max-h-[70vh] overflow-auto">
+      {/* Desktop Table — cards below 640px (sm) */}
+      <div className="hidden sm:block max-h-[70vh] overflow-auto">
         <table className="w-full min-w-[36rem] text-sm">
           <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50/95 text-left text-xs uppercase tracking-wide text-gray-500 backdrop-blur-sm">
             <tr>
@@ -167,8 +167,8 @@ export function DataTable<T extends Record<string, unknown>>({
         </table>
       </div>
 
-      {/* Mobile Cards */}
-      <div className="md:hidden divide-y divide-gray-100">
+      {/* Mobile Cards — ≤640px */}
+      <div className="sm:hidden divide-y divide-gray-100">
         {paged.map((row) => (
           <div key={keyExtractor(row)} className="p-4">
             {renderMobileCard ? (
