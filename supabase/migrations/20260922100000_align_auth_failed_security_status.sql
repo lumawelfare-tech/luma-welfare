@@ -1,5 +1,31 @@
 -- Align get_security_status() with admin-monitoring's auth_failed action.
 -- Failed logins are written by auth-login as action = 'auth_failed'.
+-- Also recreate check_orphan_payments_v2() if missing (present in phase13
+-- migration history but absent on some environments after later lockdowns).
+
+CREATE OR REPLACE FUNCTION check_orphan_payments_v2()
+RETURNS TABLE (
+  payment_id uuid,
+  member_id uuid,
+  amount numeric,
+  status text,
+  created_at timestamptz,
+  age_minutes numeric
+) LANGUAGE sql STABLE AS $$
+  SELECT
+    p.id,
+    p.member_id,
+    p.amount,
+    p.status::text,
+    p.created_at,
+    EXTRACT(EPOCH FROM (now() - p.created_at)) / 60 as age_minutes
+  FROM payments p
+  WHERE p.status = 'Completed'
+    AND NOT EXISTS (
+      SELECT 1 FROM contributions c WHERE c.payment_id = p.id
+    )
+  ORDER BY p.created_at DESC;
+$$;
 
 CREATE OR REPLACE FUNCTION get_security_status()
 RETURNS TABLE (
