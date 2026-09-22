@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useHead } from '../../lib/seo'
-import { api, ApiError } from '../../lib/api'
+import { api } from '../../lib/api'
+import { reportLoadError } from '../../lib/userFacingError'
 import { supabase } from '../../lib/supabase'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 
@@ -613,7 +614,7 @@ export function AdminScheduledReports() {
       const d = await api<{ schedules: Schedule[] }>('/admin/scheduled-reports', { auth: true })
       setSchedules(d.schedules ?? [])
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Failed to load schedules')
+      setError(reportLoadError(e, { page: 'admin-scheduled-reports' }, 'Failed to load schedules'))
     } finally { setLoading(false) }
   }, [])
 
@@ -636,7 +637,7 @@ export function AdminScheduledReports() {
       setHistoryPages(d.total_pages)
       setSelectedIds(new Set())
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Failed to load history')
+      setError(reportLoadError(e, { page: 'admin-scheduled-reports' }, 'Failed to load history'))
     } finally { setHistoryLoading(false) }
   }, [historySearch, historyType, historyStatus, historyDateFrom, historyDateTo])
 
@@ -656,12 +657,12 @@ export function AdminScheduledReports() {
       setNotice('Schedule created.')
       setShowCreate(false); setFormName(''); setFormRecipients(''); setFormStatus(''); setFormDateFrom(''); setFormDateTo('')
       await load()
-    } catch (e) { setError(e instanceof ApiError ? e.message : 'Failed to create schedule') }
+    } catch (e) { setError(reportLoadError(e, { page: 'admin-scheduled-reports' }, 'Failed to create schedule')) }
   }
 
   async function toggleEnabled(id: string, current: boolean) {
     try { await api(`/admin/scheduled-reports?id=${id}`, { method: 'PATCH', auth: true, body: { enabled: !current } }); await load() }
-    catch (e) { setError(e instanceof ApiError ? e.message : 'Failed to update') }
+    catch (e) { setError(reportLoadError(e, { page: 'admin-scheduled-reports' }, 'Failed to update')) }
   }
 
   async function deleteSchedule(id: string, name: string) {
@@ -671,7 +672,7 @@ export function AdminScheduledReports() {
   async function confirmDelete() {
     if (!deleteTarget) return
     try { await api(`/admin/scheduled-reports?id=${deleteTarget.id}`, { method: 'DELETE', auth: true }); setNotice(`Deleted "${deleteTarget.name}".`); await load() }
-    catch (e) { setError(e instanceof ApiError ? e.message : 'Failed to delete') }
+    catch (e) { setError(reportLoadError(e, { page: 'admin-scheduled-reports' }, 'Failed to delete')) }
     setDeleteTarget(null)
   }
 
@@ -682,7 +683,7 @@ export function AdminScheduledReports() {
       setNotice(`Generated: ${result.filename} (${result.records} records)`)
       if (result.signed_url) { window.open(result.signed_url, '_blank') }
       await load()
-    } catch (e) { setError(e instanceof ApiError ? e.message : 'Failed to generate') }
+    } catch (e) { setError(reportLoadError(e, { page: 'admin-scheduled-reports' }, 'Failed to generate')) }
     finally { setGenerating(null) }
   }
 
@@ -726,7 +727,7 @@ export function AdminScheduledReports() {
       URL.revokeObjectURL(url)
       setNotice(`Downloaded ${selectedIds.size} report(s) as ZIP`)
       setSelectedIds(new Set())
-    } catch (e) { setError(e instanceof Error ? e.message : 'Bulk download failed') }
+    } catch (e) { setError(reportLoadError(e, { page: 'admin-scheduled-reports' }, 'Bulk download failed')) }
     finally { setBulkDownloading(false) }
   }
 
@@ -737,7 +738,7 @@ export function AdminScheduledReports() {
       setNotice(`Deleted ${selectedIds.size} report(s)`)
       setSelectedIds(new Set()); setShowCleanup(false)
       await loadHistory(historyPage)
-    } catch (e) { setError(e instanceof ApiError ? e.message : 'Failed to cleanup') }
+    } catch (e) { setError(reportLoadError(e, { page: 'admin-scheduled-reports' }, 'Failed to cleanup')) }
   }
 
   return (

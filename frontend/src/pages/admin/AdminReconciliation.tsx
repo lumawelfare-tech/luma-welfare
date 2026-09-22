@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api } from '../../lib/api'
+import { reportLoadError } from '../../lib/userFacingError'
 import { useHead } from '../../lib/seo'
 
 type ReconciliationSummary = {
@@ -240,7 +241,7 @@ function OrphanPaymentsTab() {
       setTotal(data.total)
       setPage(p)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load')
+      setError(reportLoadError(e, { page: 'admin-reconciliation' }, 'Failed to load'))
     } finally {
       setLoading(false)
     }
@@ -272,7 +273,7 @@ function OrphanPaymentsTab() {
       setLinkSearch('')
       setLinkResults([])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to link')
+      setError(reportLoadError(e, { page: 'admin-reconciliation' }, 'Failed to link'))
     } finally {
       setLinking(null)
     }
@@ -410,7 +411,7 @@ function UnmatchedContributionsTab() {
       setTotal(data.total)
       setPage(p)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load')
+      setError(reportLoadError(e, { page: 'admin-reconciliation' }, 'Failed to load'))
     } finally {
       setLoading(false)
     }
@@ -499,7 +500,7 @@ function StalePendingTab() {
       setPayments(data.payments)
       setTotal(data.total)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load')
+      setError(reportLoadError(e, { page: 'admin-reconciliation' }, 'Failed to load'))
     } finally {
       setLoading(false)
     }
@@ -518,7 +519,7 @@ function StalePendingTab() {
       setPayments(prev => prev.filter(p => p.id !== paymentId))
       setTotal(prev => prev - 1)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to mark as failed')
+      setError(reportLoadError(e, { page: 'admin-reconciliation' }, 'Failed to mark as failed'))
     } finally {
       setMarking(null)
     }
@@ -610,7 +611,7 @@ function ExceptionsTab() {
       setTotal(data.total)
       setPage(data.page)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load')
+      setError(reportLoadError(e, { page: 'admin-reconciliation' }, 'Failed to load'))
     } finally {
       setLoading(false)
     }
@@ -629,7 +630,7 @@ function ExceptionsTab() {
       setExceptions(prev => prev.filter(e => e.id !== id))
       setTotal(prev => prev - 1)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed')
+      setError(reportLoadError(e, { page: 'admin-reconciliation' }, 'Failed'))
     } finally {
       setResolving(null)
     }
@@ -729,7 +730,7 @@ export function AdminReconciliation() {
       const data = await api<{ summary: ReconciliationSummary }>('/admin/reconciliation?action=summary', { auth: true })
       setSummary(data.summary)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load summary')
+      setError(reportLoadError(e, { page: 'admin-reconciliation' }, 'Failed to load summary'))
     }
   }, [])
 
@@ -749,7 +750,7 @@ export function AdminReconciliation() {
       setSearchTotal(data.total)
       setSearchPage(data.page)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Search failed')
+      setError(reportLoadError(e, { page: 'admin-reconciliation' }, 'Search failed'))
     }
   }
 

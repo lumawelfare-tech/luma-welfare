@@ -5,7 +5,7 @@ const DEFAULT_FALLBACK = 'Something went wrong. Please try again.'
 
 /** Messages that look like infrastructure leaks — never show to users. */
 const UNSAFE_MESSAGE =
-  /\b(?:at\s+\w+|SELECT\s|INSERT\s|UPDATE\s|DELETE\s|postgres|supabase|stack trace|ECONNREFUSED|ENOTFOUND|internal server)\b/i
+  /\b(?:at\s+\w+|SELECT\s|INSERT\s|UPDATE\s|DELETE\s|postgres|postgrest|pgrst\d*|supabase|jwt|bearer\s|stack trace|ECONNREFUSED|ENOTFOUND|internal server)\b/i
 
 /**
  * Map any thrown value to a short, user-safe string.

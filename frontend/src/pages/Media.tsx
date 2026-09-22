@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 import { useHead } from '../lib/seo'
 import { PageHero } from '../components/PageHero'
 import { EmptyState } from '../components/EmptyState'
+import { reportLoadError } from '../lib/userFacingError'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -103,7 +104,7 @@ export function Media() {
       setTotalPages(d.pages ?? 1)
       setPage(d.page ?? pageNum)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load media.')
+      setError(reportLoadError(e, { page: 'media' }, 'Could not load media.'))
     } finally {
       setLoading(false)
     }

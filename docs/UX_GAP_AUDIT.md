@@ -17,10 +17,10 @@
 | 1 | Payment / trust messaging | **DONE** (Phase A) |
 | 2 | Contact info consistency | **DONE** (Phase A) |
 | 3 | Navigation and user journey | **DONE** (Phase B) |
-| 4 | Mobile UX | **PARTIAL** |
+| 4 | Mobile UX | **DONE** (Phase E — Dashboard payments + Receipts use MobileCardTable) |
 | 5 | Member portal features | **DONE** (Phase C polish) |
 | 6 | Admin portal features | **DONE** (Phase D polish) |
-| 7 | Loading / empty / error states | **PARTIAL** |
+| 7 | Loading / empty / error states | **DONE** (Phase F — public CMS + admin recon/settings/scheduled use reportLoadError; JWT/PGRST scrub) |
 | 8 | Performance | **DONE** (scores still manual) |
 | 9 | Production hardening / security verification | **PARTIAL** |
 | 10 | Accessibility | **PARTIAL** |

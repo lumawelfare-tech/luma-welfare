@@ -5,6 +5,7 @@ import { PageHero } from '../components/PageHero'
 import { MotionSection, MotionCard } from '../components/MotionSection'
 import { SkeletonCard } from '../components/Skeleton'
 import { EmptyState } from '../components/EmptyState'
+import { reportLoadError } from '../lib/userFacingError'
 
 type GalleryItem = {
   id: string
@@ -29,7 +30,7 @@ export function Gallery() {
     setError(null)
     api<{ items: GalleryItem[] }>('/gallery?resource=gallery')
       .then((d) => setItems(d.items))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load gallery.'))
+      .catch((e) => setError(reportLoadError(e, { page: 'gallery' }, 'Could not load gallery.')))
       .finally(() => setLoading(false))
   }, [])
 

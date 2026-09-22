@@ -7,6 +7,7 @@ import { MotionSection, MotionCard } from '../components/MotionSection'
 import { SkeletonPackageGrid } from '../components/Skeleton'
 import { EmptyState } from '../components/EmptyState'
 import { lumaDistance, lumaDuration, lumaStaggerDelay, lumaTransition } from '../lib/lumaMotion'
+import { reportLoadError } from '../lib/userFacingError'
 
 type Tier = { id: string; package_id: string; name: string; amount: number }
 type RuleMap = Record<string, unknown>
@@ -52,7 +53,7 @@ export function PackagesPage() {
     setError(null)
     api<{ packages: Package[] }>('/packages?resource=packages')
       .then((d) => setPackages(d.packages))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load packages.'))
+      .catch((e) => setError(reportLoadError(e, { page: 'packages' }, 'Could not load packages.')))
       .finally(() => setLoading(false))
   }, [])
 

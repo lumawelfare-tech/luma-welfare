@@ -5,6 +5,7 @@ import { PageHero } from '../components/PageHero'
 import { MotionSection, MotionCard } from '../components/MotionSection'
 import { SkeletonCard } from '../components/Skeleton'
 import { EmptyState } from '../components/EmptyState'
+import { reportLoadError } from '../lib/userFacingError'
 
 type NewsItem = {
   id: string
@@ -31,7 +32,7 @@ export function News() {
     setError(null)
     api<{ items: NewsItem[] }>('/news?resource=news')
       .then((d) => setItems(d.items))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load news.'))
+      .catch((e) => setError(reportLoadError(e, { page: 'news' }, 'Could not load news.')))
       .finally(() => setLoading(false))
   }, [])
 

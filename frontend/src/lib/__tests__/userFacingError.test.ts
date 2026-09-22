@@ -32,6 +32,15 @@ describe('userFacingMessage', () => {
     )
   })
 
+  it('scrubs JWT and PostgREST leaks from ApiError messages', () => {
+    expect(
+      userFacingMessage(new ApiError(401, 'Invalid JWT', 'UNAUTHORIZED'), 'Please sign in again.'),
+    ).toBe('Please sign in again.')
+    expect(
+      userFacingMessage(new ApiError(400, 'PGRST116: Results contain 0 rows', 'ERROR'), 'Could not load.'),
+    ).toBe('Could not load.')
+  })
+
   it('never surfaces raw Error.message', () => {
     expect(userFacingMessage(new Error('SELECT * FROM secrets'), 'Safe')).toBe('Safe')
   })

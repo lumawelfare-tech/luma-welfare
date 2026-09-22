@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api, ApiError } from '../../lib/api'
+import { api } from '../../lib/api'
+import { reportLoadError } from '../../lib/userFacingError'
 import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { WebhookSettings } from '../../components/WebhookSettings'
@@ -39,7 +40,7 @@ export function AdminSettings() {
       for (const r of rows) edits[r.key] = r.value as string
       setEditing(edits)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load settings.')
+      setError(reportLoadError(e, { page: 'admin-settings' }, 'Could not load settings.'))
     }
   }
 
@@ -66,7 +67,7 @@ export function AdminSettings() {
       addToast('success', 'Settings saved.')
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save settings.')
+      setError(reportLoadError(err, { page: 'admin-settings' }, 'Could not save settings.'))
     } finally {
       setSaving(false)
     }
@@ -81,7 +82,7 @@ export function AdminSettings() {
       setSetupData(d)
       setTwoFAAction('setup')
     } catch (err) {
-      setVerifyError(err instanceof ApiError ? err.message : 'Could not set up 2FA.')
+      setVerifyError(reportLoadError(err, { page: 'admin-settings-2fa' }, 'Could not set up 2FA.'))
     }
   }
 
@@ -103,7 +104,7 @@ export function AdminSettings() {
       setVerifyCode('')
       setVerifySuccess('2FA enabled successfully.')
     } catch (err) {
-      setVerifyError(err instanceof ApiError ? err.message : 'Could not enable 2FA.')
+      setVerifyError(reportLoadError(err, { page: 'admin-settings-2fa' }, 'Could not enable 2FA.'))
     }
   }
 
@@ -122,7 +123,7 @@ export function AdminSettings() {
       setVerifyCode('')
       setVerifySuccess('2FA disabled.')
     } catch (err) {
-      setVerifyError(err instanceof ApiError ? err.message : 'Could not disable 2FA.')
+      setVerifyError(reportLoadError(err, { page: 'admin-settings-2fa' }, 'Could not disable 2FA.'))
     }
   }
 
@@ -143,7 +144,7 @@ export function AdminSettings() {
       setAnnTitle('')
       setAnnBody('')
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not publish announcement.')
+      setError(reportLoadError(e, { page: 'admin-settings' }, 'Could not publish announcement.'))
     } finally {
       setAnnSending(false)
     }
