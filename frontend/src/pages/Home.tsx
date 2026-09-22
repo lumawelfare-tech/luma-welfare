@@ -66,12 +66,14 @@ const offerIcons: Record<string, JSX.Element> = {
 const whyChooseUs = [
   { title: 'Transparent Operations', description: 'Every contribution, waiting period, and payout is tracked and visible to you. No hidden terms.', icon: 'eye' as const },
   { title: 'Clear contribution records', description: 'Record monthly contributions in your account; administrators verify them against your packages.', icon: 'document' as const },
-  { title: '12 Welfare Packages', description: 'Choose from hospital, education, business, building, bereavement, wedding, and more.', icon: 'folder' as const },
+  { title: 'Welfare Packages', description: 'Choose from hospital, education, business, building, bereavement, wedding, and more — see the full list on Packages.', icon: 'folder' as const },
   { title: 'Community First', description: 'Members help each other. Your contributions directly support families in need.', icon: 'users' as const },
 ]
 
 const trustFeatures = [
   { title: 'Account security', description: 'Sessions use encrypted connections and secure authentication. Keep your password private.', icon: 'lock' as const },
+  { title: 'Contribution receipts', description: 'Verified contributions produce downloadable receipts you can keep for your records.', icon: 'document' as const },
+  { title: 'Role-based staff access', description: 'Admin tools use permissioned roles so staff only access what their job requires.', icon: 'users' as const },
   { title: 'Audit Trail', description: 'Administrative actions are recorded so membership changes can be reviewed.', icon: 'document' as const },
   { title: 'Data Protection', description: 'Personal data is protected with access controls; see our Privacy Policy for details.', icon: 'shield' as const },
   { title: 'Verified Claims', description: 'Every claim is reviewed before approval. Fair and consistent process.', icon: 'check-circle' as const },
@@ -151,6 +153,7 @@ export function Home() {
           <SectionHeading
             eyebrow="What We Offer"
             title="Our Welfare Packages"
+            description="A sample of packages members can join. Open Packages for the full catalogue."
             action={{ label: 'View All Packages →', to: '/packages' }}
           />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -186,7 +189,7 @@ export function Home() {
           <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { step: '01', title: 'Register', text: 'Create your account with your name, email and phone number. It\'s free.' },
-              { step: '02', title: 'Choose a Package', text: 'Browse 12 welfare packages and pick the ones that fit your family needs.' },
+              { step: '02', title: 'Choose a Package', text: 'Browse our welfare packages and pick the ones that fit your family needs.' },
               { step: '03', title: 'Contribute Monthly', text: 'Record your monthly contribution in your account. Each package is tracked separately.' },
               { step: '04', title: 'Access Benefits', text: 'Once your waiting period is met, submit a claim and receive support.' },
             ].map((s) => (
@@ -238,7 +241,7 @@ export function Home() {
                 claim records are visible to you; administrative actions are logged for accountability.
               </p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {trustFeatures.map((item) => (
                 <MotionCard key={item.title} className="glass-card p-5" hover={false}>
                   <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-luma-50 text-luma-700" aria-hidden="true">
