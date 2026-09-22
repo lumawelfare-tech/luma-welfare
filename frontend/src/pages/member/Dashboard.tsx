@@ -15,6 +15,8 @@ import {
   type PaymentUiStatus,
 } from '../../hooks/usePaymentTracker'
 import { ErrorState } from '../../components/ErrorState'
+import { PaymentStatusPanel } from '../../components/PaymentStatusPanel'
+import { isPaymentsUiMock, PAYMENTS_DISABLED_COPY, PAYMENTS_MOCK_COPY } from '../../lib/paymentsUi'
 import { reportLoadError } from '../../lib/userFacingError'
 
 type Qualification = {
@@ -151,7 +153,6 @@ export function Dashboard() {
   const [registrationFeePaid, setRegistrationFeePaid] = useState<boolean | null>(null)
   const [registrationFeeLoading, setRegistrationFeeLoading] = useState(true)
   const [payingFee, setPayingFee] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([])
@@ -159,8 +160,9 @@ export function Dashboard() {
   // Activation payment flow
   const [showPayModal, setShowPayModal] = useState(false)
   const [payPhone, setPayPhone] = useState(member?.phone ?? '')
-  const [payStep, setPayStep] = useState<'phone' | 'waiting' | 'success' | 'failed'>('phone')
+  const [payStep, setPayStep] = useState<'phone' | 'waiting' | 'success' | 'failed' | 'expired' | 'disabled'>('phone')
   const [payError, setPayError] = useState('')
+  const [paymentsDisabled, setPaymentsDisabled] = useState(false)
 
   // Contribution STK flow
   const [contribPayOpen, setContribPayOpen] = useState(false)
@@ -169,6 +171,7 @@ export function Dashboard() {
   const [contribPaymentId, setContribPaymentId] = useState<string | null>(null)
   const [contribPayError, setContribPayError] = useState('')
   const [contribPaying, setContribPaying] = useState(false)
+  const [contribMockStep, setContribMockStep] = useState<'idle' | 'waiting' | 'success' | 'failed' | 'expired'>('idle')
   const contribTracker = usePaymentTracker(contribPaymentId)
 
   // Quick-claim modal
@@ -229,6 +232,15 @@ export function Dashboard() {
 
   async function handleSendStkPush() {
     setPayError('')
+    if (isPaymentsUiMock()) {
+      setPayingFee(true)
+      setPayStep('waiting')
+      window.setTimeout(() => {
+        setPayStep('success')
+        setPayingFee(false)
+      }, 1200)
+      return
+    }
     setPayingFee(true)
     try {
       const d = await api<{ status: string; checkout_request_id?: string; payments_enabled?: boolean; message?: string }>(
@@ -241,14 +253,15 @@ export function Dashboard() {
         return
       }
       if (d.payments_enabled === false) {
-        setNotice(d.message ?? 'Payment recorded. M-Pesa is not yet enabled — an admin will verify your payment.')
-        setShowPayModal(false)
+        setPaymentsDisabled(true)
+        setPayStep('disabled')
+        setPayError(d.message ?? PAYMENTS_DISABLED_COPY)
         return
       }
       setPayStep('waiting')
       startPolling()
-    } catch (e: any) {
-      setPayError(e.message || 'Could not initiate payment. Please try again.')
+    } catch (e) {
+      setPayError(reportLoadError(e, { page: 'member-dashboard', action: 'registration-fee-stk' }, 'Could not initiate payment. Please try again.'))
     } finally {
       setPayingFee(false)
     }
@@ -260,7 +273,7 @@ export function Dashboard() {
       attempts++
       if (attempts > 60) {
         clearInterval(interval)
-        setPayStep('failed')
+        setPayStep('expired')
         setPayError('Payment timed out. Please try again.')
         return
       }
@@ -342,6 +355,7 @@ export function Dashboard() {
   const pendingBlocked = Boolean(summary?.pending_payment)
     || contribPaying
     || contribTracker.state === 'waiting'
+    || contribMockStep === 'waiting'
 
   async function startContributionPay() {
     setContribPayError('')
@@ -351,6 +365,11 @@ export function Dashboard() {
     }
     if (pendingBlocked && !contribPaymentId) {
       setContribPayError('A payment is already in progress. Please wait.')
+      return
+    }
+    if (isPaymentsUiMock()) {
+      setContribMockStep('waiting')
+      window.setTimeout(() => setContribMockStep('success'), 1200)
       return
     }
     setContribPaying(true)
@@ -366,7 +385,8 @@ export function Dashboard() {
       setContribPaymentId(result.paymentId)
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PAYMENTS_DISABLED') {
-        setContribPayError(e.message || 'M-Pesa payments are not enabled yet.')
+        setPaymentsDisabled(true)
+        setContribPayError(PAYMENTS_DISABLED_COPY)
       } else if (e instanceof ApiError && e.code === 'PAYMENT_IN_PROGRESS') {
         setContribPayError(e.message)
         const existingId = (e as ApiError & { paymentId?: string }).message
@@ -386,6 +406,7 @@ export function Dashboard() {
     setContribPhone(member?.phone ?? '')
     setContribPaymentId(null)
     setContribPayError('')
+    setContribMockStep('idle')
   }
 
   function closeContribPay() {
@@ -393,6 +414,7 @@ export function Dashboard() {
     setContribPaymentId(null)
     setContribPayError('')
     setContribPaying(false)
+    setContribMockStep('idle')
   }
 
   // Focus management for quick claim modal
@@ -421,6 +443,16 @@ export function Dashboard() {
   if (!loading && !registrationFeeLoading && registrationFeePaid === false) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-8 max-w-6xl mx-auto">
+        {isPaymentsUiMock() && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
+            {PAYMENTS_MOCK_COPY}
+          </div>
+        )}
+        {paymentsDisabled && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
+            {PAYMENTS_DISABLED_COPY}
+          </div>
+        )}
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-600">
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -431,24 +463,13 @@ export function Dashboard() {
           <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
             Pay the one-time KSh 300 activation fee to activate your membership and access available welfare packages.
           </p>
-          {notice ? (
-            <div className="mt-6 rounded-lg bg-amber-50 border border-amber-200 px-6 py-4">
-              <div className="flex items-center gap-2">
-                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-sm font-medium text-amber-800">{notice}</span>
-              </div>
-            </div>
-          ) : (
-            <button
+          <button
               onClick={openPayModal}
               className="mt-6 inline-flex items-center gap-2 rounded-lg bg-luma-700 px-6 py-3 text-sm font-semibold text-white hover:bg-luma-800 active:bg-luma-900 transition-all min-h-[44px]"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
               Pay KSh 300
             </button>
-          )}
           <p className="mt-3 text-xs text-gray-500">
             This is a one-time fee. You will not be charged again.
           </p>
@@ -500,54 +521,62 @@ export function Dashboard() {
               )}
 
               {payStep === 'waiting' && (
-                <div className="px-6 py-10 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
-                    <svg className="h-6 w-6 text-amber-600 animate-pulse motion-reduce:animate-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  </div>
-                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Waiting for M-Pesa</h3>
-                  <p className="mt-1 text-sm text-gray-500">An M-Pesa payment request has been sent to your phone. Enter your M-Pesa PIN to complete the KSh 300 activation payment.</p>
-                  <p className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-amber-800">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
-                    Waiting for confirmation…
-                  </p>
+                <PaymentStatusPanel
+                  step="waiting"
+                  message="An M-Pesa payment request has been sent to your phone. Enter your M-Pesa PIN to complete the KSh 300 activation payment."
+                >
                   {payError && (
                     <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">{payError}</div>
                   )}
-                  <button onClick={() => { setPayStep('phone'); setPayError('') }} className="mt-4 text-xs font-medium text-gray-500 hover:text-gray-700 min-h-[44px]">
+                  <button type="button" onClick={() => { setPayStep('phone'); setPayError('') }} className="mt-4 text-xs font-medium text-gray-500 hover:text-gray-700 min-h-[44px]">
                     Use a different number
                   </button>
-                </div>
+                </PaymentStatusPanel>
               )}
 
               {payStep === 'success' && (
-                <div className="px-6 py-10 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
-                    <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                  </div>
-                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Confirmed</h3>
-                  <p className="mt-1 text-sm text-gray-500">Your KSh 300 activation payment was successful. Your Luma Welfare membership is now active.</p>
-                  <button onClick={() => setShowPayModal(false)} className="mt-5 luma-btn luma-btn-primary px-5 py-2.5 text-sm">
-                    Explore Packages
-                  </button>
-                </div>
+                <PaymentStatusPanel
+                  step="success"
+                  title="Confirmed"
+                  message={
+                    isPaymentsUiMock()
+                      ? 'Mock confirmation — membership was not activated.'
+                      : 'Your KSh 300 activation payment was successful. Your Luma Welfare membership is now active.'
+                  }
+                  primaryLabel="Explore Packages"
+                  onPrimary={() => setShowPayModal(false)}
+                />
               )}
 
               {payStep === 'failed' && (
-                <div className="px-6 py-10 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </div>
-                  <h3 className="mt-3 text-lg font-semibold text-gray-900">Failed</h3>
-                  <p className="mt-1 text-sm text-gray-500">{payError || 'The payment was not completed.'}</p>
-                  <div className="mt-5 flex gap-2 justify-center">
-                    <button onClick={() => { setPayStep('phone'); setPayError('') }} className="luma-btn luma-btn-primary px-5 py-2.5 text-sm">
-                      Try Again
-                    </button>
-                    <button onClick={() => setShowPayModal(false)} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors min-h-[44px]">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+                <PaymentStatusPanel
+                  step="failed"
+                  message={payError || undefined}
+                  primaryLabel="Try Again"
+                  onPrimary={() => { setPayStep('phone'); setPayError('') }}
+                  secondaryLabel="Cancel"
+                  onSecondary={() => setShowPayModal(false)}
+                />
+              )}
+
+              {payStep === 'expired' && (
+                <PaymentStatusPanel
+                  step="expired"
+                  message={payError || undefined}
+                  primaryLabel="Try Again"
+                  onPrimary={() => { setPayStep('phone'); setPayError('') }}
+                  secondaryLabel="Cancel"
+                  onSecondary={() => setShowPayModal(false)}
+                />
+              )}
+
+              {payStep === 'disabled' && (
+                <PaymentStatusPanel
+                  step="disabled"
+                  message={payError || PAYMENTS_DISABLED_COPY}
+                  secondaryLabel="Close"
+                  onSecondary={() => setShowPayModal(false)}
+                />
               )}
             </div>
           </div>
@@ -575,6 +604,17 @@ export function Dashboard() {
           ) : undefined
         }
       />
+
+      {isPaymentsUiMock() && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
+          {PAYMENTS_MOCK_COPY}
+        </div>
+      )}
+      {paymentsDisabled && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
+          {PAYMENTS_DISABLED_COPY}
+        </div>
+      )}
 
       {/* Summary cards */}
       {!loading && !error && summary && (
@@ -1117,65 +1157,52 @@ export function Dashboard() {
               </button>
             </div>
 
-            {contribTracker.state === 'waiting' ? (
-              <div className="px-6 py-10 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
-                  <svg className="h-6 w-6 text-amber-600 animate-pulse motion-reduce:animate-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </div>
-                <h4 className="mt-3 text-lg font-semibold text-gray-900">Waiting for M-Pesa</h4>
-                <p className="mt-1 text-sm text-gray-500">Enter your M-Pesa PIN on your phone. This screen updates automatically.</p>
-                <p className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-amber-800">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
-                  Waiting for confirmation…
-                </p>
-              </div>
+            {contribMockStep !== 'idle' ? (
+              <PaymentStatusPanel
+                step={contribMockStep}
+                message={
+                  contribMockStep === 'success' && isPaymentsUiMock()
+                    ? 'Mock confirmation — contribution was not recorded.'
+                    : undefined
+                }
+                primaryLabel={contribMockStep === 'success' ? 'Done' : contribMockStep === 'failed' || contribMockStep === 'expired' ? 'Retry' : undefined}
+                onPrimary={
+                  contribMockStep === 'success'
+                    ? closeContribPay
+                    : contribMockStep === 'failed' || contribMockStep === 'expired'
+                      ? () => { setContribMockStep('idle'); setContribPayError('') }
+                      : undefined
+                }
+                secondaryLabel={contribMockStep === 'failed' || contribMockStep === 'expired' ? 'Close' : undefined}
+                onSecondary={contribMockStep === 'failed' || contribMockStep === 'expired' ? closeContribPay : undefined}
+              />
+            ) : contribTracker.state === 'waiting' ? (
+              <PaymentStatusPanel step="waiting" />
             ) : contribTracker.state === 'success' ? (
-              <div className="px-6 py-10 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
-                  <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                </div>
-                <h4 className="mt-3 text-lg font-semibold text-gray-900">Confirmed</h4>
-                {contribTracker.receipt && (
-                  <p className="mt-1 text-sm text-gray-500">Receipt: {contribTracker.receipt}</p>
-                )}
-                <button type="button" onClick={closeContribPay} className="mt-5 luma-btn luma-btn-primary px-5 py-2.5 text-sm">
-                  Done
-                </button>
-              </div>
+              <PaymentStatusPanel
+                step="success"
+                receipt={contribTracker.receipt}
+                primaryLabel="Done"
+                onPrimary={closeContribPay}
+              />
             ) : contribTracker.state === 'failed' ? (
-              <div className="px-6 py-10 text-center">
-                <h4 className="text-lg font-semibold text-gray-900">Failed</h4>
-                <p className="mt-1 text-sm text-gray-500">{contribTracker.message}</p>
-                <div className="mt-5 flex justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setContribPaymentId(null); setContribPayError('') }}
-                    className="luma-btn luma-btn-primary px-5 py-2.5 text-sm"
-                  >
-                    Retry
-                  </button>
-                  <button type="button" onClick={closeContribPay} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 min-h-[44px]">
-                    Close
-                  </button>
-                </div>
-              </div>
+              <PaymentStatusPanel
+                step="failed"
+                message={contribTracker.message ?? undefined}
+                primaryLabel="Retry"
+                onPrimary={() => { setContribPaymentId(null); setContribPayError('') }}
+                secondaryLabel="Close"
+                onSecondary={closeContribPay}
+              />
             ) : contribTracker.state === 'expired' ? (
-              <div className="px-6 py-10 text-center">
-                <h4 className="text-lg font-semibold text-gray-900">Timed out</h4>
-                <p className="mt-1 text-sm text-gray-500">{contribTracker.message}</p>
-                <div className="mt-5 flex justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setContribPaymentId(null); setContribPayError('') }}
-                    className="luma-btn luma-btn-primary px-5 py-2.5 text-sm"
-                  >
-                    Retry
-                  </button>
-                  <button type="button" onClick={closeContribPay} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 min-h-[44px]">
-                    Close
-                  </button>
-                </div>
-              </div>
+              <PaymentStatusPanel
+                step="expired"
+                message={contribTracker.message ?? undefined}
+                primaryLabel="Retry"
+                onPrimary={() => { setContribPaymentId(null); setContribPayError('') }}
+                secondaryLabel="Close"
+                onSecondary={closeContribPay}
+              />
             ) : (
               <>
                 <div className="space-y-4 px-6 py-4">
