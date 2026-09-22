@@ -7,12 +7,11 @@ import { parseRegisterBody, ValidationError } from '../shared/validate.ts'
 import { PRIVACY_POLICY_VERSION, TERMS_VERSION } from '../shared/legal-versions.ts'
 
 /**
- * auth-register — creates the Supabase Auth user, a member record in
- * pending state, and emails a 6-digit OTP for email verification.
+ * auth-register — creates the Supabase Auth user, a member application in
+ * pending_approval, issues LUMA-APP-* application number, and emails OTP.
  *
- * Flow: register → /verify-email (user enters OTP) → auth-verify-email
- * activates the auth user + member record. Registration itself never
- * activates the account.
+ * Flow: register → /verify-email (OTP) → email confirmed, still pending_approval
+ * → /application-status → admin payment verify + approve → membership number + active.
  */
 
 function json(status: number, payload: Record<string, unknown>): Response {
@@ -42,7 +41,14 @@ Deno.serve(async (req) => {
       return json(400, { message: 'Invalid JSON body.', code: 'VALIDATION' })
     }
 
-    const { email, password, fullName, phone, idNumber, privacyPolicyVersion, termsVersion } = parseRegisterBody(raw)
+    const {
+      email, password, fullName, phone, idNumber,
+      dateOfBirth, gender, maritalStatus, county, location, residentialAddress,
+      whatsappPhone, altPhone,
+      emergencyContactName, emergencyContactRelationship, emergencyContactPhone, emergencyContactAltPhone,
+      familyCoverage, applicationProgramCodes,
+      privacyPolicyVersion, termsVersion,
+    } = parseRegisterBody(raw)
 
     if (privacyPolicyVersion !== PRIVACY_POLICY_VERSION || termsVersion !== TERMS_VERSION) {
       return json(400, {
@@ -84,6 +90,14 @@ Deno.serve(async (req) => {
 
     const userId = authData.user.id
 
+    const { data: appNumRow, error: appNumErr } = await adminClient.rpc('generate_application_number')
+    if (appNumErr || !appNumRow) {
+      await adminClient.auth.admin.deleteUser(userId)
+      console.error('auth-register: application number failed', appNumErr?.code ?? 'APP_NUM')
+      return json(500, { message: 'Could not create membership. Please try again.', code: 'DB_ERROR' })
+    }
+    const applicationNumber = typeof appNumRow === 'string' ? appNumRow : String(appNumRow)
+
     const { error: memberError } = await adminClient.from('members').insert({
       id: userId,
       full_name: fullName,
@@ -91,8 +105,25 @@ Deno.serve(async (req) => {
       id_number: idNumber,
       email,
       status: 'pending_approval',
+      application_number: applicationNumber,
+      application_submitted_at: consentAt,
+      date_of_birth: dateOfBirth,
+      gender,
+      marital_status: maritalStatus,
+      county,
+      location,
+      residential_address: residentialAddress,
+      whatsapp_phone: whatsappPhone,
+      alt_phone: altPhone,
+      emergency_contact_name: emergencyContactName,
+      emergency_contact_relationship: emergencyContactRelationship,
+      emergency_contact_phone: emergencyContactPhone,
+      emergency_contact_alt_phone: emergencyContactAltPhone,
+      family_coverage: familyCoverage,
+      application_program_codes: applicationProgramCodes,
       privacy_accepted_at: consentAt,
       terms_accepted_at: consentAt,
+      constitution_accepted_at: consentAt,
       privacy_policy_version: privacyPolicyVersion,
       terms_version: termsVersion,
     })
@@ -195,11 +226,13 @@ Deno.serve(async (req) => {
 
     return json(201, {
       message: emailSent
-        ? 'Account created. We sent a 6-digit verification code to your email. It expires in 10 minutes.'
-        : 'Account created. We could not send the verification email right now — use "Resend code" on the next screen.',
+        ? 'Application received. We sent a 6-digit verification code to your email. It expires in 10 minutes.'
+        : 'Application received. We could not send the verification email right now — use "Resend code" on the next screen.',
       userId,
       email,
       emailSent,
+      applicationNumber,
+      membershipStatus: 'pending_verification',
     })
   } catch (err) {
     if (err instanceof ValidationError) {

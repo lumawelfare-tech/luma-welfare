@@ -12,6 +12,7 @@ import { setSentryUser, clearSentryUser } from '../lib/sentry'
 export type Member = {
   id: string
   membership_number: string | null
+  application_number?: string | null
   full_name: string
   phone: string
   email: string | null
@@ -31,11 +32,13 @@ export type Member = {
   terms_accepted_at?: string | null
   privacy_policy_version?: string | null
   terms_version?: string | null
+  payment_verified_at?: string | null
 }
 
 export type LoginResult = {
   member: Member | null
   isAdmin: boolean
+  emailConfirmed?: boolean
   requires2fa?: boolean
 }
 
@@ -47,21 +50,12 @@ type AuthState = {
   /** Permission keys from auth-me (`resource:action`). Empty for non-admins. */
   adminPermissions: string[]
   registrationFeePaid: boolean
+  emailConfirmed: boolean
   loading: boolean
   twoFaVerified: boolean
   login: (email: string, password: string) => Promise<LoginResult>
   signInWithGoogle: () => Promise<void>
-  register: (input: {
-    email: string
-    password: string
-    fullName: string
-    phone: string
-    idNumber: string
-    acceptedPrivacy: true
-    acceptedTerms: true
-    privacyPolicyVersion: string
-    termsVersion: string
-  }) => Promise<void>
+  register: (input: Record<string, unknown>) => Promise<{ applicationNumber?: string }>
   logout: () => void
   setTwoFaVerified: (v: boolean) => void
   refreshMember: () => Promise<void>
@@ -93,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSuperadmin, setIsSuperadmin] = useState(false)
   const [adminPermissions, setAdminPermissions] = useState<string[]>([])
   const [registrationFeePaid, setRegistrationFeePaid] = useState(false)
+  const [emailConfirmed, setEmailConfirmed] = useState(false)
   const [twoFaVerified, setTwoFaVerified] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -104,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isSuperadmin: boolean
     adminPermissions: string[]
     registrationFeePaid: boolean
+    emailConfirmed: boolean
   }> {
     try {
       const data = await api<{
@@ -113,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperadmin?: boolean
         adminPermissions?: string[]
         registrationFeePaid?: boolean
+        emailConfirmed?: boolean
       }>('/auth/me', { auth: true })
       const role = data.adminRole ?? null
       const superFlag = data.isSuperadmin === true || role === 'superadmin'
@@ -126,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperadmin: superFlag,
         adminPermissions: perms,
         registrationFeePaid: data.registrationFeePaid === true,
+        emailConfirmed: data.emailConfirmed === true,
       }
     } catch {
       return {
@@ -135,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperadmin: false,
         adminPermissions: [],
         registrationFeePaid: false,
+        emailConfirmed: false,
       }
     }
   }
@@ -146,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsSuperadmin(profile.isSuperadmin)
     setAdminPermissions(profile.adminPermissions)
     setRegistrationFeePaid(profile.registrationFeePaid)
+    setEmailConfirmed(profile.emailConfirmed)
   }
 
   function clearAuthState() {
@@ -155,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsSuperadmin(false)
     setAdminPermissions([])
     setRegistrationFeePaid(false)
+    setEmailConfirmed(false)
   }
 
   useEffect(() => {
@@ -274,15 +275,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const d = await api<{ two_factor_enabled: boolean }>('/admin/2fa', { auth: true })
         if (d.two_factor_enabled) {
-          return { member: me.member, isAdmin: true, requires2fa: true }
+          return { member: me.member, isAdmin: true, emailConfirmed: me.emailConfirmed, requires2fa: true }
         }
       } catch {
         // Fail closed for admin 2FA status — require verification UI rather than skipping
-        return { member: me.member, isAdmin: true, requires2fa: true }
+        return { member: me.member, isAdmin: true, emailConfirmed: me.emailConfirmed, requires2fa: true }
       }
     }
 
-    return { member: me.member, isAdmin: me.isAdmin }
+    return { member: me.member, isAdmin: me.isAdmin, emailConfirmed: me.emailConfirmed }
   }
 
   async function signInWithGoogle(): Promise<void> {
@@ -299,18 +300,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // for admin users.
   }
 
-  async function register(input: {
-    email: string
-    password: string
-    fullName: string
-    phone: string
-    idNumber: string
-    acceptedPrivacy: true
-    acceptedTerms: true
-    privacyPolicyVersion: string
-    termsVersion: string
-  }): Promise<void> {
-    await api('/auth/register', { method: 'POST', body: input })
+  async function register(input: Record<string, unknown>): Promise<{ applicationNumber?: string }> {
+    const res = await api<{ applicationNumber?: string }>('/auth/register', { method: 'POST', body: input })
+    return { applicationNumber: res.applicationNumber }
   }
 
   async function refreshMember(): Promise<void> {
@@ -326,7 +318,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTwoFaVerified(false)
   }
   return (
-    <AuthContext.Provider value={{ member, isAdmin, adminRole, isSuperadmin, adminPermissions, registrationFeePaid, twoFaVerified, loading, login, signInWithGoogle, register, logout, setTwoFaVerified, refreshMember }}>
+    <AuthContext.Provider value={{ member, isAdmin, adminRole, isSuperadmin, adminPermissions, registrationFeePaid, emailConfirmed, twoFaVerified, loading, login, signInWithGoogle, register, logout, setTwoFaVerified, refreshMember }}>
       {children}
     </AuthContext.Provider>
   )

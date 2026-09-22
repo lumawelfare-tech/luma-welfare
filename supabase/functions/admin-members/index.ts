@@ -145,13 +145,56 @@ Deno.serve(async (req) => {
       }
 
       const now = new Date().toISOString()
+      const updates: Record<string, unknown> = {
+        status: memberStatus,
+      }
+      if (memberStatus === 'active') {
+        updates.approved_at = now
+        updates.approved_by = session.id
+        updates.joined_at = now
+        if (typeof body.adminRemarks === 'string') {
+          updates.admin_remarks = body.adminRemarks.trim().slice(0, 2000) || null
+        }
+        if (body.markPaymentVerified === true) {
+          updates.payment_verified_at = now
+        }
+        // Assign membership number if missing
+        const { data: current } = await adminClient
+          .from('members')
+          .select('membership_number, payment_verified_at')
+          .eq('id', resourceId)
+          .maybeSingle()
+        if (!current?.membership_number) {
+          const { data: memNum, error: memErr } = await adminClient.rpc('generate_membership_number')
+          if (memErr || !memNum) {
+            return new Response(JSON.stringify({
+              message: 'Could not assign membership number.',
+              code: 'MEMBERSHIP_NUMBER',
+            }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+          }
+          updates.membership_number = typeof memNum === 'string' ? memNum : String(memNum)
+        }
+        // Prefer fee table as source of payment truth when paid
+        const { data: fee } = await adminClient
+          .from('registration_fees')
+          .select('status')
+          .eq('member_id', resourceId)
+          .eq('fee_type', 'registration')
+          .maybeSingle()
+        if (fee?.status === 'paid' && !current?.payment_verified_at) {
+          updates.payment_verified_at = now
+        }
+      }
+      if (memberStatus === 'closed' && body.rejectApplication === true) {
+        updates.rejected_at = now
+        if (typeof body.adminRemarks === 'string') {
+          updates.admin_remarks = body.adminRemarks.trim().slice(0, 2000) || null
+        }
+      }
+
       const { data, error } = await adminClient
         .from('members')
-        .update({
-          status: memberStatus,
-          approved_at: memberStatus === 'active' ? now : undefined,
-          approved_by: memberStatus === 'active' ? session.id : undefined,
-        })
+        .update(updates)
         .eq('id', resourceId)
         .select()
         .single()
@@ -160,10 +203,18 @@ Deno.serve(async (req) => {
       await logAudit(adminClient, {
         actor_id: session.id,
         actor_role: session.role_name,
-        action: `member_${memberStatus}`,
+        action: memberStatus === 'active'
+          ? 'application_approved'
+          : memberStatus === 'closed' && body.rejectApplication
+            ? 'application_rejected'
+            : `member_${memberStatus}`,
         resource: 'member',
         resource_id: resourceId,
-        meta: { by: session.display_name },
+        meta: {
+          by: session.display_name,
+          membership_number: data.membership_number ?? null,
+          application_number: data.application_number ?? null,
+        },
       })
 
       return new Response(JSON.stringify({ member: data }), {

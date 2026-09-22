@@ -28,6 +28,7 @@ import { Register } from './pages/Register'
 import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
 import { VerifyEmail } from './pages/VerifyEmail'
+import { ApplicationStatus } from './pages/ApplicationStatus'
 import { NotFound } from './pages/NotFound'
 
 // Heavy/protected pages — lazy loaded (code-split into separate chunks)
@@ -110,6 +111,7 @@ export default function App() {
 
               {/* ===== MEMBER PORTAL ===== */}
               <Route element={<RequireMember />}>
+                <Route path="/application-status" element={<ApplicationStatus />} />
                 <Route element={<MemberLayout />}>
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/contributions" element={<Contributions />} />

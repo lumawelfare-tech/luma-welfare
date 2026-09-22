@@ -73,6 +73,9 @@ Deno.serve(async (req) => {
       }
     }
 
+    const { data: authUserData } = await adminClient.auth.admin.getUserById(userId)
+    const emailConfirmed = Boolean(authUserData?.user?.email_confirmed_at)
+
     return new Response(JSON.stringify({
       member: member ?? null,
       subscriptions: subscriptions ?? [],
@@ -81,6 +84,7 @@ Deno.serve(async (req) => {
       isSuperadmin: adminRecord?.is_superadmin === true,
       adminPermissions,
       registrationFeePaid,
+      emailConfirmed,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

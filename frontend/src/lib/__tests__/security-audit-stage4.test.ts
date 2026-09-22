@@ -48,4 +48,10 @@ describe('Stage 4 security patches (source contracts)', () => {
     expect(src).toContain('sanitizeSpreadsheetCell')
     expect(src).toContain('escapeXml')
   })
+
+  it('Phase 2: email verify confirms email only (no auto-active)', () => {
+    const src = read('supabase/functions/auth-verify-email/index.ts')
+    expect(src).toContain('confirmEmailOnly')
+    expect(src).not.toMatch(/\.update\(\{\s*status:\s*'active'/)
+  })
 })

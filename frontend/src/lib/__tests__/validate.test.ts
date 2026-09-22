@@ -29,8 +29,22 @@ describe('parseRegisterBody', () => {
     fullName: 'Jane Doe',
     phone: '0712345678',
     idNumber: '12345678',
+    dateOfBirth: '1990-05-15',
+    gender: 'female',
+    maritalStatus: 'single',
+    county: 'Kajiado',
+    location: 'Kitengela',
+    residentialAddress: 'Phase 2 Estate',
+    whatsappPhone: '0712345678',
+    emergencyContactName: 'John Doe',
+    emergencyContactRelationship: 'spouse',
+    emergencyContactPhone: '0722000000',
+    familyCoverage: 'individual',
+    applicationProgramCodes: ['WELFARE'],
     acceptedPrivacy: true as const,
     acceptedTerms: true as const,
+    acceptedConstitution: true as const,
+    confirmSelfSubmission: true as const,
     privacyPolicyVersion: '2026-09-21.1',
     termsVersion: '2026-09-21.1',
   }
@@ -40,8 +54,9 @@ describe('parseRegisterBody', () => {
     expect(r.email).toBe('member@example.com')
     expect(r.phone).toBe('0712345678')
     expect(r.idNumber).toBe('12345678')
-    expect(r.acceptedPrivacy).toBe(true)
-    expect(r.acceptedTerms).toBe(true)
+    expect(r.dateOfBirth).toBe('1990-05-15')
+    expect(r.acceptedConstitution).toBe(true)
+    expect(r.applicationProgramCodes).toContain('WELFARE')
   })
 
   it('rejects weak passwords and bad phones', () => {
@@ -54,10 +69,10 @@ describe('parseRegisterBody', () => {
     expect(() => parseRegisterBody({ ...good, idNumber: '12' })).toThrow(ValidationError)
   })
 
-  it('requires privacy and terms consent', () => {
+  it('requires privacy, terms, constitution, and self-submission', () => {
     expect(() => parseRegisterBody({ ...good, acceptedPrivacy: false })).toThrow(ValidationError)
     expect(() => parseRegisterBody({ ...good, acceptedTerms: false })).toThrow(ValidationError)
-    const { acceptedPrivacy: _p, acceptedTerms: _t, ...without } = good
-    expect(() => parseRegisterBody(without)).toThrow(ValidationError)
+    expect(() => parseRegisterBody({ ...good, acceptedConstitution: false })).toThrow(ValidationError)
+    expect(() => parseRegisterBody({ ...good, confirmSelfSubmission: false })).toThrow(ValidationError)
   })
 })

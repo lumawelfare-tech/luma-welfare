@@ -4,10 +4,11 @@ import { LegalConsentGate } from './LegalConsentGate'
 
 /**
  * Member-gated routes. Server-side authorization remains authoritative.
- * Client checks only redirect for UX. Re-consent gate when legal versions change.
+ * pending_approval + unverified email → verify-email
+ * pending_approval + verified email → application-status (awaiting admin)
  */
 export function RequireMember() {
-  const { member, loading } = useAuth()
+  const { member, emailConfirmed, loading } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -23,13 +24,19 @@ export function RequireMember() {
   }
 
   if (member.status === 'pending_approval') {
-    return (
-      <Navigate
-        to="/verify-email"
-        state={{ email: member.email ?? '' }}
-        replace
-      />
-    )
+    if (!emailConfirmed) {
+      return (
+        <Navigate
+          to="/verify-email"
+          state={{ email: member.email ?? '' }}
+          replace
+        />
+      )
+    }
+    if (location.pathname !== '/application-status') {
+      return <Navigate to="/application-status" replace />
+    }
+    return <Outlet />
   }
 
   if (member.status === 'suspended' || member.status === 'closed') {

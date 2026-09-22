@@ -58,7 +58,10 @@ export function Login() {
       // confirmations are disabled in the hosted project. Either way, route
       // them to the verification screen so the OTP flow can activate them.
       if (result.member && result.member.status === 'pending_approval') {
-        navigate('/verify-email', { state: { email: email.trim() }, replace: true })
+        navigate(result.emailConfirmed ? '/application-status' : '/verify-email', {
+          state: { email: email.trim() },
+          replace: true,
+        })
         return
       }
       if (result.isAdmin) {

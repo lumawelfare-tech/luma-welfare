@@ -85,10 +85,48 @@ export type RegisterInput = {
   fullName: string
   phone: string
   idNumber: string
+  dateOfBirth: string
+  gender: 'male' | 'female' | 'prefer_not_to_say'
+  maritalStatus: 'single' | 'married' | 'other'
+  county: string
+  location: string
+  residentialAddress: string
+  whatsappPhone: string
+  altPhone: string | null
+  emergencyContactName: string
+  emergencyContactRelationship: string
+  emergencyContactPhone: string
+  emergencyContactAltPhone: string | null
+  familyCoverage: 'individual' | 'nuclear' | 'extended' | null
+  applicationProgramCodes: string[]
   acceptedPrivacy: true
   acceptedTerms: true
+  acceptedConstitution: true
+  confirmSelfSubmission: true
   privacyPolicyVersion: string
   termsVersion: string
+}
+
+const GENDERS = new Set(['male', 'female', 'prefer_not_to_say'])
+const MARITAL = new Set(['single', 'married', 'other'])
+const COVERAGE = new Set(['individual', 'nuclear', 'extended'])
+
+function parseIsoDate(raw: unknown, label: string): string {
+  const s = typeof raw === 'string' ? raw.trim() : ''
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    throw new ValidationError(`Enter a valid ${label} (YYYY-MM-DD).`)
+  }
+  const d = new Date(`${s}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) {
+    throw new ValidationError(`Enter a valid ${label}.`)
+  }
+  const min = new Date('1920-01-01T00:00:00Z')
+  const max = new Date()
+  max.setUTCFullYear(max.getUTCFullYear() - 16)
+  if (d < min || d > max) {
+    throw new ValidationError('Applicant must be at least 16 years old.')
+  }
+  return s
 }
 
 export function parseRegisterBody(input: unknown): RegisterInput {
@@ -98,6 +136,52 @@ export function parseRegisterBody(input: unknown): RegisterInput {
   const fullName = requireString(body, 'fullName', 'Full name')
   const phone = normalizeKenyanPhone(requireString(body, 'phone', 'Phone'))
   const idNumber = parseKenyanNationalId(body.idNumber)
+  const dateOfBirth = parseIsoDate(body.dateOfBirth, 'date of birth')
+  const genderRaw = requireString(body, 'gender', 'Gender').toLowerCase()
+  if (!GENDERS.has(genderRaw)) {
+    throw new ValidationError('Select a valid gender option.')
+  }
+  const maritalRaw = requireString(body, 'maritalStatus', 'Marital status').toLowerCase()
+  if (!MARITAL.has(maritalRaw)) {
+    throw new ValidationError('Select a valid marital status.')
+  }
+  const county = requireString(body, 'county', 'County')
+  const location = requireString(body, 'location', 'Town / area')
+  const residentialAddress = requireString(body, 'residentialAddress', 'Residential address')
+  const whatsappRaw = typeof body.whatsappPhone === 'string' && body.whatsappPhone.trim()
+    ? body.whatsappPhone
+    : phone
+  const whatsappPhone = normalizeKenyanPhone(whatsappRaw)
+  const altPhone = typeof body.altPhone === 'string' && body.altPhone.trim()
+    ? normalizeKenyanPhone(body.altPhone)
+    : null
+  const emergencyContactName = requireString(body, 'emergencyContactName', 'Emergency contact name')
+  const emergencyContactRelationship = requireString(body, 'emergencyContactRelationship', 'Emergency contact relationship')
+  const emergencyContactPhone = normalizeKenyanPhone(
+    requireString(body, 'emergencyContactPhone', 'Emergency contact phone'),
+  )
+  const emergencyContactAltPhone = typeof body.emergencyContactAltPhone === 'string' && body.emergencyContactAltPhone.trim()
+    ? normalizeKenyanPhone(body.emergencyContactAltPhone)
+    : null
+
+  let familyCoverage: RegisterInput['familyCoverage'] = null
+  if (typeof body.familyCoverage === 'string' && body.familyCoverage.trim()) {
+    const fc = body.familyCoverage.trim().toLowerCase()
+    if (!COVERAGE.has(fc)) {
+      throw new ValidationError('Select a valid family coverage option.')
+    }
+    familyCoverage = fc as RegisterInput['familyCoverage']
+  }
+
+  const programCodesRaw = body.applicationProgramCodes ?? body.programCodes
+  const applicationProgramCodes: string[] = []
+  if (Array.isArray(programCodesRaw)) {
+    for (const c of programCodesRaw) {
+      if (typeof c === 'string' && c.trim() && c.trim().length <= 40) {
+        applicationProgramCodes.push(c.trim().toUpperCase())
+      }
+    }
+  }
 
   if (!EMAIL_RE.test(email)) {
     throw new ValidationError('Enter a valid email address.')
@@ -114,14 +198,29 @@ export function parseRegisterBody(input: unknown): RegisterInput {
   if (fullName.length > 120) {
     throw new ValidationError('Full name is too long.')
   }
-  if (!KENYA_PHONE_RE.test(phone)) {
+  if (county.length > 80 || location.length > 120 || residentialAddress.length > 300) {
+    throw new ValidationError('Address fields are too long.')
+  }
+  if (!KENYA_PHONE_RE.test(phone) || !KENYA_PHONE_RE.test(whatsappPhone) || !KENYA_PHONE_RE.test(emergencyContactPhone)) {
     throw new ValidationError('Enter a valid Kenyan phone number (e.g. 0712345678).')
+  }
+  if (altPhone && !KENYA_PHONE_RE.test(altPhone)) {
+    throw new ValidationError('Enter a valid alternative phone number.')
+  }
+  if (emergencyContactAltPhone && !KENYA_PHONE_RE.test(emergencyContactAltPhone)) {
+    throw new ValidationError('Enter a valid emergency alternative phone.')
   }
   if (body.acceptedPrivacy !== true) {
     throw new ValidationError('You must accept the Privacy Policy to create an account.')
   }
   if (body.acceptedTerms !== true) {
     throw new ValidationError('You must accept the Terms & Conditions to create an account.')
+  }
+  if (body.acceptedConstitution !== true) {
+    throw new ValidationError('You must agree to the LUMA Welfare Constitution and Membership Terms.')
+  }
+  if (body.confirmSelfSubmission !== true) {
+    throw new ValidationError('Confirm that you are submitting this application yourself.')
   }
   const privacyPolicyVersion = requireString(body, 'privacyPolicyVersion', 'Privacy Policy version')
   const termsVersion = requireString(body, 'termsVersion', 'Terms version')
@@ -135,8 +234,24 @@ export function parseRegisterBody(input: unknown): RegisterInput {
     fullName,
     phone,
     idNumber,
+    dateOfBirth,
+    gender: genderRaw as RegisterInput['gender'],
+    maritalStatus: maritalRaw as RegisterInput['maritalStatus'],
+    county,
+    location,
+    residentialAddress,
+    whatsappPhone,
+    altPhone,
+    emergencyContactName,
+    emergencyContactRelationship,
+    emergencyContactPhone,
+    emergencyContactAltPhone,
+    familyCoverage,
+    applicationProgramCodes,
     acceptedPrivacy: true,
     acceptedTerms: true,
+    acceptedConstitution: true,
+    confirmSelfSubmission: true,
     privacyPolicyVersion,
     termsVersion,
   }

@@ -27,6 +27,7 @@ const renderWithRouter = (initialPath: string) =>
         </Route>
         <Route path="/login" element={<div>Login Page</div>} />
         <Route path="/verify-email" element={<div>Verify Email Page</div>} />
+        <Route path="/application-status" element={<div>Application Status Page</div>} />
         <Route path="/dashboard" element={<div>Dashboard Page</div>} />
         <Route path="/privacy" element={<div>Privacy Page</div>} />
         <Route path="/terms" element={<div>Terms Page</div>} />
@@ -48,14 +49,26 @@ describe('RequireMember', () => {
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
   })
 
-  it('redirects to verify-email when status is pending_approval', () => {
+  it('redirects to verify-email when pending and email not confirmed', () => {
     mockedUseAuth.mockReturnValue({
       member: { status: 'pending_approval', email: 'test@example.com' },
+      emailConfirmed: false,
       loading: false,
       refreshMember: vi.fn(),
     })
     renderWithRouter('/protected')
     expect(screen.getByText('Verify Email Page')).toBeInTheDocument()
+  })
+
+  it('redirects to application-status when pending and email confirmed', () => {
+    mockedUseAuth.mockReturnValue({
+      member: { status: 'pending_approval', email: 'test@example.com' },
+      emailConfirmed: true,
+      loading: false,
+      refreshMember: vi.fn(),
+    })
+    renderWithRouter('/protected')
+    expect(screen.getByText('Application Status Page')).toBeInTheDocument()
   })
 
   it('renders outlet when authenticated with active status and current legal versions', () => {

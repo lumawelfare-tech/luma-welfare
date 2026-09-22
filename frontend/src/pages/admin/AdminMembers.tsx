@@ -31,6 +31,7 @@ export function matchesDeleteConfirmation(typed: string, fullName: string): bool
 type Member = {
   id: string
   membership_number: string | null
+  application_number?: string | null
   full_name: string
   phone: string
   email: string | null
@@ -44,7 +45,7 @@ type Member = {
 
 const BASE_MEMBER_STATUS_FILTERS = [
   { value: '', label: 'All' },
-  { value: 'pending_approval', label: 'Pending' },
+  { value: 'pending_approval', label: 'Applications' },
   { value: 'active', label: 'Active' },
   { value: 'suspended', label: 'Suspended' },
   { value: 'closed', label: 'Closed' },
@@ -225,11 +226,32 @@ export function AdminMembers() {
     }
   }
 
-  async function setStatus(id: string, status: 'active' | 'suspended' | 'closed') {
+  async function setStatus(
+    id: string,
+    status: 'active' | 'suspended' | 'closed',
+    opts?: { rejectApplication?: boolean; markPaymentVerified?: boolean },
+  ) {
     setBusyId(id)
     try {
-      await api(`/admin/members/${id}`, { method: 'PATCH', auth: true, body: { status } })
-      addToast('success', `Member ${status === 'active' ? 'approved' : status === 'suspended' ? 'suspended' : 'closed'}.`)
+      await api(`/admin/members/${id}`, {
+        method: 'PATCH',
+        auth: true,
+        body: {
+          status,
+          ...(status === 'active' ? { markPaymentVerified: opts?.markPaymentVerified !== false } : {}),
+          ...(status === 'closed' && opts?.rejectApplication ? { rejectApplication: true } : {}),
+        },
+      })
+      addToast(
+        'success',
+        status === 'active'
+          ? 'Application approved — membership number assigned if missing.'
+          : status === 'suspended'
+            ? 'Member suspended.'
+            : opts?.rejectApplication
+              ? 'Application rejected.'
+              : 'Member closed.',
+      )
       await load()
     } catch (e) {
       addToast('error', e instanceof ApiError ? e.message : 'Could not update the member.')
@@ -435,6 +457,7 @@ export function AdminMembers() {
             ) : null}
           </div>
           {m.membership_number && <div className="text-xs text-gray-400">#{m.membership_number}</div>}
+          {m.application_number && <div className="text-xs text-gray-400">{m.application_number}</div>}
         </button>
       ),
     },
@@ -509,14 +532,24 @@ export function AdminMembers() {
         ) : (
         <div className="flex min-h-[44px] items-center justify-end gap-1.5">
           {m.status === 'pending_approval' && (
-            <button
-              type="button"
-              disabled={busyId === m.id}
-              onClick={() => setStatus(m.id, 'active')}
-              className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-            >
-              Approve
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={busyId === m.id}
+                onClick={() => setStatus(m.id, 'active', { markPaymentVerified: true })}
+                className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                disabled={busyId === m.id}
+                onClick={() => setStatus(m.id, 'closed', { rejectApplication: true })}
+                className="min-h-[44px] rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors"
+              >
+                Reject
+              </button>
+            </>
           )}
           {m.status === 'active' && (
             <button
@@ -690,6 +723,7 @@ export function AdminMembers() {
                     <button type="button" onClick={() => viewMember(m)} className="min-h-[44px] text-left">
                       <div className="font-medium text-gray-900">{m.full_name}</div>
                       {m.membership_number && <div className="text-xs text-gray-400">#{m.membership_number}</div>}
+          {m.application_number && <div className="text-xs text-gray-400">{m.application_number}</div>}
                       {m.is_anonymized ? (
                         <span className="mt-1 inline-block max-w-[16rem] rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-700">
                           Anonymized: personal data erased, financial records retained
@@ -730,7 +764,10 @@ export function AdminMembers() {
                     ) : (
                       <>
                         {m.status === 'pending_approval' && (
-                          <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'active')} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Approve</button>
+                          <>
+                            <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'active', { markPaymentVerified: true })} className="min-h-[44px] rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Approve</button>
+                            <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'closed', { rejectApplication: true })} className="min-h-[44px] rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-700">Reject</button>
+                          </>
                         )}
                         {m.status === 'active' && (
                           <button type="button" disabled={busyId === m.id} onClick={() => setStatus(m.id, 'suspended')} className="min-h-[44px] rounded-md border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600">Suspend</button>

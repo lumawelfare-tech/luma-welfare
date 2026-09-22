@@ -27,8 +27,8 @@ import { parseVerifyEmailBody, ValidationError } from '../shared/validate.ts'
  *   - Resend: 60s cooldown + max 3 per rolling hour (atomic conditional updates)
  *   - Per-IP rate limits on both actions
  *   - Anti-enumeration: unknown emails get generic responses
- *   - Activation (auth email_confirm + member status) only happens here,
- *     never on the client.
+ *   - Email confirmation (Auth email_confirm) only happens here.
+ *     Member status stays pending_approval until an admin approves.
  */
 
 const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000'
@@ -52,23 +52,15 @@ async function timingBurn(): Promise<void> {
   await otpMatches(DUMMY_USER_ID, '000000', null)
 }
 
-/** Flip auth email confirmation + activate a pending member. Idempotent. */
-async function activateMember(
+/** Confirm Auth email only. Membership stays pending_approval until admin approve. */
+async function confirmEmailOnly(
   adminClient: ReturnType<typeof createAdminClient>,
   userId: string,
 ): Promise<void> {
-  await adminClient
-    .from('members')
-    .update({ status: 'active' })
-    .eq('id', userId)
-    .eq('status', 'pending_approval')
-
   const { error } = await adminClient.auth.admin.updateUserById(userId, {
     email_confirm: true,
   })
   if (error) {
-    // Member activation is already effective; log so ops can confirm the
-    // Supabase auth flag (only matters when email confirmations are enforced).
     console.error(`auth-verify-email: updateUserById failed for ${userId}: ${error.name ?? 'AuthError'}`)
   }
 }
@@ -136,7 +128,7 @@ Deno.serve(async (req) => {
     // Already verified — idempotent success (also self-heals activation).
     if (row.verified_at) {
       if ((member as { status: string }).status === 'pending_approval') {
-        await activateMember(adminClient, member.id)
+        await confirmEmailOnly(adminClient, member.id)
       }
       return json(200, { verified: true, alreadyVerified: true })
     }
@@ -203,7 +195,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (claimed) {
-      await activateMember(adminClient, member.id)
+      await confirmEmailOnly(adminClient, member.id)
       await logAudit(adminClient, {
         actor_id: member.id,
         action: 'OTP_VERIFIED',
