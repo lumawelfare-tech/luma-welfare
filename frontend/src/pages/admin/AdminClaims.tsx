@@ -28,9 +28,14 @@ type Claim = {
   created_at: string
   submitted_at: string | null
   decided_at: string | null
+  paid_at?: string | null
   member_id: string
   members: { full_name: string | null; phone: string | null; email: string | null } | null
   packages: { code: string | null; name: string | null } | null
+  checklist_docs_ok?: boolean
+  checklist_membership_ok?: boolean
+  checklist_contributions_ok?: boolean
+  checklist_completed_at?: string | null
 }
 
 type ClaimDocument = {
@@ -39,6 +44,23 @@ type ClaimDocument = {
   file_name: string
   file_url: string
   uploaded_at: string
+}
+
+type ClaimPayout = {
+  id: string
+  amount: number
+  method: string
+  status: string
+  reference: string | null
+  processed_at: string | null
+}
+
+function checklistReady(c: Claim | null | undefined): boolean {
+  return Boolean(c?.checklist_docs_ok && c?.checklist_membership_ok && c?.checklist_contributions_ok)
+}
+
+function isReviewable(status: string): boolean {
+  return status === 'Submitted' || status === 'Under Review' || status === 'Additional Information Required'
 }
 
 const filterTabs = [
@@ -82,7 +104,9 @@ export function AdminClaims() {
   // Detail modal
   const [detail, setDetail] = useState<Claim | null>(null)
   const [documents, setDocuments] = useState<ClaimDocument[]>([])
+  const [payouts, setPayouts] = useState<ClaimPayout[]>([])
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [checklistBusy, setChecklistBusy] = useState(false)
 
   // Dialogs
   const [approveTarget, setApproveTarget] = useState<Claim | null>(null)
@@ -94,6 +118,10 @@ export function AdminClaims() {
   const [infoMessage, setInfoMessage] = useState('')
   const [bulkRejectNotes, setBulkRejectNotes] = useState('')
   const [showBulkReject, setShowBulkReject] = useState(false)
+  const [payoutTarget, setPayoutTarget] = useState<Claim | null>(null)
+  const [payoutAmount, setPayoutAmount] = useState('')
+  const [payoutReference, setPayoutReference] = useState('')
+  const [payoutNotes, setPayoutNotes] = useState('')
 
   const load = useCallback(async (pageNum = 1) => {
     setError(null)
@@ -206,15 +234,46 @@ export function AdminClaims() {
   async function viewDetail(claim: Claim) {
     setDetail(claim)
     setDocuments([])
+    setPayouts([])
     setLoadingDetail(true)
     try {
-      const d = await api<{ claim: Claim; documents: ClaimDocument[] }>(`/admin/claims/${claim.id}`, { auth: true })
+      const d = await api<{ claim: Claim; documents: ClaimDocument[]; payouts?: ClaimPayout[] }>(`/admin/claims/${claim.id}`, { auth: true })
+      setDetail(d.claim)
       setDocuments(d.documents ?? [])
+      setPayouts(d.payouts ?? [])
     } catch {
       addToast('warning', 'Could not load claim documents.')
     } finally {
       setLoadingDetail(false)
     }
+  }
+
+  async function updateChecklist(field: 'checklistDocsOk' | 'checklistMembershipOk' | 'checklistContributionsOk', value: boolean) {
+    if (!detail) return
+    setChecklistBusy(true)
+    try {
+      const d = await api<{ claim: Claim }>(`/admin/claims/${detail.id}`, {
+        method: 'PATCH',
+        auth: true,
+        body: { action: 'checklist', [field]: value },
+      })
+      setDetail(d.claim)
+      await load(page)
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not update checklist.')
+    } finally {
+      setChecklistBusy(false)
+    }
+  }
+
+  function openApprove(claim: Claim) {
+    if (!checklistReady(claim)) {
+      addToast('warning', 'Complete the review checklist (documents, membership, contributions) before approving.')
+      return
+    }
+    setApproveTarget(claim)
+    setApproveAmount(claim.amount_requested != null ? String(claim.amount_requested) : '')
+    setApproveNotes('')
   }
 
   async function approve(claim: Claim) {
@@ -273,6 +332,34 @@ export function AdminClaims() {
       await load()
     } catch (e) {
       addToast('error', e instanceof ApiError ? e.message : 'Could not update claim.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function recordPayout(claim: Claim) {
+    setBusyId(claim.id)
+    try {
+      await api(`/admin/claims/${claim.id}`, {
+        method: 'PATCH',
+        auth: true,
+        body: {
+          action: 'record-payout',
+          amount: payoutAmount ? Number(payoutAmount) : undefined,
+          reference: payoutReference.trim() || undefined,
+          notes: payoutNotes.trim() || undefined,
+          method: 'manual',
+        },
+      })
+      addToast('success', `Payout recorded for ${claim.claim_number}. Member notified.`)
+      setPayoutTarget(null)
+      setPayoutAmount('')
+      setPayoutReference('')
+      setPayoutNotes('')
+      setDetail(null)
+      await load()
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not record payout.')
     } finally {
       setBusyId(null)
     }
@@ -369,11 +456,11 @@ export function AdminClaims() {
         const cl = row as unknown as Claim
         return (
           <div className="flex justify-end gap-1.5">
-            {cl.status === 'Submitted' && (
+            {isReviewable(cl.status) && (
               <>
                 <button
                   disabled={busyId === cl.id}
-                  onClick={() => { setApproveTarget(cl); setApproveAmount(cl.amount_requested != null ? String(cl.amount_requested) : ''); setApproveNotes('') }}
+                  onClick={() => openApprove(cl)}
                   className="rounded-lg bg-emerald-600 px-2.5 py-2.5 text-xs min-h-[44px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                 >
                   Approve
@@ -394,6 +481,20 @@ export function AdminClaims() {
                 </button>
               </>
             )}
+            {cl.status === 'Approved' && (
+              <button
+                disabled={busyId === cl.id}
+                onClick={() => {
+                  setPayoutTarget(cl)
+                  setPayoutAmount(cl.approved_amount != null ? String(cl.approved_amount) : cl.amount_requested != null ? String(cl.amount_requested) : '')
+                  setPayoutReference('')
+                  setPayoutNotes('')
+                }}
+                className="rounded-lg bg-luma-700 px-2.5 py-2.5 text-xs min-h-[44px] font-semibold text-white hover:bg-luma-800 disabled:opacity-50 transition-colors"
+              >
+                Record payout
+              </button>
+            )}
           </div>
         )
       },
@@ -405,7 +506,7 @@ export function AdminClaims() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Claims</h1>
-          <p className="text-sm text-gray-500 mt-1">Review member claims. Approved claims are recorded for future payout processing.</p>
+          <p className="text-sm text-gray-500 mt-1">Review checklist, decide claims, and record manual payouts (M-Pesa payouts remain disabled).</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -517,11 +618,11 @@ export function AdminClaims() {
                 <div className="text-sm font-medium text-gray-900">
                   {cl.amount_requested != null ? `KSh ${cl.amount_requested.toLocaleString('en-KE')}` : '—'}
                 </div>
-                {cl.status === 'Submitted' && (
+                {isReviewable(cl.status) && (
                   <div className="flex gap-2 pt-1">
                     <button
                       disabled={busyId === cl.id}
-                      onClick={() => { setApproveTarget(cl); setApproveAmount(cl.amount_requested != null ? String(cl.amount_requested) : ''); setApproveNotes('') }}
+                      onClick={() => openApprove(cl)}
                       className="rounded-lg bg-emerald-600 px-3 py-2.5 text-xs min-h-[44px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
                       Approve
@@ -532,6 +633,22 @@ export function AdminClaims() {
                       className="rounded-lg border border-red-200 px-3 py-2.5 text-xs min-h-[44px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >
                       Reject
+                    </button>
+                  </div>
+                )}
+                {cl.status === 'Approved' && (
+                  <div className="pt-1">
+                    <button
+                      disabled={busyId === cl.id}
+                      onClick={() => {
+                        setPayoutTarget(cl)
+                        setPayoutAmount(cl.approved_amount != null ? String(cl.approved_amount) : cl.amount_requested != null ? String(cl.amount_requested) : '')
+                        setPayoutReference('')
+                        setPayoutNotes('')
+                      }}
+                      className="rounded-lg bg-luma-700 px-3 py-2.5 text-xs min-h-[44px] font-semibold text-white hover:bg-luma-800 disabled:opacity-50"
+                    >
+                      Record payout
                     </button>
                   </div>
                 )}
@@ -642,12 +759,80 @@ export function AdminClaims() {
                 </div>
               )}
               {loadingDetail && <div className="text-center text-gray-400 text-xs py-2">Loading documents…</div>}
+
+              {isReviewable(detail.status) && (
+                <div className="rounded-lg border border-gray-200 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Review checklist</p>
+                  <p className="mt-1 text-xs text-gray-500">Confirm documents, membership, and contributions before approving.</p>
+                  <ul className="mt-3 space-y-2">
+                    {(
+                      [
+                        { key: 'checklistDocsOk' as const, label: 'Documents verified', checked: Boolean(detail.checklist_docs_ok) },
+                        { key: 'checklistMembershipOk' as const, label: 'Membership verified', checked: Boolean(detail.checklist_membership_ok) },
+                        { key: 'checklistContributionsOk' as const, label: 'Contributions verified', checked: Boolean(detail.checklist_contributions_ok) },
+                      ]
+                    ).map((item) => (
+                      <li key={item.key}>
+                        <label className="flex min-h-11 items-center gap-2 text-sm text-gray-800">
+                          <input
+                            type="checkbox"
+                            checked={item.checked}
+                            disabled={checklistBusy}
+                            onChange={(e) => updateChecklist(item.key, e.target.checked)}
+                          />
+                          {item.label}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                  {!checklistReady(detail) && (
+                    <p className="mt-2 text-xs text-amber-700">Approve stays disabled until all three checks are complete.</p>
+                  )}
+                </div>
+              )}
+
+              {payouts.length > 0 && (
+                <div>
+                  <span className="text-gray-400 text-xs">Payouts</span>
+                  <ul className="mt-1 space-y-1 text-sm">
+                    {payouts.map((p) => (
+                      <li key={p.id} className="rounded-lg bg-gray-50 px-3 py-2">
+                        KSh {Number(p.amount).toLocaleString('en-KE')} · {p.method} · {p.status}
+                        {p.reference ? ` · ${p.reference}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-            {detail.status === 'Submitted' && (
-              <div className="border-t border-gray-200 px-6 py-4 flex gap-2 justify-end">
-                <button onClick={() => { setApproveTarget(detail); setApproveAmount(detail.amount_requested != null ? String(detail.amount_requested) : ''); setApproveNotes('') }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">Approve</button>
-                <button onClick={() => { setInfoTarget(detail); setInfoMessage('') }} className="rounded-lg border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors">Request Info</button>
-                <button onClick={() => { setRejectTarget(detail); setRejectNotes('') }} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">Reject</button>
+            {isReviewable(detail.status) && (
+              <div className="border-t border-gray-200 px-6 py-4 flex flex-wrap gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => openApprove(detail)}
+                  disabled={!checklistReady(detail)}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                >
+                  Approve
+                </button>
+                <button type="button" onClick={() => { setInfoTarget(detail); setInfoMessage('') }} className="rounded-lg border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors">Request Info</button>
+                <button type="button" onClick={() => { setRejectTarget(detail); setRejectNotes('') }} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">Reject</button>
+              </div>
+            )}
+            {detail.status === 'Approved' && (
+              <div className="border-t border-gray-200 px-6 py-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPayoutTarget(detail)
+                    setPayoutAmount(detail.approved_amount != null ? String(detail.approved_amount) : detail.amount_requested != null ? String(detail.amount_requested) : '')
+                    setPayoutReference('')
+                    setPayoutNotes('')
+                  }}
+                  className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white hover:bg-luma-800"
+                >
+                  Record payout
+                </button>
               </div>
             )}
           </div>
@@ -696,6 +881,38 @@ export function AdminClaims() {
               <button onClick={() => setApproveTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
               <button onClick={() => approve(approveTarget)} disabled={busyId === approveTarget.id} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                 {busyId === approveTarget.id ? 'Approving…' : 'Approve Claim'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record payout dialog */}
+      {payoutTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setPayoutTarget(null)}>
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 space-y-3">
+              <h3 className="text-lg font-semibold text-gray-900">Record manual payout</h3>
+              <p className="text-sm text-gray-500">
+                Mark <strong>{payoutTarget.claim_number}</strong> as paid. This does not send M-Pesa — enter the offline transfer reference.
+              </p>
+              <div>
+                <label className="text-xs font-medium text-gray-600" htmlFor="payout-amount">Amount (KSh)</label>
+                <input id="payout-amount" type="number" value={payoutAmount} onChange={(e) => setPayoutAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600" htmlFor="payout-ref">Reference</label>
+                <input id="payout-ref" value={payoutReference} onChange={(e) => setPayoutReference(e.target.value)} maxLength={120} placeholder="Bank / cash / voucher ref" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600" htmlFor="payout-notes">Notes</label>
+                <textarea id="payout-notes" value={payoutNotes} onChange={(e) => setPayoutNotes(e.target.value)} rows={2} maxLength={2000} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-4">
+              <button type="button" onClick={() => setPayoutTarget(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">Cancel</button>
+              <button type="button" disabled={busyId === payoutTarget.id} onClick={() => recordPayout(payoutTarget)} className="rounded-lg bg-luma-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                {busyId === payoutTarget.id ? 'Recording…' : 'Record & notify'}
               </button>
             </div>
           </div>

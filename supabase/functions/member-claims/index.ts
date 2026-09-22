@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && !claimId) {
       const { data, error } = await adminClient
         .from('claims')
-        .select('id, claim_number, claim_type, amount_requested, status, description, created_at, submitted_at, decided_at, admin_notes, packages(code, name)')
+        .select('id, claim_number, claim_type, amount_requested, status, description, created_at, submitted_at, decided_at, paid_at, admin_notes, checklist_docs_ok, checklist_membership_ok, checklist_contributions_ok, packages(code, name)')
         .eq('member_id', user.id)
         .order('created_at', { ascending: false })
 

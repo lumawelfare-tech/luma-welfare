@@ -24,6 +24,9 @@ type Claim = {
   decided_at: string | null
   paid_at: string | null
   packages: { code: string | null; name: string | null } | null
+  checklist_docs_ok?: boolean
+  checklist_membership_ok?: boolean
+  checklist_contributions_ok?: boolean
 }
 type ClaimDocument = {
   id: string
@@ -171,6 +174,7 @@ export function Claims() {
     setDocuments([])
     try {
       const d = await api<{ claim: Claim; documents: ClaimDocument[] }>(`/member/claims?id=${claim.id}`, { auth: true })
+      if (d.claim) setDetail(d.claim)
       setDocuments(d.documents ?? [])
     } catch {
       // Silently fail
@@ -491,6 +495,16 @@ export function Claims() {
               <div className="mt-4">
                 <ClaimTimeline status={detail.status} />
               </div>
+              {(detail.status === 'Submitted' || detail.status === 'Under Review' || detail.status === 'Approved' || detail.status === 'Paid') && (
+                <div className="mt-4 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                  <p className="font-semibold text-gray-700">Review progress</p>
+                  <ul className="mt-1 space-y-0.5">
+                    <li>{detail.checklist_docs_ok ? '✓' : '○'} Documents</li>
+                    <li>{detail.checklist_membership_ok ? '✓' : '○'} Membership</li>
+                    <li>{detail.checklist_contributions_ok ? '✓' : '○'} Contributions</li>
+                  </ul>
+                </div>
+              )}
             </div>
             <div className="px-6 py-4 space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">

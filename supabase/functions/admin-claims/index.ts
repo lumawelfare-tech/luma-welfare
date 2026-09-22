@@ -5,6 +5,20 @@ import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
 import { withSignedClaimDocumentUrls } from '../shared/storage-signed.ts'
 
+/** Claim review checklist complete when all three ops stages are true. */
+function checklistComplete(c: {
+  checklist_docs_ok?: boolean | null
+  checklist_membership_ok?: boolean | null
+  checklist_contributions_ok?: boolean | null
+}): boolean {
+  return Boolean(c.checklist_docs_ok && c.checklist_membership_ok && c.checklist_contributions_ok)
+}
+
+function sanitizeText(input: unknown, max: number): string {
+  if (typeof input !== 'string') return ''
+  return input.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, max)
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
@@ -28,6 +42,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const resourceId = url.searchParams.get('resource_id')
     const claimId = resourceId
+    const batchAction = url.searchParams.get('action')
 
     // GET /admin-claims — list with search + pagination
     if (req.method === 'GET' && !claimId) {
@@ -63,11 +78,17 @@ Deno.serve(async (req) => {
       if (error) throw new Error('Claim not found')
       const { data: documents } = await adminClient.from('claim_documents').select('*').eq('claim_id', claim.id)
       const signedDocs = await withSignedClaimDocumentUrls(adminClient, documents ?? [])
-      return new Response(JSON.stringify({ claim, documents: signedDocs }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      const { data: payouts } = await adminClient
+        .from('payouts')
+        .select('id, amount, method, status, reference, processed_at, notes, created_at')
+        .eq('claim_id', claim.id)
+        .order('created_at', { ascending: false })
+      return new Response(JSON.stringify({ claim, documents: signedDocs, payouts: payouts ?? [] }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // POST /admin-claims?action=batch — batch reject claims
-    const batchAction = url.searchParams.get('action')
     if (req.method === 'POST' && (batchAction === 'batch' || resourceId === 'batch')) {
       requirePermission(session, 'claims', 'approve')
       const body = await req.json()
@@ -85,7 +106,17 @@ Deno.serve(async (req) => {
         })
       }
 
-      const statusMap: Record<string, string> = { approve: 'Approved', reject: 'Rejected', 'request-info': 'Additional Information Required' }
+      // Batch approve requires per-claim checklist — only allow reject / request-info in batch
+      if (decision === 'approve') {
+        return new Response(JSON.stringify({
+          message: 'Batch approve is disabled. Complete the review checklist and approve each claim individually.',
+          code: 'BATCH_APPROVE_DISABLED',
+        }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const statusMap: Record<string, string> = { reject: 'Rejected', 'request-info': 'Additional Information Required' }
       if (!statusMap[decision]) {
         return new Response(JSON.stringify({ message: 'Invalid decision' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -102,7 +133,7 @@ Deno.serve(async (req) => {
             admin_notes: adminNotes || null,
             reviewed_at: new Date().toISOString(),
           }
-          if (decision === 'approve' || decision === 'reject') {
+          if (decision === 'reject') {
             updates.decided_at = new Date().toISOString()
             updates.decided_by = session.id
           }
@@ -160,26 +191,242 @@ Deno.serve(async (req) => {
       })
     }
 
-    // PATCH /admin-claims?resource_id=xxx — approve/reject/request-info
+    // PATCH /admin-claims?resource_id=xxx — checklist | record-payout | approve/reject/request-info
     if (req.method === 'PATCH' && claimId) {
-      requirePermission(session, 'claims', 'approve')
       const body = await req.json()
+      const action = typeof body.action === 'string' ? body.action : null
+
+      // --- Checklist update ---
+      if (action === 'checklist') {
+        requirePermission(session, 'claims', 'approve')
+        const { data: existing, error: loadErr } = await adminClient
+          .from('claims')
+          .select('id, status, checklist_docs_ok, checklist_membership_ok, checklist_contributions_ok')
+          .eq('id', claimId)
+          .maybeSingle()
+        if (loadErr) throw new Error(loadErr.message)
+        if (!existing) {
+          return new Response(JSON.stringify({ message: 'Claim not found', code: 'NOT_FOUND' }), {
+            status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        if (!['Submitted', 'Under Review', 'Additional Information Required'].includes(existing.status)) {
+          return new Response(JSON.stringify({
+            message: 'Checklist can only be updated while the claim is under review.',
+            code: 'VALIDATION',
+          }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        const docsOk = typeof body.checklistDocsOk === 'boolean' ? body.checklistDocsOk : existing.checklist_docs_ok
+        const membershipOk = typeof body.checklistMembershipOk === 'boolean' ? body.checklistMembershipOk : existing.checklist_membership_ok
+        const contributionsOk = typeof body.checklistContributionsOk === 'boolean' ? body.checklistContributionsOk : existing.checklist_contributions_ok
+        const complete = Boolean(docsOk && membershipOk && contributionsOk)
+        const now = new Date().toISOString()
+        const updates: Record<string, unknown> = {
+          checklist_docs_ok: docsOk,
+          checklist_membership_ok: membershipOk,
+          checklist_contributions_ok: contributionsOk,
+          checklist_updated_by: session.id,
+          checklist_completed_at: complete ? now : null,
+          reviewed_at: now,
+        }
+        // Move Submitted → Under Review when review starts
+        if (existing.status === 'Submitted' && (docsOk || membershipOk || contributionsOk)) {
+          updates.status = 'Under Review'
+        }
+
+        const { data, error } = await adminClient
+          .from('claims')
+          .update(updates)
+          .eq('id', claimId)
+          .select('*')
+          .single()
+        if (error) throw new Error(error.message)
+
+        await logAudit(adminClient, {
+          actor_id: session.id,
+          actor_role: session.role_name,
+          action: 'claim_checklist_updated',
+          resource: 'claim',
+          resource_id: claimId,
+          meta: { docsOk, membershipOk, contributionsOk, complete },
+        })
+
+        return new Response(JSON.stringify({ claim: data }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // --- Record manual payout (no M-Pesa) ---
+      if (action === 'record-payout') {
+        // Completing claim payout is part of claims approve workflow (manual only; no M-Pesa).
+        requirePermission(session, 'claims', 'approve')
+        const { data: existing, error: loadErr } = await adminClient
+          .from('claims')
+          .select('id, status, claim_number, member_id, package_id, approved_amount, amount_requested')
+          .eq('id', claimId)
+          .maybeSingle()
+        if (loadErr) throw new Error(loadErr.message)
+        if (!existing) {
+          return new Response(JSON.stringify({ message: 'Claim not found', code: 'NOT_FOUND' }), {
+            status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        if (existing.status !== 'Approved') {
+          return new Response(JSON.stringify({
+            message: 'Only approved claims can record a payout.',
+            code: 'VALIDATION',
+          }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        const { data: existingPayout } = await adminClient
+          .from('payouts')
+          .select('id')
+          .eq('claim_id', claimId)
+          .in('status', ['Pending', 'Processing', 'Completed'])
+          .maybeSingle()
+        if (existingPayout) {
+          return new Response(JSON.stringify({
+            message: 'A payout already exists for this claim.',
+            code: 'CONFLICT',
+          }), {
+            status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        const amountRaw = body.amount != null ? Number(body.amount) : Number(existing.approved_amount ?? existing.amount_requested)
+        if (!Number.isFinite(amountRaw) || amountRaw <= 0) {
+          return new Response(JSON.stringify({ message: 'A valid payout amount is required.', code: 'VALIDATION' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        const reference = sanitizeText(body.reference, 120) || null
+        const notes = sanitizeText(body.notes, 2000) || null
+        const method = sanitizeText(body.method, 40) || 'manual'
+        // Never allow mpesa/stk as method while payments are gated
+        const safeMethod = method.toLowerCase() === 'mpesa' ? 'manual' : method
+        const now = new Date().toISOString()
+
+        const { data: payout, error: payoutErr } = await adminClient
+          .from('payouts')
+          .insert({
+            claim_id: claimId,
+            member_id: existing.member_id,
+            package_id: existing.package_id,
+            amount: amountRaw,
+            method: safeMethod,
+            status: 'Completed',
+            reference,
+            notes,
+            processed_at: now,
+            processed_by: session.id,
+          })
+          .select('id, amount, method, status, reference, processed_at')
+          .single()
+        if (payoutErr) throw new Error(payoutErr.message)
+
+        const { data: claim, error: claimErr } = await adminClient
+          .from('claims')
+          .update({ status: 'Paid', paid_at: now, reviewed_at: now })
+          .eq('id', claimId)
+          .select('*')
+          .single()
+        if (claimErr) throw new Error(claimErr.message)
+
+        await logAudit(adminClient, {
+          actor_id: session.id,
+          actor_role: session.role_name,
+          action: 'claim_payout_recorded',
+          resource: 'claim',
+          resource_id: claimId,
+          meta: { payout_id: payout.id, amount: amountRaw, method: safeMethod },
+        })
+
+        await sendNotification(adminClient, {
+          memberId: existing.member_id,
+          subject: 'Claim payout recorded',
+          body: `Your claim ${existing.claim_number ?? claimId} payout of KSh ${amountRaw.toLocaleString('en-KE')} has been recorded${reference ? ` (ref: ${reference})` : ''}.`,
+          type: 'system',
+          meta: { claim_id: claimId, payout_id: payout.id },
+          emailButtonText: 'View claims',
+          emailButtonUrl: 'https://luma-welfare.vercel.app/claims',
+        })
+
+        return new Response(JSON.stringify({ claim, payout }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // --- Decision: approve / reject / request-info ---
+      requirePermission(session, 'claims', 'approve')
       const { decision, adminNotes, amount } = body
       const statusMap: Record<string, string> = { approve: 'Approved', reject: 'Rejected', 'request-info': 'Additional Information Required' }
-      if (!statusMap[decision]) return new Response(JSON.stringify({ message: 'Invalid decision' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      if (!statusMap[decision]) {
+        return new Response(JSON.stringify({ message: 'Invalid decision' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
 
-      const updates: Record<string, unknown> = { status: statusMap[decision], admin_notes: adminNotes, reviewed_at: new Date().toISOString() }
-      if (decision === 'approve' || decision === 'reject') { updates.decided_at = new Date().toISOString(); updates.decided_by = session.id }
+      const { data: current, error: curErr } = await adminClient
+        .from('claims')
+        .select('id, status, checklist_docs_ok, checklist_membership_ok, checklist_contributions_ok, claim_number, member_id')
+        .eq('id', claimId)
+        .maybeSingle()
+      if (curErr) throw new Error(curErr.message)
+      if (!current) {
+        return new Response(JSON.stringify({ message: 'Claim not found', code: 'NOT_FOUND' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (decision === 'approve' && !checklistComplete(current)) {
+        return new Response(JSON.stringify({
+          message: 'Complete the review checklist (documents, membership, contributions) before approving.',
+          code: 'CHECKLIST_INCOMPLETE',
+        }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (!['Submitted', 'Under Review', 'Additional Information Required'].includes(current.status) && decision !== 'request-info') {
+        // Allow reject/approve only from reviewable states
+        if (decision === 'approve' || decision === 'reject') {
+          if (!['Submitted', 'Under Review', 'Additional Information Required'].includes(current.status)) {
+            return new Response(JSON.stringify({
+              message: `Cannot ${decision} a claim in status ${current.status}.`,
+              code: 'VALIDATION',
+            }), {
+              status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+          }
+        }
+      }
+
+      const updates: Record<string, unknown> = {
+        status: statusMap[decision],
+        admin_notes: adminNotes ?? null,
+        reviewed_at: new Date().toISOString(),
+      }
+      if (decision === 'approve' || decision === 'reject') {
+        updates.decided_at = new Date().toISOString()
+        updates.decided_by = session.id
+      }
       if (amount) updates.approved_amount = amount
 
       const { data, error } = await adminClient.from('claims').update(updates).eq('id', claimId).select('*, members(full_name)').single()
       if (error) throw new Error('Claim not found')
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: `claim_${decision}`, resource: 'claim', resource_id: claimId })
 
-      // Send notification to member (respects channel preferences)
       const claimNum = data.claim_number ?? claimId
       const notifMessages: Record<string, { subject: string; body: string }> = {
-        approve: { subject: 'Claim Approved', body: `Your claim ${claimNum} has been approved${amount ? ` for KSh ${Number(amount).toLocaleString('en-KE')}` : ''}. The payout will be processed shortly.` },
+        approve: {
+          subject: 'Claim Approved',
+          body: `Your claim ${claimNum} has been approved${amount ? ` for KSh ${Number(amount).toLocaleString('en-KE')}` : ''}. Payout will be recorded manually by Luma Welfare — you will be notified when it is completed.`,
+        },
         reject: { subject: 'Claim Rejected', body: `Your claim ${claimNum} has been rejected.${adminNotes ? ` Reason: ${adminNotes}` : ''}` },
         'request-info': { subject: 'More Information Needed', body: `We need more information for your claim ${claimNum}.${adminNotes ? ` ${adminNotes}` : ''}` },
       }
@@ -189,8 +436,10 @@ Deno.serve(async (req) => {
           memberId: data.member_id,
           subject: msg.subject,
           body: msg.body,
-          emailButtonText: 'View Dashboard',
-          emailButtonUrl: 'https://luma-welfare.vercel.app/member',
+          type: 'system',
+          meta: { claim_id: claimId, decision },
+          emailButtonText: 'View claims',
+          emailButtonUrl: 'https://luma-welfare.vercel.app/claims',
         })
       }
 

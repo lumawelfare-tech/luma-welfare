@@ -146,7 +146,7 @@ New tables likely only for: applications (if not folded into members), documents
 | **2** | Membership application | `members`, fees, auth-register, AdminMembers | **DONE in-repo** — form fields + APP# + pending after email verify + admin approve issues membership # | E2E register→approve; feature-flag |
 | **3** | Member portal gaps | existing member pages | **DONE in-repo** — Programs nav, Family & beneficiaries, `/documents` inbox, profile membership summary | member E2E; hide routes |
 | **4** | Admin operations | AdminLayout, RBAC | **DONE in-repo** — Applications nav/detail polish, complaints, community support records | permission E2E; drop routes |
-| **5** | Claims & welfare ops | qualify, claims EFs | checklist stages; payout notify | claims E2E; ignore new cols |
+| **5** | Claims & welfare ops | qualify, claims EFs | **DONE in-repo** — checklist stages; manual payout record + notify | claims E2E; ignore new cols |
 | **6** | Documents + KB | storage-signed patterns | ACL docs + lifecycle | storage RLS; private default |
 | **7** | RAG / hybrid AI | auth + member query EFs | ingest, embeddings, assistant | AI security tests; kill switch |
 | **8** | Testing + hardening | Playwright, CI | ENFORCE gate, preview→prod | full suite |
@@ -157,6 +157,6 @@ New tables likely only for: applications (if not folded into members), documents
 
 ## STOP
 
-**Phases 1–4** landed in-repo (schema foundation, membership application, member portal gaps, admin ops). Phase 4: complaints + community tables, Applications polish.
+**Phases 1–5** landed in-repo. Phase 5: claim review checklist + manual payout recording with member notify (no M-Pesa).
 
-Await approval before **Phase 5** (claims & welfare ops: checklist stages, payout notify).
+Await approval before **Phase 6** (documents + KB ACL lifecycle).
