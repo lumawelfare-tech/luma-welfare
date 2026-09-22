@@ -8,6 +8,7 @@ import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { reportLoadError } from '../../lib/userFacingError'
 import { useToast } from '../../components/Toast'
+import { formatApplicationProgramCodes, memberStatusLabel } from '../../lib/applicationPrograms'
 
 type ClaimDocument = {
   id: string
@@ -108,16 +109,16 @@ export function MemberDocuments() {
           </div>
           <div>
             <dt className="text-gray-500">Membership number</dt>
-            <dd className="font-medium text-gray-900">{member?.membership_number ? `#${member.membership_number}` : 'Pending approval'}</dd>
+            <dd className="font-medium text-gray-900">{member?.membership_number ? `#${member.membership_number}` : 'Pending verification'}</dd>
           </div>
           <div>
             <dt className="text-gray-500">Status</dt>
-            <dd className="font-medium capitalize text-gray-900">{member?.status?.replace(/_/g, ' ') ?? '—'}</dd>
+            <dd className="font-medium text-gray-900">{memberStatusLabel(member?.status)}</dd>
           </div>
           <div>
             <dt className="text-gray-500">Programs of interest</dt>
             <dd className="font-medium text-gray-900">
-              {programs.length > 0 ? programs.join(', ') : (
+              {programs.length > 0 ? formatApplicationProgramCodes(programs) : (
                 <Link to="/join" className="text-luma-700 hover:underline">Choose programs</Link>
               )}
             </dd>

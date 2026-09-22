@@ -8,17 +8,7 @@ import { fieldClass, alertErrorClass } from '../components/PageHero'
 import { MotionSection } from '../components/MotionSection'
 import { legalConfig } from '../config/legal'
 import { lumaPress } from '../lib/lumaMotion'
-
-const PROGRAM_OPTIONS = [
-  { code: 'WELFARE', label: 'Welfare & Bereavement Support' },
-  { code: 'OUTPATIENT', label: 'Outpatient Hospital Support' },
-  { code: 'EDUCATION', label: 'Education Support' },
-  { code: 'BUSINESS', label: 'Business Support' },
-  { code: 'BUILDING', label: 'Building & Land Support' },
-  { code: 'FARMING', label: 'Farming Support' },
-  { code: 'SENIOR', label: 'Senior Citizen Support' },
-  { code: 'OTHER', label: 'Other LUMA Welfare Program' },
-] as const
+import { APPLICATION_PROGRAM_OPTIONS } from '../lib/applicationPrograms'
 
 type FormState = {
   fullName: string
@@ -256,9 +246,12 @@ export function Register() {
 
           <section className="space-y-4">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">4. Programs & family coverage</h2>
-            <p className="text-sm text-gray-500">Select programs of interest. You can confirm package subscriptions after approval.</p>
+            <p className="text-sm text-gray-500">
+              Select packages you are interested in. Subscriptions are confirmed after approval.
+              Family / dependant details are collected in the member portal after membership is approved.
+            </p>
             <ul className="grid gap-2 sm:grid-cols-2">
-              {PROGRAM_OPTIONS.map((p) => (
+              {APPLICATION_PROGRAM_OPTIONS.map((p) => (
                 <li key={p.code}>
                   <label className="flex min-h-11 cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
                     <input

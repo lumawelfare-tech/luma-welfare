@@ -40,7 +40,7 @@ describe('parseRegisterBody', () => {
     emergencyContactRelationship: 'spouse',
     emergencyContactPhone: '0722000000',
     familyCoverage: 'individual',
-    applicationProgramCodes: ['WELFARE'],
+    applicationProgramCodes: ['welfare'],
     acceptedPrivacy: true as const,
     acceptedTerms: true as const,
     acceptedConstitution: true as const,
@@ -56,7 +56,21 @@ describe('parseRegisterBody', () => {
     expect(r.idNumber).toBe('12345678')
     expect(r.dateOfBirth).toBe('1990-05-15')
     expect(r.acceptedConstitution).toBe(true)
-    expect(r.applicationProgramCodes).toContain('WELFARE')
+    expect(r.applicationProgramCodes).toContain('welfare')
+  })
+
+  it('normalizes legacy interest codes to package codes', () => {
+    const r = parseRegisterBody({
+      ...good,
+      applicationProgramCodes: ['WELFARE', 'OUTPATIENT', 'mission_of_mercy'],
+    })
+    expect(r.applicationProgramCodes).toEqual(['welfare', 'hospital', 'mission_of_mercy'])
+  })
+
+  it('rejects unknown program interest codes', () => {
+    expect(() =>
+      parseRegisterBody({ ...good, applicationProgramCodes: ['OTHER'] }),
+    ).toThrow(ValidationError)
   })
 
   it('rejects weak passwords and bad phones', () => {

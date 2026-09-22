@@ -19,6 +19,7 @@ import { exportMemberRecordsCSV, exportMemberRecordsExcel, exportMemberRecordsPD
 import { ErrorState } from '../../components/ErrorState'
 import { SkeletonTable } from '../../components/Skeleton'
 import { reportLoadError } from '../../lib/userFacingError'
+import { formatApplicationProgramCodes } from '../../lib/applicationPrograms'
 
 /** Typed confirmation matches member full name (case-insensitive) or the word DELETE. */
 export function matchesDeleteConfirmation(typed: string, fullName: string): boolean {
@@ -1117,7 +1118,7 @@ export function AdminMembers() {
                       <span className="text-gray-400">Programs of interest</span>
                       <div className="font-medium">
                         {Array.isArray(detailData.member.application_program_codes) && (detailData.member.application_program_codes as string[]).length > 0
-                          ? (detailData.member.application_program_codes as string[]).join(', ')
+                          ? formatApplicationProgramCodes(detailData.member.application_program_codes as string[])
                           : '—'}
                       </div>
                     </div>

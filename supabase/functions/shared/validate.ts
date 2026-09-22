@@ -111,6 +111,57 @@ const GENDERS = new Set(['male', 'female', 'prefer_not_to_say'])
 const MARITAL = new Set(['single', 'married', 'other'])
 const COVERAGE = new Set(['individual', 'nuclear', 'extended'])
 
+/**
+ * Canonical joinable package codes accepted as registration interests.
+ * Keep in sync with frontend/src/lib/applicationPrograms.ts.
+ */
+export const APPLICATION_PROGRAM_CODES = [
+  'welfare',
+  'hospital',
+  'education',
+  'business',
+  'building',
+  'land',
+  'farming',
+  'wedding',
+  'dowry',
+  'disaster',
+  'youth',
+  'senior',
+  'mission_of_mercy',
+] as const
+
+const APPLICATION_PROGRAM_CODE_SET = new Set<string>(APPLICATION_PROGRAM_CODES)
+
+/** Map older uppercase interest codes → package codes. Vague OTHER is rejected. */
+const LEGACY_PROGRAM_CODE_MAP: Record<string, string> = {
+  WELFARE: 'welfare',
+  OUTPATIENT: 'hospital',
+  HOSPITAL: 'hospital',
+  EDUCATION: 'education',
+  BUSINESS: 'business',
+  BUILDING: 'building',
+  LAND: 'land',
+  FARMING: 'farming',
+  SENIOR: 'senior',
+  WEDDING: 'wedding',
+  DOWRY: 'dowry',
+  DISASTER: 'disaster',
+  YOUTH: 'youth',
+  MISSION: 'mission_of_mercy',
+  MISSION_OF_MERCY: 'mission_of_mercy',
+}
+
+function normalizeApplicationProgramCode(raw: string): string | null {
+  const trimmed = raw.trim()
+  if (!trimmed || trimmed.length > 40) return null
+  const legacy = LEGACY_PROGRAM_CODE_MAP[trimmed.toUpperCase()]
+  if (legacy) return legacy
+  const lower = trimmed.toLowerCase()
+  if (APPLICATION_PROGRAM_CODE_SET.has(lower)) return lower
+  return null
+}
+
 function parseIsoDate(raw: unknown, label: string): string {
   const s = typeof raw === 'string' ? raw.trim() : ''
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
@@ -177,8 +228,18 @@ export function parseRegisterBody(input: unknown): RegisterInput {
   const applicationProgramCodes: string[] = []
   if (Array.isArray(programCodesRaw)) {
     for (const c of programCodesRaw) {
-      if (typeof c === 'string' && c.trim() && c.trim().length <= 40) {
-        applicationProgramCodes.push(c.trim().toUpperCase())
+      if (typeof c !== 'string') continue
+      const normalized = normalizeApplicationProgramCode(c)
+      if (!normalized) {
+        if (c.trim()) {
+          throw new ValidationError(
+            'Select valid programs of interest (each must match a LUMA package).',
+          )
+        }
+        continue
+      }
+      if (!applicationProgramCodes.includes(normalized)) {
+        applicationProgramCodes.push(normalized)
       }
     }
   }

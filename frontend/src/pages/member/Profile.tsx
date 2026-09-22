@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useHead } from '../../lib/seo'
+import { formatApplicationProgramCodes } from '../../lib/applicationPrograms'
 
 export function Profile() {
   useHead('Profile', undefined, { noindex: true })
@@ -208,7 +209,7 @@ export function Profile() {
             {(member?.application_program_codes?.length ?? 0) > 0 && (
               <p className="mt-2 text-xs text-gray-500">
                 Programs of interest:{' '}
-                <span className="font-medium text-gray-700">{member!.application_program_codes!.join(', ')}</span>
+                <span className="font-medium text-gray-700">{formatApplicationProgramCodes(member!.application_program_codes)}</span>
                 {' · '}
                 <Link to="/join" className="text-luma-700 hover:underline">Manage programs</Link>
               </p>
