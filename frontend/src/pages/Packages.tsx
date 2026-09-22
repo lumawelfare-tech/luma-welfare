@@ -95,8 +95,9 @@ export function PackagesPage() {
       <h1 className="mt-2 text-3xl font-bold text-luma-900 sm:text-4xl">Choose protection that fits your family</h1>
       <div className="mt-3 h-1 w-12 rounded-full bg-luma-500" />
       <p className="mt-4 max-w-2xl text-gray-600">
-        Twelve support packages, each with its own monthly contribution, coverage and waiting
-        period. Members can hold more than one package at a time.
+        Support packages with their own monthly contribution, coverage, and waiting period —
+        including nested Mission of Mercy options and age-aware Welfare pricing. Members can hold
+        more than one package at a time.
       </p>
       <div className="mt-6">
         <Link
