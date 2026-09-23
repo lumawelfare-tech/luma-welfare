@@ -27,6 +27,9 @@ describe('Official document phrases on public legal/FAQ pages', () => {
     expect(faq).toContain('proposed late-payment deadline')
     expect(faq).toContain('non-refundable contribution rule')
     expect(faq).toContain('Children’s Orphanage/Vulnerables')
+    expect(faq).toContain('Every enrolled package requires its applicable monthly contribution.')
+    expect(faq).toContain('Monthly payments cannot be skipped for any package.')
+    expect(faq).toContain('does not treat them as a single combined formula')
   })
 
   it('Privacy and Terms keep the draft banner and Kenyan-review caveat', () => {
@@ -40,5 +43,9 @@ describe('Official document phrases on public legal/FAQ pages', () => {
     expect(terms).toContain('does not automatically guarantee')
     expect(terms).toContain('proposed late-payment deadline')
     expect(terms).toContain('Code of Conduct')
+    expect(terms).toContain('Every enrolled package requires its applicable monthly contribution.')
+    expect(terms).toContain('Monthly payments cannot be skipped for any package.')
+    expect(terms).not.toMatch(/non-refundable\./)
+    expect(faq).not.toMatch(/contributions are non-refundable/i)
   })
 })

@@ -62,7 +62,7 @@ const categories: FAQCategory[] = [
       },
       {
         q: 'How much do I contribute and are there waiting periods?',
-        a: 'Amounts and waiting periods below come from the organisational framework’s package table. They describe the published schedule; your live subscription follows the package you actually join on the site. Welfare Package / Burial Support: no fixed waiting period; age 79 and below KSh 100/month, age 80 and above KSh 400/month; Nuclear Family KSh 300/month; Extended Family KSh 500/month; contributions must stay current. The framework lists both age bands and family-coverage tiers — confirm with the office which combination applies to you. Outpatient hospital support: KSh 1,200/month, 12-month wait. Education Support: KSh 1,200/month, 6-month wait. Business, Building, Land Purchase, Farming, Wedding, Dowry/Ruracio, Disaster Relief, Youth Empowerment, and Senior Citizen Support: KSh 2,000/month, 12-month wait. Mission of Mercy: KSh 500/month, 12-month wait. Package benefits, exclusions, and any payout limits must be in the final approved schedule before anyone is promised a specific benefit.',
+        a: 'Amounts and waiting periods below come from the organisational framework’s package table. They describe published schedule figures; the amount you pay is the contribution shown for the package and tier you actually enroll in on this site. Welfare Package / Burial Support: no fixed waiting period. The framework publishes separate age-band figures (79 and below KSh 100/month; 80 and above KSh 400/month) and separate family-coverage figures (Nuclear Family KSh 300/month; Extended Family KSh 500/month). Those dimensions are listed independently — this site does not treat them as a single combined formula. Welfare contributions vary by the applicable age band and family coverage; the final monthly amount is the one attached to your enrolled package/tier. Outpatient hospital support: KSh 1,200/month, 12-month wait. Education Support: KSh 1,200/month, 6-month wait. Business, Building, Land Purchase, Farming, Wedding, Dowry/Ruracio, Disaster Relief, Youth Empowerment, and Senior Citizen Support: KSh 2,000/month, 12-month wait. Mission of Mercy: KSh 500/month, 12-month wait. Package benefits, exclusions, and any payout limits must be in the final approved schedule before anyone is promised a specific benefit.',
       },
       {
         q: 'How do I compare packages?',
@@ -82,7 +82,7 @@ const categories: FAQCategory[] = [
       },
       {
         q: 'How do package contributions work?',
-        a: 'Each package has a specific monthly contribution amount. You record your payments through the platform, and they are reviewed and verified by administrators. Your contribution history and payment status are visible on your dashboard.',
+        a: 'Each package has a specific monthly contribution amount. Every enrolled package requires its applicable monthly contribution. Monthly payments cannot be skipped for any package. You record payments through the platform, and they are reviewed and verified by administrators. Your contribution history and payment status are visible on your dashboard.',
       },
       {
         q: 'Can package rules differ between packages?',
@@ -97,6 +97,10 @@ const categories: FAQCategory[] = [
   {
     label: 'Contributions',
     items: [
+      {
+        q: 'Must I pay every month for every package?',
+        a: 'Yes. Every enrolled package requires its applicable monthly contribution. Monthly payments cannot be skipped for any package. You cannot selectively skip one package while remaining enrolled in it. This applies to every Luma package, not only the Welfare Package. The amount is the contribution for the package and tier you enrolled in on this site — not a single organisation-wide Welfare figure. This rule does not add late fees, penalties, automatic suspension, or cancellation; those are not stated here as adopted rules.',
+      },
       {
         q: 'How do I make a contribution?',
         a: 'From your member dashboard, go to the Contributions section. You can record a manual payment by selecting the package, entering the amount, payment method, and transaction reference. Your contribution will be submitted for admin verification. Contributions should be recorded against your unique membership number and the package you selected.',

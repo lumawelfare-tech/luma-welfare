@@ -82,7 +82,7 @@ const trustFeatures = [
 const faqItems = [
   { q: 'What is Luma Welfare?', a: 'LUMA Welfare is a community welfare organisation founded in Kitengela in 2021. Members support each other through key life events — hospital bills, education costs, business support, and more — under the Mission of Mercy.' },
   { q: 'How do I join?', a: 'Click "Join Luma", create a free account, verify your email, complete the KSh 300 activation fee (administrators can verify it while online M-Pesa is launching), then choose a welfare package that suits your needs.' },
-  { q: 'How do contributions work?', a: 'Each package has a monthly contribution amount. Record your payment in your account; administrators verify it. You can see your contribution history anytime.' },
+  { q: 'How do contributions work?', a: 'Each package has a monthly contribution amount. Every enrolled package requires its applicable monthly contribution. Monthly payments cannot be skipped for any package. Record your payment in your account; administrators verify it. You can see your contribution history anytime.' },
   { q: 'When can I submit a claim?', a: 'Each package has a waiting period. Once you have made enough contributions and the waiting period has passed, you become eligible to submit claims.' },
   { q: 'Is my information protected?', a: 'Sessions use encrypted connections and secure authentication. Administrative actions are logged. See our Privacy Policy for details.' },
   { q: 'Can I have multiple packages?', a: 'Yes. You can subscribe to multiple welfare packages simultaneously. Each package tracks contributions and eligibility independently.' },

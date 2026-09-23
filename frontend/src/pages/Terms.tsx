@@ -103,6 +103,7 @@ export function Terms() {
           <Section number={5} title="Packages, Contributions, and Claims">
             <ul className="list-disc space-y-2 pl-6">
               <li>Each package has its own contribution rules, waiting period, and eligibility logic. You may hold multiple packages; each is tracked separately.</li>
+              <li>Every enrolled package requires its applicable monthly contribution. Monthly payments cannot be skipped for any package. This applies to every Luma package, not only the Welfare Package. The amount is set by the package and tier you joined. This does not create late fees, penalties, or automatic suspension unless separately adopted and communicated.</li>
               <li>Contributions should be recorded against your unique membership number and selected package. On this Platform they are recorded in-app and verified by administrators. Online M-Pesa checkout remains disabled unless payments are enabled by operators.</li>
               <li>Contributions are due on the date specified by the organisation. The organisational framework&apos;s current proposed late-payment deadline is the 10th of the relevant month, subject to the final approved rules.</li>
               <li>Use only official LUMA Welfare payment instructions. Confirm approved payment details before paying. Do not use unofficial payment channels.</li>

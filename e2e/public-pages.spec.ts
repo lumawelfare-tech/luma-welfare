@@ -212,6 +212,9 @@ test.describe('Site footer', () => {
   test('is the last landmark and links resolve without 404', async ({ page }) => {
     await page.goto(`${BASE}/`)
     await page.waitForSelector('[data-testid="site-footer"], footer', { timeout: 20_000 })
+    await page.waitForFunction(() => !document.querySelector('main[data-prerender="true"]'), null, {
+      timeout: 20_000,
+    }).catch(() => {})
 
     const footer = page.locator('[data-testid="site-footer"], footer[role="contentinfo"]').last()
     await expect(footer).toBeVisible()
@@ -225,7 +228,13 @@ test.describe('Site footer', () => {
         el = el.parentElement
       }
       const rootChildren = Array.from(document.querySelector('#root')?.children ?? document.body.children)
-      const lastMeaningful = [...rootChildren].reverse().find((n) => n instanceof HTMLElement)
+      const lastMeaningful = [...rootChildren].reverse().find((n) => {
+        if (!(n instanceof HTMLElement)) return false
+        const text = (n.textContent || '').trim()
+        const cls = String(n.className || '')
+        if (!text && cls.includes('pointer-events-none')) return false
+        return true
+      })
       return lastMeaningful != null && (lastMeaningful === el || lastMeaningful.contains(last))
     })
     expect(isLast).toBe(true)
@@ -408,9 +417,14 @@ test.describe('Official organisation copy', () => {
   test('FAQ, Privacy, and Terms contain key phrases from the org documents', async ({ page }) => {
     await page.goto(`${BASE}/faq`)
     await expect(page.getByRole('heading', { name: /Frequently Asked Questions/i })).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('button', { name: /What is LUMA Welfare and when was it founded/i }).click()
     await expect(page.getByText(/Boss Williams/i).first()).toBeVisible()
     await expect(page.getByText(/Mission of Mercy/i).first()).toBeVisible()
+    await page.getByRole('button', { name: /core values/i }).click()
     await expect(page.getByText(/Unity/i).first()).toBeVisible()
+    await page.getByRole('button', { name: /Must I pay every month for every package/i }).click()
+    await expect(page.getByText(/Every enrolled package requires its applicable monthly contribution/i).first()).toBeVisible()
+    await expect(page.getByText(/Monthly payments cannot be skipped for any package/i).first()).toBeVisible()
 
     await page.goto(`${BASE}/privacy`)
     await expect(page.getByRole('heading', { name: /Privacy Policy/i })).toBeVisible({ timeout: 20_000 })
@@ -421,5 +435,7 @@ test.describe('Official organisation copy', () => {
     await expect(page.getByRole('heading', { name: /Terms/i })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText(/DRAFT/i).first()).toBeVisible()
     await expect(page.getByText(/does not automatically guarantee/i).first()).toBeVisible()
+    await expect(page.getByText(/Every enrolled package requires its applicable monthly contribution/i).first()).toBeVisible()
+    await expect(page.getByText(/Monthly payments cannot be skipped for any package/i).first()).toBeVisible()
   })
 })
