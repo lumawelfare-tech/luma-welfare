@@ -15,15 +15,19 @@ import { exportContributionRecordsCSV, exportContributionRecordsExcel, exportCon
 import { ErrorState } from '../../components/ErrorState'
 import { SkeletonTable } from '../../components/Skeleton'
 import { reportLoadError } from '../../lib/userFacingError'
+import { InstalmentProgress } from '../../components/InstalmentProgress'
 
 type Contribution = {
   id: string
   period: string
   amount: number
+  amount_paid?: number
+  remaining?: number
   status: string
   notes: string | null
   created_at: string
   member_id: string
+  subscription_id?: string
   members: { full_name: string | null; phone: string | null; email: string | null; membership_number: string | null } | null
   packages: { code: string; name: string } | null
   payments: { mpesa_receipt: string | null; channel: string | null } | null
@@ -106,6 +110,15 @@ export function AdminContributions() {
   const [rejectNotes, setRejectNotes] = useState('')
   const [showBulkReject, setShowBulkReject] = useState(false)
   const [bulkRejectNotes, setBulkRejectNotes] = useState('')
+  const [detail, setDetail] = useState<{
+    contribution: Contribution
+    instalments: { id: string; amount: number; running_balance_after: number; status: string; paid_at: string; payment_method?: string | null }[]
+    required_amount: number
+    amount_paid: number
+    remaining: number
+  } | null>(null)
+  const [instAmount, setInstAmount] = useState('')
+  const [instBusy, setInstBusy] = useState(false)
 
   const load = useCallback(async (pageNum = 1) => {
     setError(null)
@@ -184,6 +197,53 @@ export function AdminContributions() {
       addToast('error', e instanceof ApiError ? e.message : 'Could not reject contribution.')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  async function openDetail(id: string) {
+    try {
+      const d = await api<{
+        contribution: Contribution
+        instalments: { id: string; amount: number; running_balance_after: number; status: string; paid_at: string; payment_method?: string | null }[]
+        required_amount: number
+        amount_paid: number
+        remaining: number
+      }>(`/admin/contributions/${id}`, { auth: true })
+      setDetail(d)
+      setInstAmount('')
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not load instalments.')
+    }
+  }
+
+  async function recordInstalment() {
+    if (!detail?.contribution.subscription_id) {
+      addToast('error', 'This period has no subscription to record against.')
+      return
+    }
+    const amount = Number(instAmount)
+    if (!(amount > 0)) {
+      addToast('error', 'Enter an amount greater than zero.')
+      return
+    }
+    setInstBusy(true)
+    try {
+      await api('/admin/contributions', {
+        method: 'POST',
+        auth: true,
+        body: {
+          subscriptionId: detail.contribution.subscription_id,
+          period: detail.contribution.period,
+          amount,
+        },
+      })
+      addToast('success', 'Instalment recorded.')
+      await openDetail(detail.contribution.id)
+      await load()
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not record instalment.')
+    } finally {
+      setInstBusy(false)
     }
   }
 
@@ -276,8 +336,17 @@ export function AdminContributions() {
     { key: 'period', header: 'Period', render: (row) => <span className="font-mono">{(row as unknown as Contribution).period}</span> },
     {
       key: 'amount',
-      header: 'Amount',
-      render: (row) => <span className="font-medium text-gray-900">KSh {(row as unknown as Contribution).amount.toLocaleString('en-KE')}</span>,
+      header: 'Required / remaining',
+      render: (row) => {
+        const c = row as unknown as Contribution
+        const remaining = Number(c.remaining ?? Math.max(0, c.amount - Number(c.amount_paid ?? 0)))
+        return (
+          <div>
+            <div className="font-medium text-gray-900">KSh {c.amount.toLocaleString('en-KE')}</div>
+            <div className="text-xs text-gray-500">Left KSh {remaining.toLocaleString('en-KE')}</div>
+          </div>
+        )
+      },
     },
     {
       key: 'method',
@@ -307,6 +376,13 @@ export function AdminContributions() {
         const c = row as unknown as Contribution
         return (
           <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => { void openDetail(c.id) }}
+              className="inline-flex items-center rounded-lg border border-gray-200 px-3 py-2.5 text-xs min-h-[44px] font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Instalments
+            </button>
             {c.status === 'Pending' && (
               <>
                 <button
@@ -378,6 +454,51 @@ export function AdminContributions() {
           <div className="mt-0.5 text-xs text-gray-500">{totalCount} matching records</div>
         </div>
       </div>
+
+      {detail && (
+        <div className="rounded-xl border border-luma-200 bg-white p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Lipa Pole Pole — {detail.contribution.packages?.name ?? 'package'} · {detail.contribution.period}</h2>
+              <p className="text-xs text-gray-500">{detail.contribution.members?.full_name ?? 'Member'}</p>
+            </div>
+            <button type="button" className="text-sm text-gray-500 min-h-[44px]" onClick={() => setDetail(null)}>Close</button>
+          </div>
+          <InstalmentProgress required={detail.required_amount} paid={detail.amount_paid} remaining={detail.remaining} />
+          <ul className="mt-4 space-y-2 text-sm">
+            {detail.instalments.length === 0 && <li className="text-gray-500">No instalments yet.</li>}
+            {detail.instalments.map((row) => (
+              <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                <span>KSh {row.amount.toLocaleString('en-KE')} · {new Date(row.paid_at).toLocaleDateString('en-KE')}</span>
+                <span className="text-xs text-gray-500">{row.status} · remaining {row.running_balance_after.toLocaleString('en-KE')}</span>
+              </li>
+            ))}
+          </ul>
+          {detail.remaining > 0 && (
+            <form
+              className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-end"
+              onSubmit={(e) => { e.preventDefault(); void recordInstalment() }}
+            >
+              <div className="flex-1">
+                <label htmlFor="admin-inst-amt" className="block text-xs font-medium text-gray-600 mb-1">Record instalment (KSh)</label>
+                <input
+                  id="admin-inst-amt"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={instAmount}
+                  onChange={(e) => setInstAmount(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm min-h-[44px]"
+                  placeholder={`Up to ${detail.remaining}`}
+                />
+              </div>
+              <button type="submit" disabled={instBusy} className="rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-medium text-white min-h-[44px] disabled:opacity-50">
+                {instBusy ? 'Saving…' : 'Record payment'}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* Filters + Search */}
       <div className="space-y-3">

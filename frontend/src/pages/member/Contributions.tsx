@@ -10,9 +10,31 @@ import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { useHead } from '../../lib/seo'
 import { reportLoadError } from '../../lib/userFacingError'
+import { InstalmentProgress } from '../../components/InstalmentProgress'
 
 type Subscription = { id: string; status: string; packages: { code: string; name: string }[]; package_tiers: { name: string; amount: number }[] }
-type Contribution = { id: string; subscription_id: string; period: string; amount: number; status: string; packages: { code: string; name: string }[]; created_at: string; notes?: string | null }
+type Contribution = {
+  id: string
+  subscription_id: string
+  period: string
+  amount: number
+  amount_paid?: number
+  remaining?: number
+  status: string
+  packages: { code: string; name: string }[]
+  created_at: string
+  notes?: string | null
+}
+
+type Instalment = {
+  id: string
+  amount: number
+  running_balance_after: number
+  status: string
+  paid_at: string
+  payment_method?: string | null
+  transaction_reference?: string | null
+}
 
 type PaginatedResponse = {
   contributions: Contribution[]
@@ -51,6 +73,11 @@ export function Contributions() {
   const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 7))
   const [formNotes, setFormNotes] = useState('')
   const [formError, setFormError] = useState('')
+  const [balanceRequired, setBalanceRequired] = useState<number | null>(null)
+  const [balanceRemaining, setBalanceRemaining] = useState<number | null>(null)
+  const [balancePaid, setBalancePaid] = useState(0)
+  const [historyId, setHistoryId] = useState<string | null>(null)
+  const [historyRows, setHistoryRows] = useState<Instalment[]>([])
 
   const loadPage = useCallback(async (targetPage: number, isInitial = false) => {
     if (isInitial) setLoading(true)
@@ -86,6 +113,27 @@ export function Contributions() {
       setPageLoading(false)
     }
   }, [])
+
+  async function loadBalance(subscriptionId: string, period: string) {
+    if (!subscriptionId || !period) {
+      setBalanceRequired(null)
+      setBalanceRemaining(null)
+      setBalancePaid(0)
+      return
+    }
+    try {
+      const d = await api<{ required_amount: number; remaining: number; amount_paid: number }>(
+        `/contributions?action=balance&subscriptionId=${encodeURIComponent(subscriptionId)}&period=${encodeURIComponent(period)}`,
+        { auth: true },
+      )
+      setBalanceRequired(Number(d.required_amount ?? 0))
+      setBalanceRemaining(Number(d.remaining ?? 0))
+      setBalancePaid(Number(d.amount_paid ?? 0))
+    } catch {
+      setBalanceRequired(null)
+      setBalanceRemaining(null)
+    }
+  }
 
   // eslint-disable-next-line oxc/react/set-state-in-effect — loading initialized true; setLoading(false) in finally after await
   useEffect(() => { loadPage(1, true) }, [loadPage])
@@ -130,6 +178,10 @@ export function Contributions() {
     if (!formSubId) { setFormError('Please select a package.'); return }
     if (!formAmount || Number(formAmount) <= 0) { setFormError('Please enter a valid amount.'); return }
     if (!formDate) { setFormError('Please select a payment period.'); return }
+    if (balanceRemaining != null && Number(formAmount) > balanceRemaining) {
+      setFormError(`Amount exceeds remaining balance of KSh ${balanceRemaining.toLocaleString('en-KE')}.`)
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -140,12 +192,14 @@ export function Contributions() {
           subscriptionId: formSubId,
           period: formDate,
           amount: Number(formAmount),
+          paymentMethod: formMethod,
+          transactionReference: formReference || undefined,
+          notes: formNotes || undefined,
         },
       })
       setSubmitSuccess(true)
-      // Refresh to page 1 to show the new contribution
       await loadPage(1)
-      setPaidCount((c) => c) // Will be refreshed on next initial load
+      await loadBalance(formSubId, formDate)
     } catch (err: any) {
       setFormError(err.message || 'Failed to record payment.')
     } finally {
@@ -153,13 +207,25 @@ export function Contributions() {
     }
   }
 
+  async function toggleHistory(id: string) {
+    if (historyId === id) {
+      setHistoryId(null)
+      setHistoryRows([])
+      return
+    }
+    setHistoryId(id)
+    try {
+      const d = await api<{ instalments: Instalment[] }>(`/contributions?action=instalments&contributionId=${encodeURIComponent(id)}`, { auth: true })
+      setHistoryRows(d.instalments ?? [])
+    } catch {
+      setHistoryRows([])
+    }
+  }
+
   function handleSubChange(subId: string) {
     setFormSubId(subId)
     setFormError('')
-    const sub = subscriptions.find(s => s.id === subId)
-    if (sub?.package_tiers?.[0]?.amount) {
-      setFormAmount(String(sub.package_tiers[0].amount))
-    }
+    void loadBalance(subId, formDate)
   }
 
   if (!registrationFeePaid) {
@@ -182,7 +248,7 @@ export function Contributions() {
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
       <PageHeader
         title="Contributions"
-        description="Track your contribution history and record payments for verification."
+        description="Record Lipa Pole Pole instalments of any amount toward each month’s contribution. Administrators verify payments."
         breadcrumbs={[
           { label: 'Dashboard', to: '/dashboard' },
           { label: 'Contributions' },
@@ -243,8 +309,11 @@ export function Contributions() {
             <button onClick={resetForm} className="text-sm text-gray-500 hover:text-gray-700 min-h-[44px] px-2">Cancel</button>
           </div>
           <p className="text-sm text-gray-500 mb-4">
-            Record a manual payment for admin verification. Your payment will be marked as <strong>Pending</strong> until an administrator reviews and approves it.
+            Record any amount toward this month (KSh 1 and up). It stays <strong>Pending</strong> until an administrator verifies it. Overpayments are rejected — you cannot go past the remaining balance.
           </p>
+          {balanceRequired != null && balanceRemaining != null && (
+            <InstalmentProgress required={balanceRequired} paid={balancePaid} remaining={Math.max(0, balanceRequired - balancePaid)} />
+          )}
 
           {submitSuccess ? (
             <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-6 text-center">
@@ -280,11 +349,15 @@ export function Contributions() {
                     id="contrib-amt"
                     type="number"
                     min="1"
+                    step="1"
                     value={formAmount}
                     onChange={(e) => { setFormAmount(e.target.value); setFormError('') }}
-                    placeholder="e.g. 1200"
+                    placeholder={balanceRemaining != null ? `Up to ${balanceRemaining}` : 'e.g. 50'}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500 min-h-[44px]"
                   />
+                  {balanceRemaining != null && (
+                    <p className="mt-1 text-xs text-gray-500">Remaining this period: KSh {balanceRemaining.toLocaleString('en-KE')}</p>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="contrib-date" className="block text-sm font-medium text-gray-700 mb-1">Period (YYYY-MM) *</label>
@@ -292,7 +365,7 @@ export function Contributions() {
                     id="contrib-date"
                     type="month"
                     value={formDate}
-                    onChange={(e) => { setFormDate(e.target.value); setFormError('') }}
+                    onChange={(e) => { setFormDate(e.target.value); setFormError(''); void loadBalance(formSubId, e.target.value) }}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-luma-500 focus:ring-1 focus:ring-luma-500 min-h-[44px]"
                   />
                 </div>
@@ -404,8 +477,23 @@ export function Contributions() {
                   <div className="text-right text-xs text-gray-500">
                     <div>Period {c.period}</div>
                     {c.notes && <div className="mt-1 font-mono text-gray-600">Ref: {c.notes}</div>}
+                    <button type="button" className="mt-2 text-luma-700 underline" onClick={() => toggleHistory(c.id)}>
+                      {historyId === c.id ? 'Hide payments' : 'Instalments'}
+                    </button>
                   </div>
                 </div>
+                <InstalmentProgress required={c.amount} paid={Number(c.amount_paid ?? 0)} remaining={Number(c.remaining ?? Math.max(0, c.amount - Number(c.amount_paid ?? 0)))} />
+                {historyId === c.id && (
+                  <ul className="mt-3 space-y-1 text-xs text-gray-600">
+                    {historyRows.length === 0 && <li>No instalments yet.</li>}
+                    {historyRows.map((row) => (
+                      <li key={row.id} className="flex justify-between gap-2">
+                        <span>{new Date(row.paid_at).toLocaleDateString('en-KE')} · KSh {row.amount.toLocaleString('en-KE')}</span>
+                        <span>{row.status} · left {row.running_balance_after.toLocaleString('en-KE')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </article>
             ))}
           </div>
@@ -429,8 +517,13 @@ export function Contributions() {
                 },
                 {
                   key: 'amount',
-                  header: 'Amount',
+                  header: 'Required',
                   render: (c) => <span className="font-medium text-gray-900">KSh {c.amount.toLocaleString('en-KE')}</span>,
+                },
+                {
+                  key: 'remaining',
+                  header: 'Remaining',
+                  render: (c) => <span className="text-gray-700">KSh {Number(c.remaining ?? Math.max(0, c.amount - Number(c.amount_paid ?? 0))).toLocaleString('en-KE')}</span>,
                 },
                 {
                   key: 'status',

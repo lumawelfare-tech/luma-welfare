@@ -1191,6 +1191,9 @@ export function AdminMembers() {
                         <div key={String(c.id)} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-100 last:border-0">
                           <span className="text-gray-600">{String(c.period)}</span>
                           <span className="font-medium">KSh {Number(c.amount ?? 0).toLocaleString()}</span>
+                          {c.amount_paid != null && (
+                            <span className="text-xs text-gray-500">paid {Number(c.amount_paid).toLocaleString()}</span>
+                          )}
                           <span className={`text-xs font-medium ${c.status === 'Verified' || c.status === 'Paid' ? 'text-emerald-600' : c.status === 'Pending' ? 'text-amber-600' : 'text-red-600'}`}>{String(c.status)}</span>
                         </div>
                       ))}

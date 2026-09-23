@@ -50,6 +50,9 @@ type ReceiptData = {
   date: string
   package: string | null
   period?: string
+  remaining?: number | null
+  running_balance_after?: number | null
+  amount_paid?: number | null
 }
 
 const statusColors: Record<string, string> = {
@@ -192,6 +195,7 @@ function buildShareText(r: ReceiptData): string {
   if (r.period) lines.push(`Period: ${r.period}`)
   lines.push(`Date: ${new Date(r.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}`)
   lines.push(`Amount: KSh ${r.amount.toLocaleString('en-KE')}`)
+  if (r.remaining != null) lines.push(`Remaining after this payment: KSh ${Number(r.remaining).toLocaleString('en-KE')}`)
   lines.push(`Status: ${r.status}`)
   if (r.reference) lines.push(`Reference: ${r.reference}`)
   lines.push('', 'Contact details are partially masked for privacy.')
@@ -254,6 +258,7 @@ ${r.period ? `<div class="field"><span class="label">Period</span><span>${escape
 ${r.payment_method ? `<div class="field"><span class="label">Payment Method</span><span>${escapeHtml(r.payment_method)}</span></div>` : ''}
 ${r.reference ? `<div class="field"><span class="label">Reference</span><span>${escapeHtml(r.reference)}</span></div>` : ''}
 <div class="amount">KSh ${r.amount.toLocaleString('en-KE')}</div>
+${r.remaining != null ? `<div class="field"><span class="label">Remaining after this payment</span><span>KSh ${Number(r.remaining).toLocaleString('en-KE')}</span></div>` : ''}
 <div class="footer">
   <p>This is a computer-generated receipt. Contact details are partially masked for privacy.</p>
   <p>Generated: ${new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
@@ -445,6 +450,7 @@ export function ReceiptsStatements() {
               {receipt.period && <div className="flex justify-between"><span className="text-gray-500">Period</span><span>{receipt.period}</span></div>}
               <div className="flex justify-between"><span className="text-gray-500">Date</span><span>{new Date(receipt.date).toLocaleDateString()}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Amount</span><span className="font-bold text-lg">KSh {receipt.amount.toLocaleString('en-KE')}</span></div>
+              {receipt.remaining != null && <div className="flex justify-between"><span className="text-gray-500">Remaining</span><span>KSh {Number(receipt.remaining).toLocaleString('en-KE')}</span></div>}
               <div className="flex justify-between"><span className="text-gray-500">Status</span><span className="font-semibold">{receipt.status}</span></div>
               {receipt.reference && <div className="flex justify-between"><span className="text-gray-500">Reference</span><span>{receipt.reference}</span></div>}
               {receipt.payment_method && <div className="flex justify-between"><span className="text-gray-500">Method</span><span>{receipt.payment_method}</span></div>}
