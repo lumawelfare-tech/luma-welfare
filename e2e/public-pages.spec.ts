@@ -403,3 +403,23 @@ test.describe('Performance', () => {
     }
   })
 })
+
+test.describe('Official organisation copy', () => {
+  test('FAQ, Privacy, and Terms contain key phrases from the org documents', async ({ page }) => {
+    await page.goto(`${BASE}/faq`)
+    await expect(page.getByRole('heading', { name: /Frequently Asked Questions/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/Boss Williams/i).first()).toBeVisible()
+    await expect(page.getByText(/Mission of Mercy/i).first()).toBeVisible()
+    await expect(page.getByText(/Unity/i).first()).toBeVisible()
+
+    await page.goto(`${BASE}/privacy`)
+    await expect(page.getByRole('heading', { name: /Privacy Policy/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/DRAFT/i).first()).toBeVisible()
+    await expect(page.getByText(/legitimate welfare activities/i).first()).toBeVisible()
+
+    await page.goto(`${BASE}/terms`)
+    await expect(page.getByRole('heading', { name: /Terms/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/DRAFT/i).first()).toBeVisible()
+    await expect(page.getByText(/does not automatically guarantee/i).first()).toBeVisible()
+  })
+})
