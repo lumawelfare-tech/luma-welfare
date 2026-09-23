@@ -61,20 +61,34 @@ export function Privacy() {
               constitute registration with the Office of the Data Protection Commissioner (ODPC) or a compliance certificate.
             </p>
             <p>
+              LUMA Welfare&apos;s organisational framework (Privacy &amp; Records) states that a final privacy and
+              data-protection policy should be prepared in line with applicable Kenyan requirements. Accurate
+              description of what the organisation and this Platform collect is not the same as a legally reviewed policy.
+            </p>
+            <p>
               Creating an account requires accepting this Privacy Policy (version {legalConfig.privacyPolicyVersion}) and our Terms.
               If we publish a new version, signed-in members may be asked to re-accept before continuing.
             </p>
           </Section>
 
           <Section number={2} title="Information We Collect">
-            <p>Based on current product behaviour, we process:</p>
+            <p>
+              The online membership registration form states that information you provide is used for membership
+              registration, communication, record keeping, and administration of LUMA Welfare programmes.
+              The organisational framework says LUMA should collect only information necessary for membership,
+              administration, payments, claims, and lawful community activities.
+            </p>
+            <p>Depending on how you use the Platform, that can include:</p>
             <ul className="list-disc space-y-2 pl-6">
-              <li><strong>Account &amp; identity:</strong> full name, email, phone, optional national ID number, membership number, profile photo, and profile fields you choose to add (for example county, location, occupation, alternate phone).</li>
+              <li><strong>Personal details from the registration form:</strong> full name, national ID or passport number, date of birth, gender, marital status, county, town/area, and residential address.</li>
+              <li><strong>Contact details:</strong> mobile number, WhatsApp number, email, and alternative contact.</li>
+              <li><strong>Emergency contact / next of kin:</strong> name, relationship, phone, and alternative phone.</li>
+              <li><strong>Family / dependant and beneficiary information:</strong> names, relationships, dates of birth, and ID or birth-certificate numbers you provide, plus beneficiary details kept for packages that require them.</li>
+              <li><strong>Programme selections:</strong> packages you apply for or subscribe to, and family-coverage choice (Individual, Nuclear Family, or Extended Family) where collected.</li>
+              <li><strong>Payment and contribution records:</strong> registration or activation fee records, selected monthly contributions, payment method, references, amounts, periods, and verification status. Online M-Pesa collection exists in code but remains disabled unless payments are explicitly enabled.</li>
+              <li><strong>Claim-related documents:</strong> as applicable — medical documents, school documents, receipts, death or burial documentation, police or official reports, identification, membership details, and other files specified by a package. Files are stored in a private Storage bucket and accessed via short-lived signed URLs.</li>
+              <li><strong>Account &amp; identity on the Platform:</strong> membership number, profile photo, and other profile fields you choose to add (for example occupation or location).</li>
               <li><strong>Authentication data:</strong> passwords (handled by Supabase Auth; not stored in plain text by the app), session tokens, and email one-time passcodes (hashed) for verification.</li>
-              <li><strong>Family / next of kin:</strong> details you add under Family Members.</li>
-              <li><strong>Subscriptions &amp; qualification:</strong> package selections, subscription status, and qualification state.</li>
-              <li><strong>Contributions:</strong> amounts, periods, status, notes, and references you or admins record. Online M-Pesa collection exists in code but remains disabled unless payments are explicitly enabled.</li>
-              <li><strong>Claims &amp; evidence:</strong> claim details and supporting files stored in a private Storage bucket, accessed via short-lived signed URLs.</li>
               <li><strong>Communications:</strong> in-app notifications, notification preferences, optional web-push subscription endpoints, and messages you submit via the public contact form.</li>
               <li><strong>Technical / security:</strong> request metadata needed to operate and secure the service (for example IP-related rate limiting, browser/user-agent where logged for security or consent records).</li>
               <li><strong>Admin &amp; audit:</strong> administrative actions recorded in audit logs; admin accounts may use step-up 2FA.</li>
@@ -82,13 +96,16 @@ export function Privacy() {
           </Section>
 
           <Section number={3} title="Purposes">
+            <p>We use personal information to:</p>
             <ul className="list-disc space-y-2 pl-6">
-              <li>Registering and authenticating members</li>
-              <li>Managing packages, contributions, claims, and eligibility</li>
-              <li>Member support and service messages</li>
-              <li>Security, abuse prevention, and troubleshooting</li>
-              <li>Admin reporting and operational oversight</li>
-              <li>Meeting record-keeping and legal obligations where applicable</li>
+              <li>Register and authenticate members, and review membership applications</li>
+              <li>Communicate with you about membership, contributions, claims, and official notices</li>
+              <li>Keep records and administer LUMA Welfare programmes</li>
+              <li>Process contributions, claims, and eligibility checks</li>
+              <li>Carry out lawful community activities under the Mission of Mercy where approved</li>
+              <li>Support security, abuse prevention, and troubleshooting</li>
+              <li>Support admin reporting and operational oversight</li>
+              <li>Meet record-keeping and legal obligations where applicable</li>
             </ul>
           </Section>
 
@@ -117,7 +134,13 @@ export function Privacy() {
             </p>
           </Section>
 
-          <Section number={6} title="Security Measures (as implemented)">
+          <Section number={6} title="How Records Are Protected">
+            <p>
+              The organisational framework requires records to be protected against unauthorised access and
+              access to be limited according to role. Member information should not be disclosed publicly
+              without a lawful basis or appropriate consent.
+            </p>
+            <p>On this Platform, those principles are supported by (among other controls):</p>
             <ul className="list-disc space-y-2 pl-6">
               <li>HTTPS/TLS in transit</li>
               <li>Supabase Auth password hashing and JWTs</li>
@@ -126,6 +149,10 @@ export function Privacy() {
               <li>Rate limiting on sensitive Edge Function routes</li>
               <li>PII scrubbing in client and Edge logging / Sentry pipelines</li>
             </ul>
+            <p>
+              These are operational protections. They are not a certification, ODPC registration, or a claim
+              that processing is fully compliant until counsel completes review.
+            </p>
             <p>No system is perfectly secure; please use a strong unique password and protect your device.</p>
           </Section>
 
@@ -150,20 +177,38 @@ export function Privacy() {
             </ul>
           </Section>
 
-          <Section number={9} title="Children">
+          <Section number={9} title="Consent">
+            <p>When you apply for membership you are asked to confirm two statements that match the official registration form:</p>
+            <ul className="list-disc space-y-2 pl-6">
+              <li>You have read and agree to the LUMA Welfare Constitution and Membership Terms &amp; Conditions.</li>
+              <li>You consent to LUMA Welfare using your information for membership administration, communication, record keeping, and legitimate welfare activities.</li>
+            </ul>
             <p>
-              The Platform is not designed for children to create accounts. If you believe a child provided personal data without appropriate authority, contact us so we can review.
+              You also confirm that the information you provide is true and accurate to the best of your knowledge,
+              and that you are submitting the application yourself.
             </p>
           </Section>
 
-          <Section number={10} title="Changes">
+          <Section number={10} title="Children">
+            <p>
+              The Platform is not designed for children to create accounts. If you believe a child provided personal data without appropriate authority, contact us so we can review.
+            </p>
+            <p>
+              The organisational framework requires that any support involving children follow applicable
+              safeguarding requirements and the partner institution&apos;s procedures. LUMA should not publish
+              children&apos;s personal information or images without appropriate authorisation. Community outreach
+              records should describe the activity and outcome — not a child&apos;s private identity.
+            </p>
+          </Section>
+
+          <Section number={11} title="Changes">
             <p>
               Material updates receive a new <strong>policy version</strong> ({legalConfig.privacyPolicyVersion} is current).
               Members who accepted an older version may be required to re-consent in the member portal.
             </p>
           </Section>
 
-          <Section number={11} title="Contact">
+          <Section number={12} title="Contact">
             <p>Questions about this Privacy Policy or personal data:</p>
             <LegalContactBlock />
           </Section>

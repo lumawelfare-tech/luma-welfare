@@ -38,8 +38,8 @@ export type LegalConfig = {
 
 export const legalConfig: LegalConfig = {
   draftPendingLegalReview: true,
-  privacyPolicyVersion: '2026-09-21.1',
-  termsVersion: '2026-09-21.1',
+  privacyPolicyVersion: '2026-09-23.1',
+  termsVersion: '2026-09-23.1',
   effectiveDateDisplay: 'PLACEHOLDER_EFFECTIVE_DATE',
   legalEntityName: 'PLACEHOLDER_LEGAL_ENTITY_NAME',
   tradingName: 'Luma Welfare',
