@@ -23,7 +23,7 @@ export const ADMIN_ROUTE_PERMISSIONS: Record<string, AdminPermission | 'superadm
   media: 'packages:read',
   reports: 'members:read',
   'scheduled-reports': 'members:read',
-  settings: 'members:read',
+  settings: 'settings:read',
   'audit-logs': 'audit_logs:read',
   reconciliation: 'payments:read',
   health: 'members:read',

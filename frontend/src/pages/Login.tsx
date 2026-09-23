@@ -54,6 +54,10 @@ export function Login() {
         setBusy(false)
         return
       }
+      if (result.requires2faSetup) {
+        navigate('/admin', { replace: true })
+        return
+      }
       // Pending (unverified) accounts can only reach here when Supabase
       // confirmations are disabled in the hosted project. Either way, route
       // them to the verification screen so the OTP flow can activate them.

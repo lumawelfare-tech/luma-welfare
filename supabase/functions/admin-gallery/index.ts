@@ -2,6 +2,7 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { buildIlikeOrFilter } from '../shared/search.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
+import { detectAllowedImage, looksLikeScriptableMarkup } from '../shared/file-upload.ts'
 
 /** Generate a safe storage path */
 function makeStoragePath(filename: string): string {
@@ -27,7 +28,6 @@ async function uploadBase64(
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
   if (!match) throw new Error('Invalid image data.')
 
-  const contentType = match[1]
   const base64 = match[2]
   const binaryStr = atob(base64)
   const bytes = new Uint8Array(binaryStr.length)
@@ -38,10 +38,18 @@ async function uploadBase64(
     throw new Error('File too large. Maximum size is 10MB.')
   }
 
+  if (looksLikeScriptableMarkup(bytes)) {
+    throw new Error('This file type is not allowed')
+  }
+  const detected = detectAllowedImage(bytes)
+  if (!detected) {
+    throw new Error('Only JPEG, PNG, or WebP images are allowed')
+  }
+
   const path = makeStoragePath(filename)
   const { error } = await adminClient.storage
     .from('gallery')
-    .upload(path, bytes, { contentType, upsert: false })
+    .upload(path, bytes, { contentType: detected.mime, upsert: false })
   if (error) throw new Error(`Storage upload failed: ${error.message}`)
 
   const { data: urlData } = adminClient.storage.from('gallery').getPublicUrl(path)

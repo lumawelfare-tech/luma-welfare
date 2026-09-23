@@ -48,6 +48,7 @@ vi.mock('../../lib/supabase', () => {
           data: { subscription: { unsubscribe } },
         })),
         signInWithPassword: vi.fn(),
+        setSession: vi.fn(),
         signInWithOAuth: vi.fn(),
         signOut: vi.fn(() => Promise.resolve()),
       },
@@ -196,6 +197,45 @@ describe('AuthContext', () => {
   })
 
   // ── useAuth throws outside provider ───────────────────────────────────────
+
+  it('login uses the rate-limited auth-login API instead of GoTrue signInWithPassword', async () => {
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: null } })
+    vi.mocked(supabase.auth.onAuthStateChange).mockReturnValue({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    })
+    vi.mocked(supabase.auth.setSession).mockResolvedValue({ data: { session: null }, error: null })
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        session: {
+          access_token: 'edge-token',
+          refresh_token: 'refresh-token',
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+        },
+        requires_2fa: false,
+        requires_2fa_setup: false,
+      })
+      .mockResolvedValueOnce({
+        member: mockMember,
+        isAdmin: false,
+        adminRole: null,
+        registrationFeePaid: true,
+        emailConfirmed: true,
+      })
+
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider })
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await result.current.login('member@test.com', 'Secret123')
+
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled()
+    expect(api).toHaveBeenCalledWith('/auth/login', {
+      method: 'POST',
+      body: { email: 'member@test.com', password: 'Secret123' },
+    })
+    expect(supabase.auth.setSession).toHaveBeenCalled()
+  })
 
   it('useAuth throws when called outside AuthProvider', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})

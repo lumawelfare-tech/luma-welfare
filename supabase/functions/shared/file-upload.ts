@@ -3,7 +3,7 @@
  * Do not trust client-supplied MIME or extension alone.
  */
 
-export type AllowedUploadKind = 'image' | 'pdf' | 'docx'
+export type AllowedUploadKind = 'image' | 'pdf' | 'docx' | 'video'
 
 export type DetectedFile = {
   kind: AllowedUploadKind
@@ -56,6 +56,25 @@ export function detectAllowedUpload(bytes: Uint8Array): DetectedFile | null {
         ext: 'docx',
       }
     }
+  }
+  return null
+}
+
+/** Images only (JPEG / PNG / WebP) — used for avatars, gallery, news. */
+export function detectAllowedImage(bytes: Uint8Array): DetectedFile | null {
+  const detected = detectAllowedUpload(bytes)
+  return detected?.kind === 'image' ? detected : null
+}
+
+/** Public media library: images plus MP4 / WebM. Never trust client MIME. */
+export function detectAllowedPublicMedia(bytes: Uint8Array): DetectedFile | null {
+  const image = detectAllowedImage(bytes)
+  if (image) return image
+  if (bytes.length >= 12 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    return { kind: 'video', mime: 'video/mp4', ext: 'mp4' }
+  }
+  if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
+    return { kind: 'video', mime: 'video/webm', ext: 'webm' }
   }
   return null
 }

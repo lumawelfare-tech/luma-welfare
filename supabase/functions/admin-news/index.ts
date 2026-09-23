@@ -2,6 +2,7 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { buildIlikeOrFilter } from '../shared/search.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
+import { detectAllowedImage, looksLikeScriptableMarkup } from '../shared/file-upload.ts'
 
 /** Generate a URL-safe slug from a title */
 function slugify(title: string): string {
@@ -22,7 +23,6 @@ function makeStoragePath(filename: string, bucket: string): string {
 async function uploadBase64(adminClient: ReturnType<typeof createAdminClient>, dataUrl: string, filename: string, bucket: string): Promise<string> {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
   if (!match) throw new Error('Invalid image data.')
-  const contentType = match[1]
   const base64 = match[2]
   const binaryStr = atob(base64)
   const bytes = new Uint8Array(binaryStr.length)
@@ -33,8 +33,16 @@ async function uploadBase64(adminClient: ReturnType<typeof createAdminClient>, d
     throw new Error('File too large. Maximum size is 10MB.')
   }
 
+  if (looksLikeScriptableMarkup(bytes)) {
+    throw new Error('This file type is not allowed')
+  }
+  const detected = detectAllowedImage(bytes)
+  if (!detected) {
+    throw new Error('Only JPEG, PNG, or WebP images are allowed')
+  }
+
   const path = makeStoragePath(filename, bucket)
-  const { error } = await adminClient.storage.from(bucket).upload(path, bytes, { contentType, upsert: false })
+  const { error } = await adminClient.storage.from(bucket).upload(path, bytes, { contentType: detected.mime, upsert: false })
   if (error) throw new Error(`Storage upload failed: ${error.message}`)
   const { data: urlData } = adminClient.storage.from(bucket).getPublicUrl(path)
   return urlData.publicUrl

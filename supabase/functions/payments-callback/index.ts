@@ -21,7 +21,7 @@
  * - webhook_events table tracks all received callbacks
  */
 
-import { corsHeaders } from '../shared/cors.ts'
+import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createAdminClient, logAudit } from '../shared/supabase.ts'
 import { safeLog } from '../shared/observability.ts'
 import { sendNotification } from '../shared/notifications.ts'
@@ -108,9 +108,8 @@ function extractMetadata(items?: Array<{ Name: string; Value: string | number }>
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const corsResponse = handleCors(req)
+  if (corsResponse) return corsResponse
 
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ message: 'Method not allowed' }), {

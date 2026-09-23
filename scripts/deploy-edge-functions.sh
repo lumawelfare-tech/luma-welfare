@@ -73,6 +73,7 @@ NO_VERIFY_JWT_FUNCTIONS=(
   auth-register
   auth-verify-email
   auth-login
+  auth-forgot-password
   public-data
   contact
   payments-callback
@@ -122,6 +123,7 @@ ALL_FUNCTIONS=(
   admin-kb-ingest
   auth-google-authorize
   auth-login
+  auth-forgot-password
   auth-me
   auth-oauth-provision
   auth-register

@@ -44,7 +44,6 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && url.searchParams.get('action') === 'announce') {
       if (!session.is_superadmin) {
         const canNotify = session.permissions.has('notifications:create')
-          || session.permissions.has('members:update')
           || session.permissions.has('notifications:write')
         if (!canNotify) {
           return new Response(JSON.stringify({ message: 'Forbidden', code: 'FORBIDDEN' }), {

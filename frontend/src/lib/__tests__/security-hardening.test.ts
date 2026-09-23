@@ -35,6 +35,7 @@ describe('rate-limit source contracts', () => {
     expect(read('supabase/functions/auth-login/index.ts')).toContain('rateLimitAsync')
     expect(read('supabase/functions/auth-register/index.ts')).toContain('rateLimitAsync')
     expect(read('supabase/functions/auth-verify-email/index.ts')).toContain('rateLimitAsync')
+    expect(read('supabase/functions/auth-forgot-password/index.ts')).toContain('rateLimitAsync')
     expect(read('supabase/functions/payments-initiate/index.ts')).toContain('rateLimitAsync')
   })
 

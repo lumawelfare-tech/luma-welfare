@@ -69,7 +69,7 @@ describe('reveal-member-id contracts', () => {
   it('edge function enforces admin session, permission, audit, and rate limit', () => {
     const src = read('supabase/functions/admin-reveal-member-id/index.ts')
     expect(src).toContain('loadAdminSession')
-    expect(src).toContain("requirePermission(session, 'members', 'read')")
+    expect(src).toContain("requirePermission(session, 'members', 'reveal')")
     expect(src).toContain("action: 'view_national_id'")
     expect(src).toContain('rateLimitAsync')
     expect(src).toContain('parseRevealMemberIdInput')

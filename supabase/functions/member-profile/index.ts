@@ -5,6 +5,7 @@ import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { withLogging } from '../shared/logging.ts'
 import { PRIVACY_POLICY_VERSION, TERMS_VERSION } from '../shared/legal-versions.ts'
 import { parseMemberProfilePatchBody, ValidationError } from '../shared/validate.ts'
+import { detectAllowedImage, looksLikeScriptableMarkup } from '../shared/file-upload.ts'
 
 /**
  * Member Profile — Update profile, avatar, password, data export, deletion request
@@ -232,7 +233,7 @@ Deno.serve(withLogging('member-profile', async (req) => {
     // POST — upload avatar
     if (req.method === 'POST' && action === 'avatar') {
       const body = await req.json()
-      const { fileName, fileData, fileType } = body
+      const { fileName, fileData } = body
 
       if (!fileName || !fileData) {
         return new Response(JSON.stringify({ message: 'fileName and fileData (base64) are required' }), {
@@ -248,25 +249,32 @@ Deno.serve(withLogging('member-profile', async (req) => {
         })
       }
 
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
-      if (!allowedTypes.includes(fileType)) {
+      let bytes: Uint8Array
+      try {
+        const binaryStr = atob(fileData)
+        bytes = new Uint8Array(binaryStr.length)
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i)
+        }
+      } catch {
+        return new Response(JSON.stringify({ message: 'Invalid file data encoding' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (looksLikeScriptableMarkup(bytes)) {
+        return new Response(JSON.stringify({ message: 'This file type is not allowed' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const detected = detectAllowedImage(bytes)
+      if (!detected) {
         return new Response(JSON.stringify({ message: 'Only JPG, PNG, and WebP images are allowed' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      // Decode base64
-      const binaryStr = atob(fileData)
-      const bytes = new Uint8Array(binaryStr.length)
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i)
-      }
-
-      // Generate storage path
-      const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const ext = safeName.split('.').pop() ?? 'jpg'
-      const storagePath = `${user.id}/avatar.${ext}`
+      const storagePath = `${user.id}/avatar.${detected.ext}`
 
       // Delete old avatar if exists
       try {
@@ -283,7 +291,7 @@ Deno.serve(withLogging('member-profile', async (req) => {
       const { error: uploadErr } = await adminClient.storage
         .from('avatars')
         .upload(storagePath, bytes, {
-          contentType: fileType,
+          contentType: detected.mime,
           upsert: true,
         })
 

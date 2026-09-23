@@ -53,6 +53,9 @@ describe('FAIL_CLOSED_IDENTIFIERS', () => {
   it('includes auth and admin mutation identifiers', () => {
     expect(FAIL_CLOSED_IDENTIFIERS.has('auth-login')).toBe(true)
     expect(FAIL_CLOSED_IDENTIFIERS.has('auth-register')).toBe(true)
+    expect(FAIL_CLOSED_IDENTIFIERS.has('auth-forgot-password')).toBe(true)
+    expect(FAIL_CLOSED_IDENTIFIERS.has('contact')).toBe(true)
+    expect(FAIL_CLOSED_IDENTIFIERS.has('admin-2fa')).toBe(true)
     expect(FAIL_CLOSED_IDENTIFIERS.has('admin-claims-mutation')).toBe(true)
   })
 })

@@ -3,6 +3,7 @@ import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/sup
 import { detectAllowedUpload, looksLikeScriptableMarkup } from '../shared/file-upload.ts'
 import { assertMemberActive } from '../shared/member-status.ts'
 import { withSignedClaimDocumentUrls } from '../shared/storage-signed.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 /**
  * Member Claims — Submit, List, Detail, Document Upload
@@ -29,8 +30,18 @@ Deno.serve(async (req) => {
 
     const adminClient = createAdminClient()
     const url = new URL(req.url)
-    const claimId = url.searchParams.get('id')
-    const uploadClaimId = url.searchParams.get('claimId')
+    const idParam = url.searchParams.get('id')
+    const claimIdAlias = url.searchParams.get('claimId')
+    // One claim identity only — never allow id and claimId to target different rows (IDOR).
+    if (idParam && claimIdAlias && idParam !== claimIdAlias) {
+      return new Response(JSON.stringify({
+        message: 'Claim id mismatch',
+        code: 'VALIDATION',
+      }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const claimId = idParam ?? claimIdAlias
     const action = url.searchParams.get('action')
 
     // GET — all claim documents for this member (documents inbox)
@@ -179,13 +190,26 @@ Deno.serve(async (req) => {
       })
     }
 
-    // POST — upload document for a claim
-    if (req.method === 'POST' && uploadClaimId) {
+    // POST — upload document for a claim (same id used for ownership + write)
+    const isUploadPost = req.method === 'POST' && Boolean(claimId) && (
+      url.searchParams.get('resource_id') === 'upload' ||
+      action === 'upload' ||
+      Boolean(claimIdAlias)
+    )
+    if (isUploadPost && claimId) {
+      const uploadLimit = await rateLimitAsync(req, 'member-claims-upload', {
+        userId: user.id,
+        adminClient,
+        windowMs: 60_000,
+        max: 10,
+      })
+      if (!uploadLimit.ok) return uploadLimit.response!
+
       // Verify claim belongs to this member
       const { data: claim, error: claimErr } = await adminClient
         .from('claims')
         .select('id, member_id, status')
-        .eq('id', uploadClaimId)
+        .eq('id', claimId)
         .eq('member_id', user.id)
         .single()
 
@@ -306,7 +330,7 @@ Deno.serve(async (req) => {
     }
 
     // POST — submit new claim (creates as Draft or Submitted)
-    if (req.method === 'POST' && !uploadClaimId) {
+    if (req.method === 'POST' && !claimId) {
       const inactive = await assertMemberActive(adminClient, user.id)
       if (inactive) return inactive
 
@@ -392,7 +416,11 @@ Deno.serve(async (req) => {
       status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal server error' }), {
+    console.error('member-claims error:', err instanceof Error ? err.name : 'unknown')
+    return new Response(JSON.stringify({
+      message: 'An unexpected error occurred.',
+      code: 'INTERNAL',
+    }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

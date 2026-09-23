@@ -8,6 +8,7 @@ import {
   handleAdminError,
 } from '../shared/supabase.ts'
 import { mintAdmin2faStepUpToken } from '../shared/admin-2fa-token.ts'
+import { rateLimitAsync } from '../shared/rate-limit.ts'
 
 /**
  * Admin 2FA — TOTP-based two-factor authentication
@@ -128,6 +129,16 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const action = url.searchParams.get('action')
 
+    if (req.method === 'POST') {
+      const rl = await rateLimitAsync(req, 'admin-2fa', {
+        userId: user.id,
+        adminClient,
+        windowMs: 60_000,
+        max: 8,
+      })
+      if (!rl.ok) return rl.response!
+    }
+
     // GET — 2FA status
     if (req.method === 'GET') {
       const { data: admin } = await adminClient
@@ -211,6 +222,14 @@ Deno.serve(async (req) => {
 
         const valid = await verifyTOTP(admin.two_factor_secret, code)
         if (!valid) {
+          await logAudit(adminClient, {
+            actor_id: session.id,
+            actor_role: session.role_name,
+            action: 'totp_failed',
+            resource: 'admin',
+            resource_id: user.id,
+            meta: { step: 'enable' },
+          }).catch(() => {})
           return new Response(JSON.stringify({ message: 'Invalid verification code. Please try again.' }), {
             status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
@@ -290,6 +309,14 @@ Deno.serve(async (req) => {
         }
 
         if (!valid) {
+          await logAudit(adminClient, {
+            actor_id: session.id,
+            actor_role: session.role_name,
+            action: 'totp_failed',
+            resource: 'admin',
+            resource_id: user.id,
+            meta: { step: 'disable' },
+          }).catch(() => {})
           return new Response(JSON.stringify({ message: 'Invalid code. Please enter a valid TOTP code or recovery code.' }), {
             status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
@@ -335,8 +362,12 @@ Deno.serve(async (req) => {
           .single()
 
         if (!admin?.two_factor_enabled) {
-          return new Response(JSON.stringify({ verified: true, message: '2FA not enabled.' }), {
-            status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          return new Response(JSON.stringify({
+            verified: false,
+            message: '2FA is not enabled. Complete setup first.',
+            code: 'ADMIN_2FA_SETUP_REQUIRED',
+          }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
         }
 
@@ -361,6 +392,14 @@ Deno.serve(async (req) => {
         }
 
         if (!valid) {
+          await logAudit(adminClient, {
+            actor_id: session.id,
+            actor_role: session.role_name,
+            action: 'totp_failed',
+            resource: 'admin',
+            resource_id: targetUserId,
+            meta: { step: 'verify' },
+          }).catch(() => {})
           return new Response(JSON.stringify({ verified: false, message: 'Invalid verification code.' }), {
             status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })

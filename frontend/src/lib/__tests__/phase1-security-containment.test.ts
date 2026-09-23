@@ -52,7 +52,8 @@ describe('Phase 1 — JWT deploy strategy is allowlisted', () => {
 
   it('CI single-function deploy uses the same allowlist', () => {
     const src = read('.github/workflows/deploy-functions.yml')
-    expect(src).toContain('auth-register|auth-verify-email|auth-login|public-data|contact|payments-callback|send-report-email|admin-exports-worker|health')
+    expect(src).toContain('auth-register|auth-verify-email|auth-login|auth-forgot-password|public-data|contact|payments-callback|send-report-email|admin-exports-worker|health')
+    expect(src).toContain('FUNCTION_NAME: ${{ inputs.function_name }}')
     expect(src).not.toMatch(/supabase functions deploy \$\{?\{? inputs\.function_name \}?\}? --project-ref mkbxigxmhqdhxmptanqr --no-verify-jwt/)
   })
 })
@@ -181,6 +182,7 @@ describe('Admin 2FA step-up', () => {
   it('loadAdminSession enforces step-up when 2FA enabled', () => {
     const src = read('supabase/functions/shared/supabase.ts')
     expect(src).toContain('2fa_required')
+    expect(src).toContain('2fa_setup_required')
     expect(src).toContain('verifyAdmin2faStepUpToken')
   })
 })

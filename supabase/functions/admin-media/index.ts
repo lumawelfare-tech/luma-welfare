@@ -2,6 +2,7 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { buildIlikeOrFilter } from '../shared/search.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
+import { detectAllowedPublicMedia, looksLikeScriptableMarkup } from '../shared/file-upload.ts'
 
 function makeStoragePath(filename: string): string {
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 50)
@@ -24,7 +25,6 @@ async function uploadBase64(
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
   if (!match) throw new Error('Invalid file data.')
 
-  const contentType = match[1]
   const base64 = match[2]
   const binaryStr = atob(base64)
   const bytes = new Uint8Array(binaryStr.length)
@@ -34,14 +34,22 @@ async function uploadBase64(
     throw new Error('File too large. Maximum size is 50MB.')
   }
 
+  if (looksLikeScriptableMarkup(bytes)) {
+    throw new Error('This file type is not allowed')
+  }
+  const detected = detectAllowedPublicMedia(bytes)
+  if (!detected) {
+    throw new Error('Only JPEG, PNG, WebP, MP4, or WebM files are allowed')
+  }
+
   const path = makeStoragePath(filename)
   const { error } = await adminClient.storage
     .from(bucket)
-    .upload(path, bytes, { contentType, upsert: false })
+    .upload(path, bytes, { contentType: detected.mime, upsert: false })
   if (error) throw new Error(`Storage upload failed: ${error.message}`)
 
   const { data: urlData } = adminClient.storage.from(bucket).getPublicUrl(path)
-  return { url: urlData.publicUrl, path, mimeType: contentType, size: bytes.length }
+  return { url: urlData.publicUrl, path, mimeType: detected.mime, size: bytes.length }
 }
 
 function detectMediaType(mimeType: string): string {

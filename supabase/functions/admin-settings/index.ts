@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
         (!resourceId && !url.searchParams.has('resource') && !action)
       )
     ) {
-      requirePermission(session, 'members', 'read')
+      requirePermission(session, 'settings', 'read')
       const { data, error } = await adminClient
         .from('platform_settings')
         .select('key, value, description')
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
 
     // GET /admin-settings/open-questions
     if (req.method === 'GET' && (resource === 'open-questions' || resourceParam === 'open-questions')) {
-      requirePermission(session, 'members', 'read')
+      requirePermission(session, 'settings', 'read')
       const { data, error } = await adminClient.from('open_questions').select('*').order('created_at')
       if (error) throw new Error(error.message)
       return new Response(JSON.stringify({ open_questions: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
 
     // POST /admin-settings/resolve?id={questionId}
     if (req.method === 'POST' && action === 'resolve') {
-      requirePermission(session, 'members', 'update')
+      requirePermission(session, 'settings', 'update')
       const body = await req.json()
       const questionId = url.searchParams.get('id') ?? resourceId
       const { data, error } = await adminClient.from('open_questions').update({ status: 'resolved', answer: body.answer ?? '' }).eq('id', questionId).select().single()
@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
       action !== 'update-webhook' &&
       (!resource || resource === 'settings' || resourceParam === 'settings')
     ) {
-      requirePermission(session, 'members', 'update')
+      requirePermission(session, 'settings', 'update')
       const rl = await rateLimitAsync(req, 'admin-settings-mutation', { userId: session.id, adminClient })
       if (!rl.ok) return rl.response!
       const body = await req.json()
@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
 
     // GET /admin-settings?resource=webhooks
     if (req.method === 'GET' && (resource === 'webhooks' || resourceParam === 'webhooks')) {
-      requirePermission(session, 'members', 'read')
+      requirePermission(session, 'settings', 'read')
       const { data, error } = await adminClient.rpc('get_system_webhooks')
       if (error) throw new Error(error.message)
       return new Response(JSON.stringify({ webhooks: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
 
     // POST /admin-settings?action=create-webhook
     if (req.method === 'POST' && action === 'create-webhook') {
-      requirePermission(session, 'members', 'update')
+      requirePermission(session, 'settings', 'update')
       const rl = await rateLimitAsync(req, 'admin-settings-mutation', { userId: session.id, adminClient })
       if (!rl.ok) return rl.response!
       const body = await req.json()
@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
 
     // PATCH /admin-settings?action=update-webhook&id={id}
     if (req.method === 'PATCH' && action === 'update-webhook') {
-      requirePermission(session, 'members', 'update')
+      requirePermission(session, 'settings', 'update')
       const rl = await rateLimitAsync(req, 'admin-settings-mutation', { userId: session.id, adminClient })
       if (!rl.ok) return rl.response!
       const webhookId = url.searchParams.get('id')
@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
 
     // DELETE /admin-settings?action=delete-webhook&id={id}
     if (req.method === 'DELETE' && action === 'delete-webhook') {
-      requirePermission(session, 'members', 'update')
+      requirePermission(session, 'settings', 'update')
       const rl = await rateLimitAsync(req, 'admin-settings-mutation', { userId: session.id, adminClient })
       if (!rl.ok) return rl.response!
       const webhookId = url.searchParams.get('id')
@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
 
     // POST /admin-settings?action=test-webhook&id={id}
     if (req.method === 'POST' && action === 'test-webhook') {
-      requirePermission(session, 'members', 'update')
+      requirePermission(session, 'settings', 'update')
       const rl = await rateLimitAsync(req, 'admin-webhook-test', { userId: session.id, adminClient })
       if (!rl.ok) return rl.response!
       const webhookId = url.searchParams.get('id')

@@ -68,12 +68,12 @@ describe('RequireAdmin', () => {
     expect(screen.queryByText('Admin Content')).not.toBeInTheDocument()
   })
 
-  it('renders outlet when admin has 2FA disabled', async () => {
+  it('requires 2FA setup when staff 2FA is disabled', async () => {
     const setTwoFaVerified = vi.fn()
     mockedUseAuth.mockReturnValue({
       member: null,
       isAdmin: true,
-      twoFaVerified: true,
+      twoFaVerified: false,
       setTwoFaVerified,
       loading: false,
     })
@@ -82,7 +82,8 @@ describe('RequireAdmin', () => {
     renderAdmin()
 
     await waitFor(() => {
-      expect(screen.getByText('Admin Content')).toBeInTheDocument()
+      expect(screen.getByText(/Set up two-factor authentication/i)).toBeInTheDocument()
     })
+    expect(screen.queryByText('Admin Content')).not.toBeInTheDocument()
   })
 })

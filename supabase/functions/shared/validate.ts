@@ -79,6 +79,40 @@ export function parseLoginBody(input: unknown): LoginInput {
   return { email, password }
 }
 
+const RESET_REDIRECT_PATH = '/reset-password'
+const RESET_REDIRECT_ORIGINS = new Set([
+  'https://luma-welfare.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:4173',
+])
+
+export type ForgotPasswordInput = { email: string; redirectTo: string }
+
+/** Neutral password-reset request. Never used to reveal whether the email exists. */
+export function parseForgotPasswordBody(input: unknown): ForgotPasswordInput {
+  const body = asRecord(input)
+  const email = requireString(body, 'email', 'Email').toLowerCase()
+  if (!EMAIL_RE.test(email)) {
+    throw new ValidationError('Enter a valid email address.')
+  }
+  const rawRedirect = typeof body.redirectTo === 'string' ? body.redirectTo.trim() : ''
+  let parsed: URL
+  try {
+    parsed = new URL(rawRedirect)
+  } catch {
+    throw new ValidationError('Invalid reset redirect.')
+  }
+  if (parsed.pathname !== RESET_REDIRECT_PATH || parsed.hash || parsed.username || parsed.password) {
+    throw new ValidationError('Invalid reset redirect.')
+  }
+  if (!RESET_REDIRECT_ORIGINS.has(parsed.origin)) {
+    throw new ValidationError('Invalid reset redirect.')
+  }
+  return { email, redirectTo: `${parsed.origin}${RESET_REDIRECT_PATH}` }
+}
+
 export type RegisterInput = {
   email: string
   password: string

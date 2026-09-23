@@ -161,15 +161,27 @@ Deno.serve(async (req) => {
         if (typeof body.adminRemarks === 'string') {
           updates.admin_remarks = body.adminRemarks.trim().slice(0, 2000) || null
         }
-        if (body.markPaymentVerified === true) {
-          updates.payment_verified_at = now
-        }
-        // Assign membership number if missing
         const { data: current } = await adminClient
           .from('members')
           .select('membership_number, payment_verified_at')
           .eq('id', resourceId)
           .maybeSingle()
+        const { data: fee } = await adminClient
+          .from('registration_fees')
+          .select('status')
+          .eq('member_id', resourceId)
+          .eq('fee_type', 'registration')
+          .maybeSingle()
+        const feePaid = fee?.status === 'paid' || Boolean(current?.payment_verified_at)
+        if (!feePaid) {
+          return new Response(JSON.stringify({
+            message: 'Registration fee must be paid before the member can be activated.',
+            code: 'FEE_REQUIRED',
+          }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+        if (fee?.status === 'paid' && !current?.payment_verified_at) {
+          updates.payment_verified_at = now
+        }
         if (!current?.membership_number) {
           const { data: memNum, error: memErr } = await adminClient.rpc('generate_membership_number')
           if (memErr || !memNum) {
@@ -179,16 +191,6 @@ Deno.serve(async (req) => {
             }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
           }
           updates.membership_number = typeof memNum === 'string' ? memNum : String(memNum)
-        }
-        // Prefer fee table as source of payment truth when paid
-        const { data: fee } = await adminClient
-          .from('registration_fees')
-          .select('status')
-          .eq('member_id', resourceId)
-          .eq('fee_type', 'registration')
-          .maybeSingle()
-        if (fee?.status === 'paid' && !current?.payment_verified_at) {
-          updates.payment_verified_at = now
         }
       }
       if (memberStatus === 'closed' && body.rejectApplication === true) {

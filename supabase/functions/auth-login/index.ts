@@ -46,7 +46,14 @@ Deno.serve(withLogging('auth-login', async (req) => {
     const { data, error } = await userClient.auth.signInWithPassword({ email, password })
 
     if (error) {
-      // Record failed login for security monitoring (no full email — domain only).
+      const supabaseCode = (error as { code?: string }).code ?? ''
+      const msg = (error.message ?? '').toLowerCase()
+      const emailNotConfirmed =
+        supabaseCode === 'email_not_confirmed' ||
+        msg.includes('not confirmed') ||
+        msg.includes('confirm your email') ||
+        msg.includes("email isn't confirmed")
+
       try {
         const emailDomain = email.includes('@') ? email.split('@')[1]?.toLowerCase() ?? null : null
         await logAudit(createAdminClient(), {
@@ -54,12 +61,22 @@ Deno.serve(withLogging('auth-login', async (req) => {
           actor_role: null,
           action: 'auth_failed',
           resource: 'auth',
-          meta: { code: 'INVALID_LOGIN', email_domain: emailDomain },
+          meta: { code: emailNotConfirmed ? 'EMAIL_NOT_CONFIRMED' : 'INVALID_LOGIN', email_domain: emailDomain },
           ip: getClientIp(req),
         })
       } catch {
         // Never block the login response on audit failure
       }
+
+      if (emailNotConfirmed) {
+        return new Response(JSON.stringify({
+          message: 'Please verify your email address before signing in.',
+          code: 'EMAIL_NOT_CONFIRMED',
+        }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       return new Response(JSON.stringify({ message: 'Email or password is incorrect.', code: 'INVALID_LOGIN' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -72,22 +89,31 @@ Deno.serve(withLogging('auth-login', async (req) => {
       .eq('id', data.user.id)
       .single()
 
-    // Check if user is an admin with 2FA enabled
-    let requires2fa = false
     const { data: admin } = await adminClient
       .from('admins')
-      .select('two_factor_enabled')
+      .select('id, is_active, two_factor_enabled')
       .eq('id', data.user.id)
+      .eq('is_active', true)
       .maybeSingle()
 
-    if (admin?.two_factor_enabled) {
-      requires2fa = true
+    const isAdmin = Boolean(admin)
+    if (member && (member.status === 'suspended' || member.status === 'closed') && !isAdmin) {
+      return new Response(JSON.stringify({
+        message: 'Your account is suspended or closed. Contact Luma Welfare support.',
+        code: 'ACCOUNT_INACTIVE',
+      }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
+
+    const requires2fa = admin?.two_factor_enabled === true
+    const requires2faSetup = isAdmin && !requires2fa
 
     const response = new Response(JSON.stringify({
       session: data.session,
       member,
       requires_2fa: requires2fa,
+      requires_2fa_setup: requires2faSetup,
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

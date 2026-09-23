@@ -398,6 +398,7 @@ Deno.serve(async (req) => {
 
     // 3. Check permission
     const config = TYPE_CONFIGS[type]
+    requirePermission(session, 'exports', 'create')
     requirePermission(session, config.permission, 'read')
 
     // 4. Format stubs

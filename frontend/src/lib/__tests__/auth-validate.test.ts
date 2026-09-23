@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
   parseLoginBody,
+  parseForgotPasswordBody,
   parseRegisterBody,
   parseVerifyEmailBody,
   ValidationError,
@@ -24,6 +25,25 @@ describe('parseLoginBody', () => {
   it('rejects missing/invalid email', () => {
     expect(() => parseLoginBody({ password: 'x' })).toThrow(ValidationError)
     expect(() => parseLoginBody({ email: 'not-an-email', password: 'x' })).toThrow(ValidationError)
+  })
+})
+
+describe('parseForgotPasswordBody', () => {
+  it('accepts an allowlisted reset URL', () => {
+    expect(parseForgotPasswordBody({
+      email: 'A@B.co',
+      redirectTo: 'http://localhost:5173/reset-password',
+    })).toEqual({
+      email: 'a@b.co',
+      redirectTo: 'http://localhost:5173/reset-password',
+    })
+  })
+
+  it('rejects a foreign reset host', () => {
+    expect(() => parseForgotPasswordBody({
+      email: 'a@b.co',
+      redirectTo: 'https://evil.test/reset-password',
+    })).toThrow(ValidationError)
   })
 })
 

@@ -10,6 +10,7 @@ describe('adminPermissions', () => {
     expect(permissionForAdminPath('/admin/reconciliation')).toBe('payments:read')
     expect(permissionForAdminPath('/admin/claims')).toBe('claims:read')
     expect(permissionForAdminPath('/admin/staff-roles')).toBe('superadmin')
+    expect(permissionForAdminPath('/admin/settings')).toBe('settings:read')
   })
 
   it('superadmin bypasses all checks', () => {

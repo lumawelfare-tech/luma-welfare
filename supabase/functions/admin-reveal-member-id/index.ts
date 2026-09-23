@@ -14,7 +14,7 @@ import { parseRevealMemberIdInput, ValidationError } from '../shared/validate.ts
 /**
  * Admin-only national ID reveal.
  * POST /admin-reveal-member-id?member_id=<uuid>
- * Validates admin session + members:read, rate-limits, audits view_national_id.
+ * Validates admin session + members:reveal, rate-limits, audits view_national_id.
  * Never logs the ID value.
  */
 
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     })
     if (!rl.ok) return rl.response!
 
-    requirePermission(session, 'members', 'read')
+    requirePermission(session, 'members', 'reveal')
 
     let body: unknown = null
     try {

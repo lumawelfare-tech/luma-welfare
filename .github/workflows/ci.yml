@@ -430,6 +430,7 @@ jobs:
             "admin-documents"
             "admin-kb-ingest"
             "auth-login"
+            "auth-forgot-password"
             "auth-me"
             "auth-register"
             "auth-verify-email"

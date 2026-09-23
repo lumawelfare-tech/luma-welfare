@@ -60,6 +60,7 @@ describe('Edge auth contracts', () => {
   it('auth-register and auth-login use shared validate parsers', () => {
     expect(readFn('auth-register')).toContain('parseRegisterBody')
     expect(readFn('auth-login')).toContain('parseLoginBody')
+    expect(readFn('auth-forgot-password')).toContain('parseForgotPasswordBody')
     expect(readFn('auth-verify-email')).toContain('parseVerifyEmailBody')
   })
 
@@ -68,7 +69,7 @@ describe('Edge auth contracts', () => {
     const dirs = readdirSync(functionsDir, { withFileTypes: true })
       .filter((d) => d.isDirectory())
       .map((d) => d.name)
-    for (const fn of [...ADMIN_FNS, ...MEMBER_FNS, 'public-data', 'health', 'contact']) {
+    for (const fn of [...ADMIN_FNS, ...MEMBER_FNS, 'public-data', 'health', 'contact', 'auth-forgot-password']) {
       expect(dirs).toContain(fn)
     }
   })

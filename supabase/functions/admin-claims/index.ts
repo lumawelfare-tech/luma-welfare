@@ -445,6 +445,15 @@ Deno.serve(async (req) => {
         })
       }
 
+      if (decision === 'approve' && current.member_id === session.id) {
+        return new Response(JSON.stringify({
+          message: 'You cannot approve or reject your own claim.',
+          code: 'SELF_APPROVE_FORBIDDEN',
+        }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       if (decision === 'approve' && !checklistComplete(current)) {
         return new Response(JSON.stringify({
           message: 'Complete the review checklist (documents, membership, contributions) and record officer names before approving.',

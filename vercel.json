@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm audit --omit=dev 2>&1 || true && npm run build -w frontend",
+  "buildCommand": "npm audit --omit=dev && npm run build -w frontend",
   "outputDirectory": "frontend/dist",
   "installCommand": "npm ci",
   "rewrites": [

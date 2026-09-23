@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { supabase } from '../lib/supabase'
+import { api, ApiError } from '../lib/api'
 import { AuthCard, fieldClass, alertErrorClass } from '../components/PageHero'
 import { useHead } from '../lib/seo'
 import { lumaPress } from '../lib/lumaMotion'
@@ -23,14 +23,23 @@ export function ForgotPassword() {
     }
     setBusy(true)
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
+      await api('/auth/forgot-password', {
+        method: 'POST',
+        body: {
+          email: email.trim(),
+          redirectTo: `${window.location.origin}/reset-password`,
+        },
       })
-      if (resetError) throw resetError
       setSent(true)
-    } catch {
-      // Neutral message to prevent email enumeration
-      setSent(true)
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 429 || err.code === 'RATE_LIMITED')) {
+        setError('Too many reset requests. Please wait a few minutes and try again.')
+      } else if (err instanceof ApiError && err.code === 'VALIDATION') {
+        setError(err.message)
+      } else {
+        // Neutral message to prevent email enumeration
+        setSent(true)
+      }
     } finally {
       setBusy(false)
     }

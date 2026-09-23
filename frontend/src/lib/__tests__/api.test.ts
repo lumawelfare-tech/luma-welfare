@@ -196,6 +196,15 @@ describe('API Path Routing', () => {
     )
   })
 
+  it('maps auth/forgot-password to auth-forgot-password function', async () => {
+    const { api } = await import('../api')
+    await api('/auth/forgot-password', { method: 'POST', body: { email: 'a@b.co', redirectTo: 'https://luma-welfare.vercel.app/reset-password' } })
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('/functions/v1/auth-forgot-password'),
+      expect.anything(),
+    )
+  })
+
   it('maps admin/2fa to admin-2fa function', async () => {
     const { api } = await import('../api')
     await api('/admin/2fa', { auth: true })

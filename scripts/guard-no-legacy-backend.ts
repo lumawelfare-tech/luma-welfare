@@ -71,6 +71,7 @@ function listEdgeFunctions(): Set<string> {
 const REQUIRED_MAPPINGS: { path: string; fn: string }[] = [
   { path: 'auth/register', fn: 'auth-register' },
   { path: 'auth/login', fn: 'auth-login' },
+  { path: 'auth/forgot-password', fn: 'auth-forgot-password' },
   { path: 'auth/verify-email', fn: 'auth-verify-email' },
   { path: 'auth/me', fn: 'auth-me' },
   { path: 'auth/oauth-provision', fn: 'auth-oauth-provision' },

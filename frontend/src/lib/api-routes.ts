@@ -20,6 +20,7 @@ export function pathToFunctionName(path: string): string | null {
   // Auth routes
   if (cleanPath === 'auth/register') return 'auth-register'
   if (cleanPath === 'auth/login') return 'auth-login'
+  if (cleanPath === 'auth/forgot-password') return 'auth-forgot-password'
   if (cleanPath === 'auth/verify-email') return 'auth-verify-email'
   if (cleanPath === 'auth/me') return 'auth-me'
   if (cleanPath === 'auth/oauth-provision') return 'auth-oauth-provision'

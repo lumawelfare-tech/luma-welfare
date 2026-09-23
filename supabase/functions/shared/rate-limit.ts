@@ -60,9 +60,14 @@ export const ENDPOINT_LIMITS: Record<string, { windowMs: number; max: number }> 
   register: { windowMs: 300_000, max: 5 },
   'auth-verify-email': { windowMs: 60_000, max: 10 },
   'auth-verify-email-resend': { windowMs: 60_000, max: 5 },
+  'auth-forgot-password': { windowMs: 300_000, max: 5 },
 
   // Public contact form
   contact: { windowMs: 600_000, max: 5 },
+
+  // Staff TOTP + member evidence uploads
+  'admin-2fa': { windowMs: 60_000, max: 8 },
+  'member-claims-upload': { windowMs: 60_000, max: 10 },
 
   // Payments (kill-switch still applies separately)
   'payments-initiate': { windowMs: 60_000, max: 5 },

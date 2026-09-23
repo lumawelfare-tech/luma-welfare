@@ -118,7 +118,6 @@ export function AdminMembers() {
   // Application approve / reject dialog
   const [decisionTarget, setDecisionTarget] = useState<{ member: Member; action: 'approve' | 'reject' } | null>(null)
   const [decisionRemarks, setDecisionRemarks] = useState('')
-  const [markPaymentVerified, setMarkPaymentVerified] = useState(true)
 
   // Bulk dialogs
   const [bulkAction, setBulkAction] = useState<'active' | 'suspended' | 'closed' | null>(null)
@@ -247,13 +246,12 @@ export function AdminMembers() {
   function openDecision(member: Member, action: 'approve' | 'reject') {
     setDecisionTarget({ member, action })
     setDecisionRemarks('')
-    setMarkPaymentVerified(true)
   }
 
   async function setStatus(
     id: string,
     status: 'active' | 'suspended' | 'closed',
-    opts?: { rejectApplication?: boolean; markPaymentVerified?: boolean; adminRemarks?: string },
+    opts?: { rejectApplication?: boolean; adminRemarks?: string },
   ) {
     setBusyId(id)
     try {
@@ -262,7 +260,6 @@ export function AdminMembers() {
         auth: true,
         body: {
           status,
-          ...(status === 'active' ? { markPaymentVerified: opts?.markPaymentVerified !== false } : {}),
           ...(status === 'closed' && opts?.rejectApplication ? { rejectApplication: true } : {}),
           ...(opts?.adminRemarks ? { adminRemarks: opts.adminRemarks } : {}),
         },
@@ -291,7 +288,6 @@ export function AdminMembers() {
     const remarks = decisionRemarks.trim()
     if (decisionTarget.action === 'approve') {
       await setStatus(decisionTarget.member.id, 'active', {
-        markPaymentVerified,
         adminRemarks: remarks || undefined,
       })
     } else {
@@ -1242,15 +1238,9 @@ export function AdminMembers() {
               />
             </div>
             {decisionTarget?.action === 'approve' && (
-              <label className="flex items-start gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={markPaymentVerified}
-                  onChange={(e) => setMarkPaymentVerified(e.target.checked)}
-                  className="mt-1"
-                />
-                <span>Mark registration payment as verified (uncheck if fee still outstanding)</span>
-              </label>
+              <p className="text-sm text-gray-600">
+                Activation requires a paid registration fee on file. Members without a paid fee cannot be activated.
+              </p>
             )}
           </div>
         }

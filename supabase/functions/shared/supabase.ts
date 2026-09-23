@@ -50,6 +50,7 @@ export type LoadAdminSessionResult =
   | { status: 'ok'; session: AdminSession }
   | { status: 'forbidden' }
   | { status: '2fa_required' }
+  | { status: '2fa_setup_required' }
 
 /**
  * Load the admin session for the authenticated user.
@@ -71,6 +72,9 @@ export async function loadAdminSession(
   if (error || !admin) return { status: 'forbidden' }
 
   const twoFactorEnabled = admin.two_factor_enabled === true
+  if (!twoFactorEnabled && !opts?.skip2faCheck) {
+    return { status: '2fa_setup_required' }
+  }
   if (twoFactorEnabled && !opts?.skip2faCheck) {
     const token = opts?.req ? extractAdmin2faStepUpToken(opts.req) : null
     const ok = await verifyAdmin2faStepUpToken(userId, token)
@@ -106,6 +110,15 @@ export function adminSessionDeniedResponse(result: Exclude<LoadAdminSessionResul
     return new Response(JSON.stringify({
       message: 'Two-factor authentication required',
       code: 'ADMIN_2FA_REQUIRED',
+    }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  if (result.status === '2fa_setup_required') {
+    return new Response(JSON.stringify({
+      message: 'Two-factor authentication must be enabled for staff accounts',
+      code: 'ADMIN_2FA_SETUP_REQUIRED',
     }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

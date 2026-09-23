@@ -81,14 +81,14 @@ export function withSecurityHeaders(response: Response): Response {
 }
 
 export function handleCors(req: Request): Response | null {
+  const origin = req.headers.get('Origin')
+  if (origin && !isOriginAllowed(origin)) {
+    return new Response(JSON.stringify({ message: 'Origin not allowed' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json', ...getSecurityHeaders() },
+    })
+  }
   if (req.method === 'OPTIONS') {
-    const origin = req.headers.get('Origin')
-    if (origin && !isOriginAllowed(origin)) {
-      return new Response(JSON.stringify({ message: 'Origin not allowed' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json', ...getSecurityHeaders() },
-      })
-    }
     return new Response('ok', { headers: getCorsHeaders(req) })
   }
   return null

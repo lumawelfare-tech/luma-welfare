@@ -66,6 +66,7 @@ CRITICAL_FUNCTIONS=(
   "admin-monitoring:401"
   "admin-exports:401"
   "auth-login:405"
+  "auth-forgot-password:405"
   "auth-register:405"
   "auth-me:401"
   "member-dashboard:401"

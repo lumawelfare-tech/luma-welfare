@@ -42,6 +42,7 @@ export type LoginResult = {
   isAdmin: boolean
   emailConfirmed?: boolean
   requires2fa?: boolean
+  requires2faSetup?: boolean
 }
 
 type AuthState = {
@@ -246,29 +247,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function login(email: string, password: string): Promise<LoginResult> {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      const supabaseCode = (error as { code?: string }).code ?? ''
-      const msg = (error.message ?? '').toLowerCase()
-      if (
-        supabaseCode === 'email_not_confirmed' ||
-        msg.includes('not confirmed') ||
-        msg.includes('confirm your email') ||
-        msg.includes("email isn't confirmed")
-      ) {
-        throw new ApiError(403, 'Please verify your email address before signing in.', 'EMAIL_NOT_CONFIRMED')
-      }
-      throw new ApiError(400, error.message, 'LOGIN_FAILED')
+    type LoginResponse = {
+      session?: { access_token: string; refresh_token?: string; expires_at?: number } | null
+      requires_2fa?: boolean
+      requires_2fa_setup?: boolean
     }
 
-    if (data.session?.access_token) {
-      setSession(data.session.access_token, data.session.expires_at)
+    let loginRes: LoginResponse
+    try {
+      loginRes = await api<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: { email, password },
+      })
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.code === 'EMAIL_NOT_CONFIRMED') {
+          throw new ApiError(403, 'Please verify your email address before signing in.', 'EMAIL_NOT_CONFIRMED')
+        }
+        if (err.code === 'ACCOUNT_INACTIVE') {
+          throw err
+        }
+        if (err.status === 429) throw err
+        throw new ApiError(err.status || 400, 'Email or password is incorrect.', 'LOGIN_FAILED')
+      }
+      throw new ApiError(400, 'Email or password is incorrect.', 'LOGIN_FAILED')
+    }
+
+    const accessToken = loginRes.session?.access_token
+    if (accessToken && loginRes.session?.refresh_token) {
+      const { error: setErr } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: loginRes.session.refresh_token,
+      })
+      if (setErr) {
+        throw new ApiError(400, 'Email or password is incorrect.', 'LOGIN_FAILED')
+      }
+      setSession(accessToken, loginRes.session.expires_at)
+    } else if (accessToken) {
+      setSession(accessToken, loginRes.session?.expires_at)
+    } else {
+      throw new ApiError(400, 'Email or password is incorrect.', 'LOGIN_FAILED')
     }
 
     const me = await loadProfile()
     applyProfile(me)
 
-    // Suspended/closed members may not use the portal (admins without member rows still allowed)
     if (me.member && (me.member.status === 'suspended' || me.member.status === 'closed') && !me.isAdmin) {
       clearSession()
       await supabase.auth.signOut()
@@ -276,16 +299,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new ApiError(403, 'Your account is suspended or closed. Contact Luma Welfare support.', 'ACCOUNT_INACTIVE')
     }
 
-    // Check if admin has 2FA enabled
     if (me.isAdmin) {
-      try {
-        const d = await api<{ two_factor_enabled: boolean }>('/admin/2fa', { auth: true })
-        if (d.two_factor_enabled) {
-          return { member: me.member, isAdmin: true, emailConfirmed: me.emailConfirmed, requires2fa: true }
-        }
-      } catch {
-        // Fail closed for admin 2FA status — require verification UI rather than skipping
+      if (loginRes.requires_2fa) {
         return { member: me.member, isAdmin: true, emailConfirmed: me.emailConfirmed, requires2fa: true }
+      }
+      if (loginRes.requires_2fa_setup) {
+        return { member: me.member, isAdmin: true, emailConfirmed: me.emailConfirmed, requires2faSetup: true }
       }
     }
 

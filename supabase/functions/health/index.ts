@@ -8,15 +8,14 @@
  * No credentials, tokens, or internal details exposed.
  */
 
-import { corsHeaders } from '../shared/cors.ts'
+import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createAdminClient } from '../shared/supabase.ts'
 import { requireCronSecret } from '../shared/internal-auth.ts'
 import { withLogging } from '../shared/logging.ts'
 
 Deno.serve(withLogging('health', async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const corsResponse = handleCors(req)
+  if (corsResponse) return corsResponse
 
   if (req.method !== 'GET') {
     return new Response(JSON.stringify({ status: 'error', message: 'Method not allowed' }), {
