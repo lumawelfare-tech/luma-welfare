@@ -12,16 +12,24 @@ const categories: FAQCategory[] = [
     label: 'General',
     items: [
       {
-        q: 'What is Luma Welfare?',
-        a: 'Luma Welfare is a community welfare organisation that helps members support each other through key life events — from hospital bills and education costs to bereavement, building, farming, weddings, and more. Members contribute monthly to one or more packages and can submit claims when eligible.',
+        q: 'What is LUMA Welfare and when was it founded?',
+        a: 'LUMA Welfare is a community-oriented welfare organisation founded in Kitengela, Kenya, in 2021 under Chairman Boss Williams. Its guiding mission is to stand with everyone through the Mission of Mercy. Members contribute to one or more welfare packages so families can prepare for life’s uncertainties and support one another — from bereavement and outpatient care to education, business, farming, and other important moments. The organisation’s public story is “Together We Are Stronger.”',
+      },
+      {
+        q: 'What are LUMA Welfare’s core values?',
+        a: 'The organisational framework lists eight core values: Unity (together we are stronger); Mercy (we respond to need with compassion and dignity); Trust (we protect confidence through honesty and responsible management); Responsibility (members and leaders each have duties toward the welfare community); Dignity (every person deserves respect); Accountability (decisions, funds, and records should be properly documented); Community (we seek positive impact beyond individual interests); and Sustainability (welfare commitments should be designed around realistic and responsible resources).',
+      },
+      {
+        q: 'What is the Mission of Mercy?',
+        a: 'The Mission of Mercy is described as the heart of LUMA Welfare: to stand with everyone. It encourages compassion toward members, families, vulnerable people, children, and communities. It may include appropriate support for children’s homes, education initiatives, emergency assistance, food and essential-item drives, bereavement support, and community outreach — where resources and approved arrangements permit. As a joinable package, Mission of Mercy is one programme (listed at KSh 500 per month with a 12-month waiting period in the organisational framework) with three nested sub-categories: Children’s Orphanage/Vulnerables, Widows, and Single Mothers — not three separate packages.',
       },
       {
         q: 'How does Luma Welfare work?',
-        a: 'You register an account and verify your email with a one-time passcode (OTP) sent to your inbox. Once verified, sign in and complete the one-time KSh 300 activation fee (online M-Pesa is being prepared; administrators can verify the fee meanwhile), then choose one or more welfare packages. Each package has its own monthly contribution amount and waiting period. Once you qualify, you can submit claims according to the rules of that package.',
+        a: 'You register an account and verify your email with a one-time passcode (OTP) sent to your inbox. Once verified, sign in and complete the one-time KSh 300 activation fee used on this platform today (online M-Pesa is being prepared; administrators can verify the fee meanwhile), then choose one or more welfare packages. Each package has its own monthly contribution amount and waiting period. Once you qualify under that package’s rules, you can submit claims. Official onboarding in the organisational framework is: application → eligibility review → registration → member number → beneficiary registration → package selection → contribution record → confirmation of active membership.',
       },
       {
         q: 'Who can join?',
-        a: 'Anyone can register for a Luma Welfare account. After registration, you verify your email using a one-time passcode (OTP) sent to your inbox. Once verified and after the KSh 300 activation fee is verified, you can explore and subscribe to available welfare packages.',
+        a: 'LUMA Welfare is designed for people who want to join an organised welfare community. Membership is open to eligible applicants who agree to the approved constitution, package terms, contribution rules, and code of conduct. On this website anyone can create an account, verify email, and submit a membership application. After approval and the KSh 300 activation fee is verified, you can explore and subscribe to available welfare packages.',
       },
       {
         q: 'How do I create an account?',
@@ -49,12 +57,20 @@ const categories: FAQCategory[] = [
     label: 'Packages',
     items: [
       {
-        q: 'What are Luma Welfare packages?',
-        a: 'Packages are specific welfare categories you can subscribe to, such as Welfare & Burial Support, Outpatient Hospital Support, Education Support, Business Support, Building Support, Land Purchase Support, Farming Support, Wedding Support, Dowry/Ruracio Support, Disaster Relief, Youth Empowerment, Senior Citizen Support, and Mission of Mercy. Each package has its own contribution amount and rules.',
+        q: 'What packages/programs can I join?',
+        a: 'The official organisational framework lists these packages: Welfare Package / Burial Support; Outpatient Hospital Support (listed in the framework as Hospital Insurance — Outpatient); Education Support; Business Support; Building Support; Land Purchase Support; Farming Support; Wedding Support; Dowry/Ruracio Support; Disaster Relief Support; Youth Empowerment Support; Senior Citizen Support; and Mission of Mercy (one package with three nested sub-categories: Children’s Orphanage/Vulnerables, Widows, and Single Mothers). The public Our Story page also groups some of these as Welfare & Bereavement, Outpatient Hospital, Education, Business, Building & Land, Farming, Senior Citizen, and other member-focused programmes. Programmes and benefits are always subject to the constitution, contribution rules, eligibility, and procedures. Specific claim amounts are only those in a final approved package schedule — this FAQ does not promise a payout figure.',
+      },
+      {
+        q: 'How much do I contribute and are there waiting periods?',
+        a: 'Amounts and waiting periods below come from the organisational framework’s package table. They describe the published schedule; your live subscription follows the package you actually join on the site. Welfare Package / Burial Support: no fixed waiting period; age 79 and below KSh 100/month, age 80 and above KSh 400/month; Nuclear Family KSh 300/month; Extended Family KSh 500/month; contributions must stay current. The framework lists both age bands and family-coverage tiers — confirm with the office which combination applies to you. Outpatient hospital support: KSh 1,200/month, 12-month wait. Education Support: KSh 1,200/month, 6-month wait. Business, Building, Land Purchase, Farming, Wedding, Dowry/Ruracio, Disaster Relief, Youth Empowerment, and Senior Citizen Support: KSh 2,000/month, 12-month wait. Mission of Mercy: KSh 500/month, 12-month wait. Package benefits, exclusions, and any payout limits must be in the final approved schedule before anyone is promised a specific benefit.',
       },
       {
         q: 'How do I compare packages?',
         a: 'Visit the Packages page on the website to see all available packages, their monthly contribution amounts, and waiting periods. Each package is designed for a different type of life event or need.',
+      },
+      {
+        q: 'How do I join?',
+        a: 'On this website: create an account, verify your email, complete the one-time KSh 300 activation fee (administrators can verify it while online M-Pesa is launching), then subscribe to packages from your dashboard. The official membership path in the organisational framework is application → eligibility review → registration → member number → beneficiary registration → package selection → contribution record → confirmation of active membership. Submitting an application does not automatically guarantee every benefit or claim; support is provided according to applicable LUMA Welfare rules.',
       },
       {
         q: 'How do I join a package?',
@@ -83,7 +99,19 @@ const categories: FAQCategory[] = [
     items: [
       {
         q: 'How do I make a contribution?',
-        a: 'From your member dashboard, go to the Contributions section. You can record a manual payment by selecting the package, entering the amount, payment method, and transaction reference. Your contribution will be submitted for admin verification.',
+        a: 'From your member dashboard, go to the Contributions section. You can record a manual payment by selecting the package, entering the amount, payment method, and transaction reference. Your contribution will be submitted for admin verification. Contributions should be recorded against your unique membership number and the package you selected.',
+      },
+      {
+        q: 'How do I pay safely?',
+        a: 'Use only official LUMA Welfare payment instructions shown on this portal or given by the organisation. Confirm the approved payment details before you pay. Do not use unofficial payment channels, private numbers, or anyone claiming to collect on LUMA’s behalf outside official instructions.',
+      },
+      {
+        q: 'Is my contribution refundable?',
+        a: 'The organisational framework does not treat a non-refund rule as automatically in force. It says that if LUMA adopts a non-refundable contribution rule, that rule must be clearly stated in the final constitution and package terms and communicated before you enroll. Until that is adopted and communicated, do not assume contributions are refundable or non-refundable — ask the office and read the terms you accept at registration.',
+      },
+      {
+        q: 'When are contributions due?',
+        a: 'Members should contribute according to the selected package and the approved schedule. Contributions are due on the date specified by the organisation. The current proposed late-payment deadline in the organisational framework is the 10th of the relevant month, subject to the final approved rules — it is not stated here as a settled obligation. Separately, the framework’s current proposed renewal is KSh 300 every two months; that is also proposed, not a final adopted rule. This website today uses a one-time KSh 300 activation fee after email verification, which is a different, implemented step — not the same as that proposed renewal.',
       },
       {
         q: 'How can I see my contribution history?',
@@ -104,7 +132,11 @@ const categories: FAQCategory[] = [
     items: [
       {
         q: 'How do I submit a claim?',
-        a: 'From your member dashboard, go to the Claims section and click "Submit Claim." Select the package you are claiming against, provide a description, upload any required supporting documents, and submit. An administrator will review your claim.',
+        a: 'On the website, open Claims from your member dashboard, choose the package, describe the event, upload supporting documents, and submit. An administrator reviews the claim. The official eight-step process in the organisational framework is: (1) you or an authorised representative report the event; (2) the official claim form is completed; (3) supporting documents are submitted; (4) membership and contribution status are checked; (5) the claim is reviewed against that package’s terms; (6) an authorised committee or official approves or declines according to the rules; (7) you receive an official decision; (8) if payment is approved, it is recorded and a receipt or payment record is kept. A claim is not approved merely because an event occurred — eligibility and package terms must be checked. Submitting a form does not guarantee approval.',
+      },
+      {
+        q: 'What documents might I need for a claim?',
+        a: 'It depends on the package and the event. The organisational framework lists, where relevant: identification, membership details, beneficiary information, medical documents, school documents, receipts, death or burial documentation, police or official reports, and any other documents that package specifies. The claim form on this site will also guide you on what to upload.',
       },
       {
         q: 'What claim statuses can I expect?',
@@ -154,7 +186,11 @@ const categories: FAQCategory[] = [
     items: [
       {
         q: 'How is my information protected?',
-        a: 'Luma Welfare uses industry-standard security measures including encrypted data transmission, secure authentication, role-based access controls, and row-level security to protect your personal information. Admin actions are recorded in audit logs.',
+        a: 'The organisational framework says LUMA should collect only information needed for membership, administration, payments, claims, and lawful community activities; protect records against unauthorised access; limit access by role; and not disclose member information publicly without a lawful basis or appropriate consent. A final privacy and data-protection policy should still be prepared in line with Kenyan requirements. On this platform we also use encrypted connections, secure authentication, role-based admin access, and row-level security so members generally see only their own records. Admin actions are logged. See the Privacy Policy (marked draft pending legal review) for details.',
+      },
+      {
+        q: 'What if I have a complaint?',
+        a: 'You should have a clear route to raise a concern without retaliation. The organisational process is: submit the complaint in writing or through an approved official channel (on this site, use Complaints after you sign in, or Contact); it is logged with a date and reference number; a responsible officer acknowledges receipt; relevant records are reviewed; a decision or response is communicated; and where appropriate you may request committee review or appeal under the constitution. Urgent safeguarding or criminal matters should be referred to the appropriate authorities.',
       },
       {
         q: 'Does Luma Welfare store my password?',
@@ -209,7 +245,7 @@ function FaqItem({ item, isOpen, onToggle, id }: { item: FAQItem; isOpen: boolea
         id={id}
         role="region"
         aria-labelledby={`btn-${id}`}
-        className={`overflow-hidden transition-[max-height,opacity] duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none ${isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
+        className={`overflow-hidden transition-[max-height,opacity] duration-[var(--motion-fast)] ease-[var(--luma-ease-out)] motion-reduce:transition-none ${isOpen ? 'max-h-[80vh] overflow-y-auto opacity-100' : 'max-h-0 opacity-0'}`}
       >
         <p className="border-t border-white/50 px-5 py-4 text-sm leading-relaxed text-gray-600">{item.a}</p>
       </div>
