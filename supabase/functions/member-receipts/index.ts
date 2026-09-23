@@ -45,7 +45,13 @@ Deno.serve(async (req) => {
       // Get contributions
       const { data: contributions } = await adminClient
         .from('contributions')
-        .select('id, period, amount, status, payment_id, created_at, packages(code, name), payments(mpesa_receipt, channel)')
+        .select('id, period, amount, amount_paid, status, payment_id, created_at, packages(code, name), payments(mpesa_receipt, channel)')
+        .eq('member_id', user.id)
+        .order('created_at', { ascending: false })
+
+      const { data: instalments } = await adminClient
+        .from('contribution_instalments')
+        .select('id, period, amount, running_balance_after, status, payment_method, transaction_reference, paid_at, created_at, packages(code, name)')
         .eq('member_id', user.id)
         .order('created_at', { ascending: false })
 
@@ -91,12 +97,27 @@ Deno.serve(async (req) => {
           type: 'Contribution',
           description: `Monthly contribution for ${c.period}`,
           package: (c.packages as unknown as { name: string })?.name ?? null,
-          amount: c.amount,
+          amount: Number(c.amount ?? 0),
           currency: 'KES',
           status: c.status,
           payment_method: (c.payments as unknown as { channel: string })?.channel ?? 'manual',
           reference: (c.payments as unknown as { mpesa_receipt: string })?.mpesa_receipt ?? null,
           date: c.created_at,
+        })
+      }
+
+      for (const inst of instalments ?? []) {
+        transactions.push({
+          id: inst.id,
+          type: 'Instalment',
+          description: `Lipa Pole Pole payment for ${inst.period} (remaining after: KSh ${Number(inst.running_balance_after ?? 0).toLocaleString('en-KE')})`,
+          package: (inst.packages as unknown as { name: string })?.name ?? null,
+          amount: Number(inst.amount ?? 0),
+          currency: 'KES',
+          status: inst.status,
+          payment_method: inst.payment_method ?? 'manual',
+          reference: inst.transaction_reference ?? null,
+          date: inst.paid_at ?? inst.created_at,
         })
       }
 
@@ -185,6 +206,36 @@ Deno.serve(async (req) => {
             date: contrib.created_at,
             package: (contrib.packages as unknown as { name: string })?.name ?? null,
             period: contrib.period,
+            amount_paid: contrib.amount_paid ?? null,
+            remaining: contrib.amount != null ? Math.max(0, Number(contrib.amount) - Number(contrib.amount_paid ?? 0)) : null,
+          }
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const { data: instalment } = await adminClient
+        .from('contribution_instalments')
+        .select('*, packages(name)')
+        .eq('id', transactionId)
+        .eq('member_id', user.id)
+        .maybeSingle()
+
+      if (instalment) {
+        return new Response(JSON.stringify({
+          receipt: {
+            type: 'Instalment',
+            number: `INS-${instalment.id.slice(0, 8).toUpperCase()}`,
+            member,
+            amount: instalment.amount,
+            currency: 'KES',
+            status: instalment.status,
+            payment_method: instalment.payment_method ?? 'manual',
+            reference: instalment.transaction_reference ?? null,
+            date: instalment.paid_at ?? instalment.created_at,
+            package: (instalment.packages as unknown as { name: string })?.name ?? null,
+            period: instalment.period,
+            amount_paid: null,
+            remaining: instalment.running_balance_after,
+            running_balance_after: instalment.running_balance_after,
           }
         }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }

@@ -267,6 +267,7 @@ describeLive('RLS isolation (live)', () => {
       'members',
       'claims',
       'contributions',
+      'contribution_instalments',
       'subscriptions',
       'family_members',
       'notifications',
@@ -301,6 +302,7 @@ describeLive('RLS isolation (live)', () => {
 
     if (contribA) {
       expect((await b.from('contributions').select('id').eq('id', contribA)).data ?? []).toEqual([])
+      expect((await b.from('contribution_instalments').select('id').eq('contribution_id', contribA)).data ?? []).toEqual([])
     }
     if (subA) {
       expect((await b.from('subscriptions').select('id').eq('id', subA)).data ?? []).toEqual([])
@@ -343,6 +345,18 @@ describeLive('RLS isolation (live)', () => {
 
     if (contribA) {
       expect((await a.from('contributions').select('id').eq('id', contribA)).data?.[0]?.id).toBe(contribA)
+      const verifiedSelf = await a.from('contribution_instalments').insert({
+        contribution_id: contribA,
+        member_id: idA,
+        subscription_id: subA,
+        package_id: packageId,
+        period: '2099-01',
+        amount: 1,
+        running_balance_after: 0,
+        status: 'Verified',
+        recorded_as_admin: true,
+      }).select('id')
+      expect(verifiedSelf.data ?? []).toEqual([])
     }
     if (subA) {
       expect((await a.from('subscriptions').select('id').eq('id', subA)).data?.[0]?.id).toBe(subA)
