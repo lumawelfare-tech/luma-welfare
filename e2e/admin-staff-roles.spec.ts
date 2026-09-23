@@ -3,8 +3,8 @@
  * Full grant/revoke live flows wait until migration + function deploy.
  */
 import { test, expect } from '@playwright/test'
-import { BASE_URL, E2E_ADMIN, E2E_MEMBER, hasAdminCreds, hasMemberCreds } from './helpers/env'
-import { loginUi, signInApi, edgeJson } from './helpers/auth'
+import { BASE_URL, E2E_MEMBER, hasAdminCreds, hasMemberCreds } from './helpers/env'
+import { loginAdminUi, signInApi, edgeJson } from './helpers/auth'
 
 test.describe('Admin Staff & Roles', () => {
   test('member JWT cannot call manage-user-role', async ({ request }) => {
@@ -25,10 +25,7 @@ test.describe('Admin Staff & Roles', () => {
     test.skip(!hasAdminCreds, 'Set E2E_ADMIN_EMAIL/PASSWORD')
     test.setTimeout(90_000)
 
-    await loginUi(page, E2E_ADMIN.email, E2E_ADMIN.password)
-    if (page.url().includes('verify') || await page.getByText(/two-factor|authenticator/i).isVisible().catch(() => false)) {
-      test.skip(true, 'Admin 2FA enabled')
-    }
+    await loginAdminUi(page)
 
     await page.setViewportSize({ width: 375, height: 800 })
     await page.goto(`${BASE_URL}/admin/staff-roles`)

@@ -7,13 +7,12 @@
 import { test, expect } from '@playwright/test'
 import {
   BASE_URL,
-  E2E_ADMIN,
   E2E_MEMBER,
   hasAdminCreds,
   hasMemberCreds,
   canSeed,
 } from './helpers/env'
-import { loginUi, signInApi, edgeJson } from './helpers/auth'
+import { loginAdminUi, signInApi, signInAdminApi, edgeJson } from './helpers/auth'
 import {
   seedSubmittedClaims,
   seedPendingContribution,
@@ -26,11 +25,7 @@ test.describe('Admin flows', () => {
 
   test('admin UI loads dashboard and members list', async ({ page }) => {
     test.setTimeout(90_000)
-    await loginUi(page, E2E_ADMIN.email, E2E_ADMIN.password)
-
-    if (page.url().includes('verify') || await page.getByText(/two-factor|authenticator/i).isVisible().catch(() => false)) {
-      test.skip(true, 'Admin account has 2FA enabled — use a test admin without 2FA for UI E2E')
-    }
+    await loginAdminUi(page)
 
     await page.goto(`${BASE_URL}/admin/dashboard`)
     await expect(page.getByText(/dashboard|members|claims|overview/i).first()).toBeVisible({ timeout: 25_000 })
@@ -44,7 +39,7 @@ test.describe('Admin flows', () => {
     test.setTimeout(120_000)
 
     const member = await signInApi(request, E2E_MEMBER.email, E2E_MEMBER.password)
-    const admin = await signInApi(request, E2E_ADMIN.email, E2E_ADMIN.password)
+    const admin = await signInAdminApi(request)
 
     const claims = await seedSubmittedClaims(request, member.userId, 2)
     test.skip(claims.length < 2, 'Could not seed two Submitted claims (member needs active subscription + packages)')
@@ -61,6 +56,7 @@ test.describe('Admin flows', () => {
         {
           query: `resource_id=${claimIds[0]}`,
           data: { decision: 'approve', adminNotes: 'E2E approve', amount: 1000 },
+          stepUpToken: admin.stepUpToken,
         },
       )
       expect([200, 403]).toContain(approve.status)
@@ -87,6 +83,7 @@ test.describe('Admin flows', () => {
         {
           query: `resource_id=${claimIds[1]}`,
           data: { decision: 'reject', adminNotes: 'E2E reject' },
+          stepUpToken: admin.stepUpToken,
         },
       )
       expect([200, 403]).toContain(reject.status)
@@ -116,6 +113,7 @@ test.describe('Admin flows', () => {
           {
             query: `resource_id=${contrib!.id}`,
             data: { action: 'verify' },
+            stepUpToken: admin.stepUpToken,
           },
         )
         expect([200, 403]).toContain(verified.status)
@@ -146,7 +144,7 @@ test.describe('Admin flows', () => {
         'GET',
         'admin-reports',
         admin.accessToken,
-        { query: 'type=claims' },
+        { query: 'type=claims', stepUpToken: admin.stepUpToken },
       )
       expect([200, 400, 403]).toContain(report.status)
 
@@ -155,7 +153,7 @@ test.describe('Admin flows', () => {
         'GET',
         'admin-claims',
         admin.accessToken,
-        { query: 'action=export&format=csv' },
+        { query: 'action=export&format=csv', stepUpToken: admin.stepUpToken },
       )
       expect([200, 400, 403, 404]).toContain(exportRes.status)
     } finally {

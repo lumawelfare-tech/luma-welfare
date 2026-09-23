@@ -3,22 +3,22 @@
  * Skips without E2E admin credentials.
  */
 import { test, expect } from '@playwright/test'
-import { BASE_URL, E2E_ADMIN, E2E_MEMBER, hasAdminCreds, hasMemberCreds } from './helpers/env'
-import { loginUi, signInApi, edgeJson } from './helpers/auth'
+import { BASE_URL, E2E_MEMBER, hasAdminCreds, hasMemberCreds } from './helpers/env'
+import { loginAdminUi, signInApi, signInAdminApi, edgeJson } from './helpers/auth'
 
 test.describe('Admin permanent member delete', () => {
   test.skip(!hasAdminCreds, 'Set E2E_ADMIN_EMAIL/PASSWORD')
 
   test('non-closed rows have no permanent-delete control; API rejects non-closed', async ({ page, request }) => {
     test.setTimeout(90_000)
-    const admin = await signInApi(request, E2E_ADMIN.email, E2E_ADMIN.password)
+    const admin = await signInAdminApi(request)
 
     const list = await edgeJson<{ members?: Array<{ id: string; status: string }> }>(
       request,
       'GET',
       'admin-members',
       admin.accessToken,
-      { query: 'status=active&per_page=5' },
+      { query: 'status=active&per_page=5', stepUpToken: admin.stepUpToken },
     )
     expect([200, 403]).toContain(list.status)
     if (list.status !== 200) test.skip(true, 'Admin cannot list members in this env')
@@ -30,16 +30,13 @@ test.describe('Admin permanent member delete', () => {
         'POST',
         'admin-delete-member',
         admin.accessToken,
-        { data: { memberId: active.id } },
+        { data: { memberId: active.id }, stepUpToken: admin.stepUpToken },
       )
       // Superadmin → 409 MEMBER_NOT_CLOSED; non-superadmin → 403
       expect([403, 409, 400]).toContain(denied.status)
     }
 
-    await loginUi(page, E2E_ADMIN.email, E2E_ADMIN.password)
-    if (page.url().includes('verify') || await page.getByText(/two-factor|authenticator/i).isVisible().catch(() => false)) {
-      test.skip(true, 'Admin 2FA enabled')
-    }
+    await loginAdminUi(page)
     await page.setViewportSize({ width: 1280, height: 800 })
     await page.goto(`${BASE_URL}/admin/members?status=active`)
     await expect(page.getByRole('heading', { name: /member/i }).first()).toBeVisible({ timeout: 25_000 })

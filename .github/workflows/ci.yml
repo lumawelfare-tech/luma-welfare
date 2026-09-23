@@ -50,6 +50,7 @@ jobs:
           E2E_MEMBER_PASSWORD: ${{ secrets.E2E_MEMBER_PASSWORD }}
           E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
           E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          E2E_ADMIN_TOTP_SECRET: ${{ secrets.E2E_ADMIN_TOTP_SECRET }}
           # Set repo variable ENFORCE_LIVE_SECRETS=true after secrets are populated to hard-fail.
           ENFORCE: ${{ vars.ENFORCE_LIVE_SECRETS }}
         run: |
@@ -62,6 +63,7 @@ jobs:
           [ -z "${E2E_MEMBER_PASSWORD:-}" ] && MISSING+=("E2E_MEMBER_PASSWORD")
           [ -z "${E2E_ADMIN_EMAIL:-}" ] && MISSING+=("E2E_ADMIN_EMAIL")
           [ -z "${E2E_ADMIN_PASSWORD:-}" ] && MISSING+=("E2E_ADMIN_PASSWORD")
+          [ -z "${E2E_ADMIN_TOTP_SECRET:-}" ] && MISSING+=("E2E_ADMIN_TOTP_SECRET")
 
           if [ "${#MISSING[@]}" -eq 0 ]; then
             echo "✅ Live verification secrets are configured."
@@ -101,21 +103,23 @@ jobs:
 
       - name: Run npm audit (root)
         run: |
+          set -o pipefail
           echo "=== Root workspace audit ==="
-          npm audit --omit=dev 2>&1 | tee audit-root.txt
+          npm audit --omit=dev --audit-level=high 2>&1 | tee audit-root.txt
           echo ""
 
       - name: Run npm audit (frontend)
         working-directory: frontend
         run: |
+          set -o pipefail
           echo "=== Frontend audit ==="
-          npm audit --omit=dev 2>&1 | tee ../audit-frontend.txt
+          npm audit --omit=dev --audit-level=high 2>&1 | tee ../audit-frontend.txt
           echo ""
 
       - name: Run npm audit (full — including dev)
         run: |
-          echo "=== Full audit (including dev dependencies) ==="
-          npm audit 2>&1 | tee audit-full.txt
+          echo "=== Full audit (including dev dependencies, informational) ==="
+          npm audit 2>&1 | tee audit-full.txt || true
           echo ""
 
       - name: Evaluate audit results
@@ -383,6 +387,7 @@ jobs:
           E2E_MEMBER_PASSWORD: ${{ secrets.E2E_MEMBER_PASSWORD }}
           E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
           E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          E2E_ADMIN_TOTP_SECRET: ${{ secrets.E2E_ADMIN_TOTP_SECRET }}
           VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 

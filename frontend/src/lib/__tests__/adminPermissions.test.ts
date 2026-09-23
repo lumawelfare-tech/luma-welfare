@@ -24,6 +24,14 @@ describe('adminPermissions', () => {
     expect(hasAdminPermission(['members:read'], false, 'superadmin')).toBe(false)
   })
 
+  it('support-like members:read cannot open settings, reveal, or exports', () => {
+    const support = ['members:read', 'complaints:read', 'complaints:update', 'complaints:approve']
+    expect(hasAdminPermission(support, false, 'settings:read')).toBe(false)
+    expect(hasAdminPermission(support, false, ADMIN_ROUTE_PERMISSIONS.settings)).toBe(false)
+    expect(hasAdminPermission(support, false, 'members:reveal')).toBe(false)
+    expect(hasAdminPermission(support, false, 'exports:create')).toBe(false)
+  })
+
   it('covers all sidebar-facing routes', () => {
     const expected = [
       'dashboard', 'members', 'registration-fees', 'subscriptions', 'contributions',

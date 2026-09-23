@@ -1,21 +1,17 @@
 /**
  * Smoke: admin dashboard metric deep-links land on filtered list screens.
- * Skips without E2E_ADMIN_* credentials. Soft-skips when 2FA blocks UI login.
+ * Skips without E2E_ADMIN_* credentials. Completes staff 2FA when E2E_ADMIN_TOTP_SECRET is set.
  */
 import { test, expect } from '@playwright/test'
-import { BASE_URL, E2E_ADMIN, hasAdminCreds } from './helpers/env'
-import { loginUi } from './helpers/auth'
+import { BASE_URL, hasAdminCreds } from './helpers/env'
+import { loginAdminUi } from './helpers/auth'
 
 test.describe('Admin dashboard filter deep links', () => {
   test.skip(!hasAdminCreds, 'Set E2E_ADMIN_EMAIL/PASSWORD + SUPABASE_URL + anon key')
 
   test('metric links open members/claims/contributions/subscriptions with status query', async ({ page }) => {
     test.setTimeout(90_000)
-    await loginUi(page, E2E_ADMIN.email, E2E_ADMIN.password)
-
-    if (page.url().includes('verify') || await page.getByText(/two-factor|authenticator/i).isVisible().catch(() => false)) {
-      test.skip(true, 'Admin account has 2FA enabled — use a test admin without 2FA for UI E2E')
-    }
+    await loginAdminUi(page)
 
     await page.goto(`${BASE_URL}/admin/dashboard`)
     await expect(page.getByRole('heading', { name: /admin dashboard/i })).toBeVisible({ timeout: 25_000 })
@@ -41,10 +37,7 @@ test.describe('Admin dashboard filter deep links', () => {
 
   test('direct status query params select the matching filter chip', async ({ page }) => {
     test.setTimeout(90_000)
-    await loginUi(page, E2E_ADMIN.email, E2E_ADMIN.password)
-    if (page.url().includes('verify') || await page.getByText(/two-factor|authenticator/i).isVisible().catch(() => false)) {
-      test.skip(true, 'Admin account has 2FA enabled')
-    }
+    await loginAdminUi(page)
 
     await page.goto(`${BASE_URL}/admin/members?status=pending_approval`)
     await expect(page).toHaveURL(/status=pending_approval/)

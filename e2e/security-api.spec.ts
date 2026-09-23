@@ -61,9 +61,16 @@ test.describe('Edge Functions — Auth Enforcement', () => {
     'admin-members',
     'admin-claims',
     'admin-exports',
+    'admin-settings',
+    'admin-reveal-member-id',
+    'admin-notifications',
+    'admin-packages',
+    'admin-2fa',
+    'manage-user-role',
     'auth-me',
     'member-dashboard',
     'member-claims',
+    'member-profile',
   ]
 
   for (const fn of protectedEndpoints) {
@@ -157,18 +164,19 @@ test.describe('CORS — Cross-Origin Requests', () => {
 test.describe('Public — Email Verification Endpoint', () => {
   test('verify endpoint rejects malformed bodies but is reachable', async ({ request }) => {
     // Should not be 401 (publicly accessible) but should be a 4xx (validation)
+    test.skip(!SUPABASE_URL || !SUPABASE_ANON_KEY, 'Set SUPABASE_URL + publishable key')
     const response = await request.post(
-      `${BASE}/functions/v1/auth-verify-email`,
+      `${SUPABASE_URL}/functions/v1/auth-verify-email`,
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
         data: {},
         failOnStatusCode: false,
       },
     )
-    // Either CORS-blocks the cross-origin POST (browser context), or the
-    // function responds with a validation error. Either is acceptable —
-    // what matters is the endpoint is NOT 404 (it's deployed).
-    expect([400, 403, 404, 405]).toContain(response.status())
+    expect([400, 403, 405, 422]).toContain(response.status())
   })
 })
 
@@ -200,25 +208,11 @@ test.describe('Error Handling', () => {
     const emailSelector = '#login-email, input[type="email"], input[name="email"], input[placeholder*="email" i]'
     await gotoAndWaitForInput(page, `${BASE}/login`, emailSelector)
 
-    // Fill in invalid credentials
     await page.locator(emailSelector).first().fill('test@test.com')
-    await page.locator('#login-password, input[type="password"]').first().fill('wrongpassword')
-
-    // Submit
-    const loginButton = page.locator('button[type="submit"], button:has-text("Sign In"), button:has-text("Log In"), button:has-text("Login")')
-    await loginButton.first().click()
-
-    // Wait for error message
-    await page.waitForTimeout(5000)
-
-    // Should show an error (toast or inline) — not a raw stack trace
-    const pageText = await page.locator('body').textContent()
-    const hasError = pageText?.toLowerCase().includes('error') ||
-      pageText?.toLowerCase().includes('incorrect') ||
-      pageText?.toLowerCase().includes('invalid') ||
-      pageText?.toLowerCase().includes('wrong') ||
-      pageText?.toLowerCase().includes('failed')
-    expect(hasError).toBeTruthy()
+    await page.locator('#login-password').fill('wrongpassword')
+    await page.locator('[data-testid="login-submit"]').click()
+    await expect(page.getByRole('alert').or(page.locator('#login-email-error')).first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('body')).toContainText(/incorrect|invalid|failed/i)
   })
 })
 

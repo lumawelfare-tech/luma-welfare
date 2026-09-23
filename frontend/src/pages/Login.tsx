@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
-import { api, ApiError } from '../lib/api'
+import { api, ApiError, setAdmin2faStepUpToken } from '../lib/api'
 import { useHead } from '../lib/seo'
 import { AuthCard, alertErrorClass, alertSuccessClass, alertWarnClass } from '../components/PageHero'
 import { Button, Input } from '../components/ui'
@@ -93,12 +93,17 @@ export function Login() {
     setVerifying2fa(true)
     setError(null)
     try {
-      await api('/admin/2fa?action=verify', {
+      const result = await api<{
+        step_up_token?: string
+        step_up_expires_at?: number
+      }>('/admin/2fa?action=verify', {
         method: 'POST',
         auth: true,
         body: { code: totpCode },
       })
-      // 2FA verified — now navigate
+      if (result.step_up_token) {
+        setAdmin2faStepUpToken(result.step_up_token, result.step_up_expires_at)
+      }
       navigate('/admin', { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Invalid code. Please try again.')
@@ -153,6 +158,7 @@ export function Login() {
                 placeholder="000000"
                 maxLength={6}
                 autoFocus
+                id="login-totp"
                 aria-label="Two-factor authentication code"
                 className="text-center font-mono text-xl tracking-[0.3em]"
               />

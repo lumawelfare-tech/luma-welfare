@@ -3,8 +3,8 @@
  * Skips when E2E credentials are unset (soft gate; ENFORCE_LIVE_SECRETS hardens CI separately).
  */
 import { test, expect } from '@playwright/test'
-import { BASE_URL, E2E_ADMIN, E2E_MEMBER, hasAdminCreds, hasMemberCreds } from './helpers/env'
-import { loginUi, signInApi, edgeJson } from './helpers/auth'
+import { BASE_URL, E2E_MEMBER, hasAdminCreds, hasMemberCreds } from './helpers/env'
+import { loginUi, loginAdminUi, signInApi, edgeJson } from './helpers/auth'
 
 test.describe('Phase 8 member critical paths', () => {
   test.skip(!hasMemberCreds, 'Set E2E_MEMBER_EMAIL/PASSWORD + SUPABASE_URL + anon key')
@@ -50,7 +50,7 @@ test.describe('Phase 8 admin critical paths', () => {
 
   test('applications, complaints, community, documents admin routes', async ({ page }) => {
     test.setTimeout(120_000)
-    await loginUi(page, E2E_ADMIN.email, E2E_ADMIN.password)
+    await loginAdminUi(page)
 
     await page.goto(`${BASE_URL}/admin/applications`)
     await page.waitForURL(/\/admin\/(applications|members)/, { timeout: 25_000 })

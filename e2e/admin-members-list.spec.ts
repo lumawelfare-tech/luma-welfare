@@ -5,12 +5,11 @@
 import { test, expect } from '@playwright/test'
 import {
   BASE_URL,
-  E2E_ADMIN,
   E2E_MEMBER,
   hasAdminCreds,
   hasMemberCreds,
 } from './helpers/env'
-import { loginUi, signInApi, edgeJson } from './helpers/auth'
+import { loginUi, loginAdminUi, signInApi, signInAdminApi, edgeJson } from './helpers/auth'
 
 test.describe('Admin Members list columns + ID reveal', () => {
   test.skip(!hasAdminCreds, 'Set E2E_ADMIN_EMAIL/PASSWORD + SUPABASE_URL + anon key')
@@ -18,14 +17,14 @@ test.describe('Admin Members list columns + ID reveal', () => {
   test('admin sees name/phone/masked ID/email; search + reveal; 375px card layout', async ({ page, request }) => {
     test.setTimeout(120_000)
 
-    const admin = await signInApi(request, E2E_ADMIN.email, E2E_ADMIN.password)
+    const admin = await signInAdminApi(request)
 
     const list = await edgeJson<{ members?: Array<Record<string, unknown>> }>(
       request,
       'GET',
       'admin-members',
       admin.accessToken,
-      { query: 'page=1&per_page=10' },
+      { query: 'page=1&per_page=10', stepUpToken: admin.stepUpToken },
     )
     expect(list.status).toBe(200)
     const rows = list.body.members ?? []
@@ -36,10 +35,7 @@ test.describe('Admin Members list columns + ID reveal', () => {
       }
     }
 
-    await loginUi(page, E2E_ADMIN.email, E2E_ADMIN.password)
-    if (page.url().includes('verify') || await page.getByText(/two-factor|authenticator/i).isVisible().catch(() => false)) {
-      test.skip(true, 'Admin account has 2FA enabled — use a test admin without 2FA for UI E2E')
-    }
+    await loginAdminUi(page)
 
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto(`${BASE_URL}/admin/members`)
@@ -69,6 +65,7 @@ test.describe('Admin Members list columns + ID reveal', () => {
         {
           query: `member_id=${encodeURIComponent(String(withPhone?.id ?? rows[0]?.id ?? ''))}`,
           data: {},
+          stepUpToken: admin.stepUpToken,
         },
       )
       expect([200, 404]).toContain(revealApi.status)

@@ -48,35 +48,14 @@ test.describe('Login Page', () => {
   })
 
   test('shows error for invalid credentials', async ({ page }) => {
+    test.setTimeout(90_000)
     await page.goto(`${BASE}/login`)
-
-    // Wait for SPA to render
-    await page.waitForSelector('#root, #app, main', { timeout: 15000 })
-
-    // Fill in invalid credentials
-    const inputs = page.locator('input')
-    const emailInput = inputs.nth(0)
-    const passwordInput = inputs.nth(1)
-
-    await emailInput.fill('nonexistent@example.com')
-    await passwordInput.fill('wrongpassword123')
-
-    // Submit via button click
-    const submitBtn = page.locator('button').last()
-    await submitBtn.click()
-
-    // Wait for error — could be toast, inline, or alert
-    await page.waitForTimeout(5000)
-
-    // Check page has some error indication
-    const pageText = await page.locator('body').textContent()
-    const hasError = pageText?.toLowerCase().includes('error') ||
-      pageText?.toLowerCase().includes('incorrect') ||
-      pageText?.toLowerCase().includes('invalid') ||
-      pageText?.toLowerCase().includes('wrong') ||
-      pageText?.toLowerCase().includes('failed') ||
-      pageText?.toLowerCase().includes('not found')
-    expect(hasError).toBeTruthy()
+    await page.locator('#login-email').waitFor({ state: 'visible', timeout: 20_000 })
+    await page.locator('#login-email').fill('nonexistent@example.com')
+    await page.locator('#login-password').fill('wrongpassword123')
+    await page.locator('[data-testid="login-submit"]').click()
+    await expect(page.getByRole('alert').or(page.locator('#login-email-error')).first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('body')).toContainText(/incorrect|invalid|failed/i)
   })
 
   test('has link to register page', async ({ page }) => {
@@ -201,7 +180,7 @@ test.describe('Protected Routes — Auth Enforcement', () => {
     '/admin/reports',
     '/admin/settings',
     '/admin/audit-logs',
-    '/admin/health-checks',
+    '/admin/health',
   ]
 
   for (const route of protectedRoutes) {

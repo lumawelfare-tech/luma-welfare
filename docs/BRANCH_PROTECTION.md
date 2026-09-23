@@ -26,7 +26,8 @@ Enable “Require status checks to pass before merging” and require:
 | `SUPABASE_ANON_KEY` | RLS live suite, E2E |
 | `SUPABASE_SERVICE_ROLE_KEY` | RLS live seed/cleanup, E2E seed |
 | `E2E_MEMBER_EMAIL` / `E2E_MEMBER_PASSWORD` | Authenticated member E2E |
-| `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD` | Admin E2E (prefer a **non-2FA** test admin) |
+| `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD` | Admin E2E (staff account with 2FA already enrolled) |
+| `E2E_ADMIN_TOTP_SECRET` | Completes required staff 2FA in Playwright (RFC 6238 secret) |
 
 Without Supabase secrets, RLS and authenticated E2E **skip** rather than fail. Configure secrets on the repo (or environment) so those suites actually run before go-live.
 

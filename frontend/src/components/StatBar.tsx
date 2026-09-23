@@ -114,7 +114,7 @@ export function StatBar() {
 
   if (status === 'loading') {
     return (
-      <div className="relative overflow-hidden bg-luma-800" aria-busy="true" aria-label="Loading statistics">
+      <div className="relative overflow-hidden bg-luma-800" role="status" aria-busy="true" aria-label="Loading statistics">
         <div className="container-luma relative grid grid-cols-2 gap-6 py-12 sm:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex flex-col items-center gap-3">
