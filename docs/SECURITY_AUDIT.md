@@ -2,9 +2,9 @@
 
 **Date:** 23 Sep 2026  
 **Scope:** Vite/React SPA (Vercel) + Supabase (Postgres / RLS / Auth / Storage) + Edge Functions  
-**This document is Stage 4** — combined findings from Stages 1–3 after approved remediations.  
-**Payments:** M-Pesa / Daraja remain **read-only**. No payment code or env changes in this cycle.  
-**Do not start Stage 5 (more product fixes) or Stage 6 (maintenance doc) until you approve.**
+**This document is Stage 4** — combined findings plus approved remediations (23 Sep 2026).  
+**Payments:** M-Pesa / Daraja remain **read-only**. No payment initiate/callback changes.  
+**Do not start Stage 5 leftover product work or Stage 6 (maintenance doc) until you approve.**
 
 Prior cycle (21 Sep 2026) High/Medium patches (H-01–H-04, M-02–M-06, M-08, M-10, L-05) stay in force. Contracts: `frontend/src/lib/__tests__/security-audit-stage4.test.ts`.
 
@@ -18,11 +18,11 @@ Prior cycle (21 Sep 2026) High/Medium patches (H-01–H-04, M-02–M-06, M-08, M
 | A02 Crypto | National ID, DOB, phones still stored at rest in Postgres. No column encryption (not approved). |
 | A03 Injection | Parameterized PostgREST / RPC. Offline sanitize + magic-byte uploads. No live exploit suites (by design). |
 | A04 Insecure design | Self-approve blocked. Fee-required activate. Claim upload uses one id. Login / forgot-password go through rate-limited Edge Functions. |
-| A05 Misconfig | Hosted `enable_signup=false`. Health / callback use `handleCors`. JWT-off functions are the public/cron set only. |
+| A05 Misconfig | Hosted `enable_signup=false`. Health / callback use `handleCors`. Member 500s no longer echo raw `Error.message`. |
 | A06 Components | CI fails production High/Critical (`pipefail` + `--audit-level=high`). Dev-only audit is informational. |
 | A07 Auth | Staff 2FA required. Login stores the step-up token. TOTP verify is rate-limited. |
 | A08 Integrity | Bundle secret scan + legacy-backend guard on build. |
-| A09 Logging | Audit log FORCE RLS, no client policies, UPDATE blocked. UI failed logins still not a first-class audit event. |
+| A09 Logging | Audit log FORCE RLS, no client policies, UPDATE blocked. `auth-login` writes `auth_failed` for invalid login and inactive accounts. |
 | A10 SSRF | No user-controlled server-side fetch. |
 
 **Residual High (ops, not product code):** CI can still go green without live RLS / authenticated E2E until `ENFORCE_LIVE_SECRETS=true` and `E2E_ADMIN_TOTP_SECRET` are set on the GitHub repo.
@@ -104,12 +104,30 @@ These suites **self-skip** when secrets are missing. That is documented. It is *
 | Live RLS isolation | `SUPABASE_URL` + anon + service role |
 | Authenticated member E2E | `E2E_MEMBER_*` + Supabase URL/anon |
 | Admin UI / API happy paths | `E2E_ADMIN_*` + `E2E_ADMIN_TOTP_SECRET` |
-| `🎭 E2E Tests` job | PR to `main`, or push to `main` (not develop-only) |
+| `🎭 E2E Tests` job | PR to `main`, or push to `main` / `develop` |
 | `🔐 Live Secrets Gate` hard fail | Repo variable `ENFORCE_LIVE_SECRETS=true` |
 
 `test:coverage` remains informational (`continue-on-error`). Playwright is Chromium + Pixel 5 only.
 
 ---
+
+## Stage 4 remediations (23 Sep 2026)
+
+| ID | Status | Change |
+|----|--------|--------|
+| O-02 | Fixed | Live RLS queries `roles`/`permissions` — support / finance / claims_reviewer must not have settings, reveal, or exports |
+| O-03 | Fixed | Idempotent storage lockdown + live isolation (claim-documents cross-member; member cannot write media/exports/kb/report-files) |
+| O-05 | Fixed | CI E2E and Edge Function Check run on `develop` pushes |
+| O-07 | Fixed | `auth-login` already audited invalid login; now also audits `ACCOUNT_INACTIVE` |
+| A05 | Fixed | Member APIs use `handleUnexpectedError` — no raw SQL / stack in 500 bodies |
+| O-01 | Ops | Still needs GitHub `E2E_ADMIN_TOTP_SECRET` + `ENFORCE_LIVE_SECRETS=true` |
+| O-04 | Deferred | Firefox / WebKit (CI time) |
+| O-06 | Deferred | Coverage threshold |
+| O-08 | Deferred | PII column encryption |
+| O-09 | Deferred | PDF malware vendor |
+| P-* | Frozen | Daraja / M-Pesa |
+
+Contracts: `frontend/src/lib/__tests__/owasp-stage4-fixes.test.ts`. Migration: `20260923180000_owasp_stage4_storage_lockdown.sql`.
 
 ## Remaining open (Stage 5 candidates)
 
@@ -118,12 +136,8 @@ Do not implement these until you approve Stage 5. No exploit PoCs.
 | ID | Severity | Item |
 |----|----------|------|
 | O-01 | High (ops) | Set GitHub secrets including `E2E_ADMIN_TOTP_SECRET`, then `ENFORCE_LIVE_SECRETS=true` |
-| O-02 | Medium | Live staff-role matrix (finance vs support vs claims_reviewer) against settings/reveal/exports |
-| O-03 | Medium | Storage object IDOR suite (signed URLs / bucket policies) |
 | O-04 | Medium | Firefox / WebKit Playwright project |
-| O-05 | Medium | Run E2E on `develop` or require preview URLs for develop pushes |
 | O-06 | Medium | Coverage threshold (today informational) |
-| O-07 | Low | UI failed-login audit event |
 | O-08 | Low | PII column encryption (product + key-management decision) |
 | O-09 | Info | Malware scan of valid PDFs (vendor) |
 | P-* | Deferred | Daraja / M-Pesa — report only until full secrets + GO |
@@ -133,7 +147,7 @@ Do not implement these until you approve Stage 5. No exploit PoCs.
 ## GO decisions before Stage 5
 
 1. Populate `E2E_ADMIN_TOTP_SECRET` (enrolled test admin) and flip `ENFORCE_LIVE_SECRETS=true`.  
-2. Which remaining IDs to patch (O-02…O-09, leftover 21 Sep Medium/Low).  
+2. Which leftover IDs to take in Stage 5 (O-04, O-06, O-08, O-09).  
 3. Payments stay frozen unless you explicitly say otherwise.
 
 ---

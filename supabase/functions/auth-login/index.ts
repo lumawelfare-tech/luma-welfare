@@ -98,6 +98,18 @@ Deno.serve(withLogging('auth-login', async (req) => {
 
     const isAdmin = Boolean(admin)
     if (member && (member.status === 'suspended' || member.status === 'closed') && !isAdmin) {
+      try {
+        await logAudit(adminClient, {
+          actor_id: data.user.id,
+          actor_role: 'member',
+          action: 'auth_failed',
+          resource: 'auth',
+          meta: { code: 'ACCOUNT_INACTIVE', status: member.status },
+          ip: getClientIp(req),
+        })
+      } catch {
+        // Never block the login response on audit failure
+      }
       return new Response(JSON.stringify({
         message: 'Your account is suspended or closed. Contact Luma Welfare support.',
         code: 'ACCOUNT_INACTIVE',

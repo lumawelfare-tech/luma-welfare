@@ -11,7 +11,7 @@
  */
 
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, handleUnexpectedError } from '../shared/supabase.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -152,9 +152,6 @@ Deno.serve(async (req) => {
       { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (err) {
-    return new Response(
-      JSON.stringify({ message: err instanceof Error ? err.message : 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+    return handleUnexpectedError(err, 'member-push-subscriptions')
   }
 })

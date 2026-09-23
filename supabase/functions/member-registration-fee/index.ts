@@ -1,5 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, logAudit, handleUnexpectedError } from '../shared/supabase.ts'
 import {
   loadRegistrationFeeConfig,
   RegistrationFeeConfigError,
@@ -313,8 +313,6 @@ Deno.serve(async (req) => {
         status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal server error' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return handleUnexpectedError(err, 'member-registration-fee')
   }
 })

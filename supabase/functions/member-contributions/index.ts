@@ -1,5 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, logAudit, handleUnexpectedError } from '../shared/supabase.ts'
 import { isValidContributionPeriod, mapInstalmentRpcError } from '../shared/instalments.ts'
 
 Deno.serve(async (req) => {
@@ -168,6 +168,6 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ message: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return handleUnexpectedError(err, 'member-contributions')
   }
 })

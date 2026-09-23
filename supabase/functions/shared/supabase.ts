@@ -175,6 +175,18 @@ export function handleAdminError(err: unknown, logLabel = 'admin'): Response {
   })
 }
 
+/** Member / public 500s — never echo raw Error.message (schema, SQL, stack). */
+export function handleUnexpectedError(err: unknown, logLabel: string): Response {
+  console.error(`${logLabel} error:`, err instanceof Error ? err.name : 'unknown')
+  return new Response(JSON.stringify({
+    message: 'An unexpected error occurred.',
+    code: 'INTERNAL',
+  }), {
+    status: 500,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 /**
  * Log an audit entry.
  */

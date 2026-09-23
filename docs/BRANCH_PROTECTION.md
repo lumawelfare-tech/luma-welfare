@@ -14,7 +14,7 @@ Enable “Require status checks to pass before merging” and require:
 | `🧹 Lint` | Lint failures |
 | `🧪 Tests` | Unit / qualify / live RLS failures (RLS self-skips only when Supabase secrets are unset) |
 | `🏗️ Build` | Build, bundle secret scan, or legacy-backend guard failures |
-| `🎭 E2E Tests` | Playwright failures on PRs and `main` pushes (skipped on non-`main` branch pushes that are not PRs) |
+| `🎭 E2E Tests` | Playwright failures on PRs and pushes to `main` or `develop` |
 | `📡 Edge Function Check` | Missing required Edge Function sources |
 | `📊 Security Summary` | Any of the above required jobs failed / cancelled / unexpectedly skipped |
 

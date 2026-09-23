@@ -74,6 +74,7 @@ describeLive('RLS isolation (live)', () => {
   let kbChunkId = ''
   let communityRecordId = ''
   let packageId: string | null = null
+  let claimDocPath = ''
 
   beforeAll(async () => {
     const a = admin()
@@ -256,6 +257,9 @@ describeLive('RLS isolation (live)', () => {
     if (contribA) await a.from('contributions').delete().eq('id', contribA)
     if (claimA) await a.from('claims').delete().eq('id', claimA)
     if (subA) await a.from('subscriptions').delete().eq('id', subA)
+    if (claimDocPath) {
+      await a.storage.from('claim-documents').remove([claimDocPath]).catch(() => {})
+    }
     await a.from('members').delete().in('id', [idA, idB])
     await a.auth.admin.deleteUser(idA).catch(() => {})
     await a.auth.admin.deleteUser(idB).catch(() => {})
@@ -388,6 +392,49 @@ describeLive('RLS isolation (live)', () => {
     const a = await userClient(emailA, password)
     expect((await a.from('admins').select('id').limit(5)).data ?? []).toEqual([])
     expect((await a.from('audit_logs').select('id').limit(5)).data ?? []).toEqual([])
+  })
+
+  it('member B cannot read member A claim-documents; members cannot write media/exports/kb', async () => {
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01])
+    claimDocPath = `${claimA}/rls-${randomUUID().slice(0, 8)}.jpg`
+    const uploaded = await admin().storage.from('claim-documents').upload(claimDocPath, jpeg, {
+      contentType: 'image/jpeg',
+      upsert: true,
+    })
+    if (uploaded.error) {
+      console.warn('[rls] claim-documents upload skipped:', uploaded.error.message)
+      return
+    }
+
+    const b = await userClient(emailB, password)
+    const stolen = await b.storage.from('claim-documents').download(claimDocPath)
+    expect(stolen.data).toBeNull()
+
+    const a = await userClient(emailA, password)
+    for (const bucket of ['media', 'exports', 'kb-documents', 'report-files'] as const) {
+      const write = await a.storage.from(bucket).upload(`rls-${randomUUID().slice(0, 8)}.jpg`, jpeg, {
+        contentType: 'image/jpeg',
+        upsert: false,
+      })
+      expect(write.error, `${bucket} must reject member upload`).toBeTruthy()
+    }
+  })
+
+  it('support / finance / claims_reviewer are not granted settings, reveal, or exports', async () => {
+    const a = admin()
+    const { data, error } = await a
+      .from('roles')
+      .select('name, permissions(resource, action)')
+      .in('name', ['support', 'finance', 'claims_reviewer'])
+    if (error) throw error
+    const forbidden = new Set(['settings:read', 'settings:update', 'members:reveal', 'exports:create'])
+    for (const role of data ?? []) {
+      const keys = ((role.permissions ?? []) as { resource: string; action: string }[])
+        .map((p) => `${p.resource}:${p.action}`)
+      for (const key of forbidden) {
+        expect(keys, `${role.name} must not have ${key}`).not.toContain(key)
+      }
+    }
   })
 
   it('non-admin edge call to admin-claims returns 403/401', async () => {

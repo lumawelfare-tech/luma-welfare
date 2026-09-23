@@ -1,5 +1,5 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, logAudit, handleUnexpectedError } from '../shared/supabase.ts'
 import {
   ageFromDateOfBirth,
   assertTierAllowedForAge,
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
 
       return new Response(JSON.stringify({ message: 'Subscription cancelled' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     } catch (err) {
-      return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return handleUnexpectedError(err, 'member-subscriptions')
     }
   }
 
@@ -155,6 +155,6 @@ Deno.serve(async (req) => {
     await logAudit(adminClient, { actor_id: user.id, action: 'requested_subscription', resource: 'subscription', resource_id: data.id })
     return new Response(JSON.stringify({ subscription: data }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
-    return new Response(JSON.stringify({ message: err instanceof Error ? err.message : 'Internal error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return handleUnexpectedError(err, 'member-subscriptions')
   }
 })
