@@ -1,5 +1,26 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
+import { maskIdNumberLast4 } from '../shared/pii.ts'
+
+function canRevealNationalId(session: { is_superadmin: boolean; permissions: Set<string> }): boolean {
+  return session.is_superadmin || session.permissions.has('members:reveal')
+}
+
+function maskReportIds(value: unknown, reveal: boolean): unknown {
+  if (Array.isArray(value)) return value.map((item) => maskReportIds(item, reveal))
+  if (value && typeof value === 'object') {
+    const next: Record<string, unknown> = {}
+    for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+      if (key === 'id_number' || key === 'national_id' || key === 'kra_pin') {
+        next[key] = reveal ? inner : maskIdNumberLast4(typeof inner === 'string' ? inner : null)
+      } else {
+        next[key] = maskReportIds(inner, reveal)
+      }
+    }
+    return next
+  }
+  return value
+}
 
 /**
  * Admin Reports & Exports
@@ -123,7 +144,7 @@ Deno.serve(async (req) => {
 
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'report_generated', resource: 'report', meta: { type: 'registration-fees', format: 'json' } })
 
-      return new Response(JSON.stringify({ report: 'Registration Fees', data: data ?? [], generated_at: new Date().toISOString() }), {
+      return new Response(JSON.stringify({ report: 'Registration Fees', data: maskReportIds(data ?? [], canRevealNationalId(session)), generated_at: new Date().toISOString() }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -146,7 +167,7 @@ Deno.serve(async (req) => {
 
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'report_generated', resource: 'report', meta: { type: 'contributions', format: 'json' } })
 
-      return new Response(JSON.stringify({ report: 'Contributions', data: data ?? [], generated_at: new Date().toISOString() }), {
+      return new Response(JSON.stringify({ report: 'Contributions', data: maskReportIds(data ?? [], canRevealNationalId(session)), generated_at: new Date().toISOString() }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -169,7 +190,7 @@ Deno.serve(async (req) => {
 
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'report_generated', resource: 'report', meta: { type: 'subscriptions', format: 'json' } })
 
-      return new Response(JSON.stringify({ report: 'Subscriptions', data: data ?? [], generated_at: new Date().toISOString() }), {
+      return new Response(JSON.stringify({ report: 'Subscriptions', data: maskReportIds(data ?? [], canRevealNationalId(session)), generated_at: new Date().toISOString() }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -192,7 +213,7 @@ Deno.serve(async (req) => {
 
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'report_generated', resource: 'report', meta: { type: 'claims', format: 'json' } })
 
-      return new Response(JSON.stringify({ report: 'Claims', data: data ?? [], generated_at: new Date().toISOString() }), {
+      return new Response(JSON.stringify({ report: 'Claims', data: maskReportIds(data ?? [], canRevealNationalId(session)), generated_at: new Date().toISOString() }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -214,7 +235,7 @@ Deno.serve(async (req) => {
 
       await logAudit(adminClient, { actor_id: session.id, actor_role: session.role_name, action: 'report_generated', resource: 'report', meta: { type: 'members', format: 'json' } })
 
-      return new Response(JSON.stringify({ report: 'Members', data: data ?? [], generated_at: new Date().toISOString() }), {
+      return new Response(JSON.stringify({ report: 'Members', data: maskReportIds(data ?? [], canRevealNationalId(session)), generated_at: new Date().toISOString() }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

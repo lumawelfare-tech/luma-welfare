@@ -87,3 +87,15 @@ export function prepareMemberListRow(row: Record<string, unknown>): Record<strin
 export function maskKraPin(value: string | null | undefined): string {
   return maskIdNumberLast4(value)
 }
+
+/** Drop raw kra_pin from an Edge member payload. Own-data export may still include it. */
+export function stripMemberKraPin(
+  member: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!member) return null
+  const { kra_pin: kraRaw, ...rest } = member
+  return {
+    ...rest,
+    kra_pin_masked: maskIdNumberLast4(typeof kraRaw === 'string' ? kraRaw : null),
+  }
+}

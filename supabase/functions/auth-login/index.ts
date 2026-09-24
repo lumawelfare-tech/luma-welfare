@@ -4,6 +4,7 @@ import { rateLimitAsync, addRateLimitHeaders } from '../shared/rate-limit.ts'
 import { parseLoginBody, ValidationError } from '../shared/validate.ts'
 import { withLogging } from '../shared/logging.ts'
 import { getClientIp } from '../shared/cloudflare.ts'
+import { stripMemberKraPin } from '../shared/pii.ts'
 
 /**
  * Auth Login — authenticate user and check 2FA status
@@ -123,7 +124,7 @@ Deno.serve(withLogging('auth-login', async (req) => {
 
     const response = new Response(JSON.stringify({
       session: data.session,
-      member,
+      member: stripMemberKraPin(member as Record<string, unknown> | null),
       requires_2fa: requires2fa,
       requires_2fa_setup: requires2faSetup,
     }), {

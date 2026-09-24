@@ -14,7 +14,7 @@ export type MemberStatus = 'pending_approval' | 'active' | 'suspended' | 'closed
 export async function assertMemberActive(
   adminClient: SupabaseClient,
   userId: string,
-  opts: { allowMissing?: boolean } = {},
+  opts: { allowMissing?: boolean; allowPending?: boolean } = {},
 ): Promise<Response | null> {
   const { data: member, error } = await adminClient
     .from('members')
@@ -39,6 +39,8 @@ export async function assertMemberActive(
 
   const status = member.status as MemberStatus
   if (status === 'active') return null
+
+  if (status === 'pending_approval' && opts.allowPending) return null
 
   if (status === 'pending_approval') {
     return new Response(JSON.stringify({

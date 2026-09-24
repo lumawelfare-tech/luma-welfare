@@ -6,6 +6,7 @@ import { withLogging } from '../shared/logging.ts'
 import { PRIVACY_POLICY_VERSION, TERMS_VERSION } from '../shared/legal-versions.ts'
 import { parseMemberProfilePatchBody, ValidationError } from '../shared/validate.ts'
 import { maskIdNumberLast4 } from '../shared/pii.ts'
+import { assertMemberActive } from '../shared/member-status.ts'
 import { detectAllowedImage, looksLikeScriptableMarkup } from '../shared/file-upload.ts'
 
 /**
@@ -414,6 +415,8 @@ Deno.serve(withLogging('member-profile', async (req) => {
 
     // PATCH — update profile fields
     if (req.method === 'PATCH') {
+      const inactive = await assertMemberActive(adminClient, user.id, { allowPending: true })
+      if (inactive) return inactive
       let raw: unknown
       try {
         raw = await req.json()

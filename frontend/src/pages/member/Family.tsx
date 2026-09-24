@@ -5,6 +5,8 @@ import { useHead } from '../../lib/seo'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { reportLoadError } from '../../lib/userFacingError'
+import { identityDocStatusLabel } from '../../lib/identityDocs'
+import { StatusBadge } from '../../components/StatusBadge'
 
 type FamilyMember = {
   id: string
@@ -35,11 +37,23 @@ export function Family() {
   const [loading, setLoading] = useState(true)
   const [docBusy, setDocBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [identityDocs, setIdentityDocs] = useState<{
+    id: string
+    document_type: string
+    family_member_id?: string | null
+    verification_status: string
+    rejection_reason?: string | null
+  }[]>([])
 
   async function load() {
     try {
-      const d = await api<{ family_members: FamilyMember[] }>('/member/family', { auth: true })
+      const [d, docs] = await Promise.all([
+        api<{ family_members: FamilyMember[] }>('/member/family', { auth: true }),
+        api<{ documents: typeof identityDocs }>('/member/identity-docs', { auth: true }).catch(() => ({ documents: [] })),
+      ])
       setMembers(d.family_members ?? [])
+      setIdentityDocs(docs.documents ?? [])
       setLoadError(null)
     } catch (e) {
       setLoadError(reportLoadError(e, { page: 'member-family' }, 'Could not load family members.'))
@@ -54,6 +68,14 @@ export function Family() {
     e.preventDefault()
     setError(null)
     setMsg(null)
+    const duplicate = members.some((m) =>
+      m.full_name.trim().toLowerCase() === form.full_name.trim().toLowerCase()
+      && m.relationship === form.relationship,
+    )
+    if (duplicate) {
+      setError('That family member is already on your list.')
+      return
+    }
     setBusy(true)
     try {
       await api('/member/family', {
@@ -78,8 +100,17 @@ export function Family() {
   }
 
   async function remove(id: string) {
-    await api(`/member/family/${id}`, { method: 'DELETE', auth: true })
-    await load()
+    if (!window.confirm('Remove this family member from your list?')) return
+    setError(null)
+    setRemovingId(id)
+    try {
+      await api(`/member/family/${id}`, { method: 'DELETE', auth: true })
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not remove the family member.')
+    } finally {
+      setRemovingId(null)
+    }
   }
 
   async function uploadBeneficiaryDoc(familyMemberId: string, file: File) {
@@ -135,8 +166,8 @@ export function Family() {
           <h2 className="text-sm font-semibold text-gray-900">Add family member</h2>
           <div className="mt-4 space-y-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Full name</label>
-              <input required value={form.full_name} onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-luma-500 focus:bg-white" />
+              <label htmlFor="family-full-name" className="mb-1 block text-xs font-medium text-gray-600">Full name</label>
+              <input id="family-full-name" required value={form.full_name} onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-luma-500 focus:bg-white" />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Relationship</label>
@@ -209,17 +240,31 @@ export function Family() {
                             {m.date_of_birth ? ` · ${m.date_of_birth}` : ''}
                           </div>
                         </div>
-                        <button onClick={() => remove(m.id)} className="text-xs font-medium text-red-600 hover:text-red-700 hover:underline">
-                          Remove
+                        <button
+                          type="button"
+                          onClick={() => void remove(m.id)}
+                          disabled={removingId === m.id}
+                          className="min-h-11 px-2 text-xs font-medium text-red-600 hover:text-red-700 hover:underline disabled:opacity-60"
+                        >
+                          {removingId === m.id ? 'Removing…' : 'Remove'}
                         </button>
                       </div>
+                      {(() => {
+                        const doc = identityDocs.find((d) => d.family_member_id === m.id && d.document_type === 'beneficiary_id')
+                        return doc ? (
+                          <div className="mt-2">
+                            <StatusBadge status={doc.verification_status}>{identityDocStatusLabel(doc.verification_status)}</StatusBadge>
+                            {doc.rejection_reason ? <p className="mt-1 text-xs text-red-600">Needs correction: {doc.rejection_reason}</p> : null}
+                          </div>
+                        ) : null
+                      })()}
                       <label className="mt-3 block text-[11px] text-gray-500">
                         National ID PDF
                         <input
                           type="file"
                           accept="application/pdf,.pdf"
                           disabled={docBusy === m.id}
-                          className="mt-1 block w-full text-xs"
+                          className="mt-1 block w-full text-xs min-h-11"
                           onChange={(e) => {
                             const file = e.target.files?.[0]
                             e.target.value = ''

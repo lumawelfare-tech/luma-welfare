@@ -25,6 +25,7 @@ type PurgeResult = {
   reference?: string
   photo_url?: string | null
   claim_document_paths?: string[]
+  member_document_paths?: string[]
   auth_action: 'delete_user' | 'ban_user'
 }
 
@@ -53,6 +54,7 @@ async function removeStorageArtifacts(
   memberId: string,
   photoUrl: string | null | undefined,
   claimPaths: string[],
+  identityPaths: string[] = [],
 ): Promise<void> {
   try {
     const { data: files } = await adminClient.storage.from('avatars').list(memberId)
@@ -95,6 +97,31 @@ async function removeStorageArtifacts(
     } catch {
       /* non-fatal */
     }
+  }
+
+  const identityKeys = identityPaths
+    .map((p) => (typeof p === 'string' && p && !p.startsWith('http') ? p : null))
+    .filter((x): x is string => !!x)
+  if (identityKeys.length > 0) {
+    try {
+      await adminClient.storage.from('member-documents').remove(identityKeys)
+    } catch {
+      /* non-fatal */
+    }
+  }
+
+  try {
+    const folders = ['identity', 'tax', 'family']
+    for (const folder of folders) {
+      const { data: files } = await adminClient.storage.from('member-documents').list(`${memberId}/${folder}`)
+      if (files && files.length > 0) {
+        await adminClient.storage.from('member-documents').remove(
+          files.map((f) => `${memberId}/${folder}/${f.name}`),
+        )
+      }
+    }
+  } catch {
+    /* non-fatal */
   }
 }
 
@@ -217,6 +244,7 @@ Deno.serve(async (req) => {
           memberId,
           purge.photo_url,
           Array.isArray(purge.claim_document_paths) ? purge.claim_document_paths : [],
+          Array.isArray(purge.member_document_paths) ? purge.member_document_paths : [],
         )
 
         try {

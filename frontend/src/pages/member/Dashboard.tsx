@@ -26,6 +26,7 @@ import {
   MANUAL_CONTRIBUTION_HINT,
 } from '../../lib/paymentsUi'
 import { reportLoadError } from '../../lib/userFacingError'
+import { identityDocsNextStep, type IdentityDocsNextStep } from '../../lib/identityDocs'
 
 type Qualification = {
   status: 'eligible' | 'not_eligible' | 'at_risk' | 'revoked'
@@ -192,6 +193,7 @@ export function Dashboard() {
   const [claimSubmitting, setClaimSubmitting] = useState(false)
   const [claimSuccess, setClaimSuccess] = useState(false)
   const claimModalRef = useRef<HTMLDivElement>(null)
+  const [docNextStep, setDocNextStep] = useState<IdentityDocsNextStep | null>(null)
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -209,6 +211,12 @@ export function Dashboard() {
       setSummary(dashboard.summary ?? null)
       setRecentPayments(dashboard.recent_payments ?? [])
       setNotifications((notifData.notifications ?? []).slice(0, 3))
+      try {
+        const docs = await api<{ documents: { document_type: string; verification_status: string }[] }>('/member/identity-docs', { auth: true })
+        setDocNextStep(identityDocsNextStep(docs.documents ?? []))
+      } catch {
+        setDocNextStep(null)
+      }
     } catch (e) {
       setError(reportLoadError(e, { page: 'member-dashboard' }, 'Could not load your membership information.'))
     } finally {
@@ -793,6 +801,13 @@ export function Dashboard() {
               Profile &amp; documents
             </Link>
           </div>
+          {docNextStep && docNextStep.kind !== 'ok' && (
+            <p className={`mt-3 text-sm rounded-lg px-3 py-2 ${
+              docNextStep.kind === 'rejected' ? 'bg-red-50 text-red-800' : docNextStep.kind === 'pending' ? 'bg-amber-50 text-amber-900' : 'bg-luma-50 text-luma-900'
+            }`} role="status">
+              {docNextStep.message}
+            </p>
+          )}
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
             <Link to="/profile" className="rounded-lg bg-gray-50 px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-100 min-h-[44px] flex items-center">
               National ID &amp; KRA

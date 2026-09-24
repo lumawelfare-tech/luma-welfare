@@ -11,6 +11,7 @@ import {
   familyTierLabel,
   identityDocLabel,
   identityDocStatusLabel,
+  identityDocsNextStep,
 } from '../identityDocs'
 
 const root = resolve(import.meta.dirname, '../../../../')
@@ -29,6 +30,16 @@ describe('identity document display helpers', () => {
     expect(familyTierLabel('nuclear')).toBe('Nuclear family')
     expect(familyTierLabel('extended')).toBe('Extended family')
     expect(beneficiaryStatusLabel('active')).toBe('Active')
+  })
+
+  it('next-step copy treats KRA as optional and flags rejection first', () => {
+    expect(identityDocsNextStep([]).kind).toBe('missing')
+    expect(identityDocsNextStep([{ document_type: 'national_id', verification_status: 'pending' }]).kind).toBe('pending')
+    expect(identityDocsNextStep([
+      { document_type: 'national_id', verification_status: 'rejected' },
+      { document_type: 'kra_certificate', verification_status: 'verified' },
+    ]).kind).toBe('rejected')
+    expect(identityDocsNextStep([{ document_type: 'national_id', verification_status: 'verified' }]).kind).toBe('ok')
   })
 })
 
@@ -100,10 +111,23 @@ describe('admin identity document contracts', () => {
     expect(src).not.toMatch(/getPublicUrl/)
   })
 
-  it('auth-me strips full kra_pin from the session member', () => {
-    const src = read('supabase/functions/auth-me/index.ts')
-    expect(src).toContain('kra_pin_masked')
-    expect(src).toContain('maskIdNumberLast4')
-    expect(src).toContain('memberSafe')
+  it('auth-me and auth-login strip full kra_pin from the session member', () => {
+    expect(read('supabase/functions/auth-me/index.ts')).toContain('stripMemberKraPin')
+    expect(read('supabase/functions/auth-login/index.ts')).toContain('stripMemberKraPin')
+    expect(read('supabase/functions/shared/pii.ts')).toContain('export function stripMemberKraPin')
+    expect(read('supabase/functions/shared/logging.ts')).toContain("'kra_pin'")
+  })
+
+  it('view-identity-document requires documents:read, not members:reveal', () => {
+    const src = read('supabase/functions/admin-members/index.ts')
+    expect(src).toContain("requirePermission(session, 'documents', 'read')")
+    expect(src).not.toMatch(/members:reveal/)
+  })
+
+  it('family and identity mutations block suspended or closed members', () => {
+    expect(read('supabase/functions/member-family/index.ts')).toContain('assertMemberActive')
+    expect(read('supabase/functions/member-identity-docs/index.ts')).toContain('assertMemberActive')
+    expect(read('supabase/functions/member-profile/index.ts')).toContain('assertMemberActive')
+    expect(read('supabase/functions/shared/member-status.ts')).toContain('allowPending')
   })
 })

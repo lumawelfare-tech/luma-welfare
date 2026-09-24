@@ -277,6 +277,7 @@ function redactSensitive(obj: Record<string, unknown>): Record<string, unknown> 
     'id_number',
     'idnumber',
     'national_id',
+    'kra_pin',
     'otp',
   ]
   const result: Record<string, unknown> = {}

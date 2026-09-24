@@ -236,8 +236,8 @@ export function Profile() {
         <h3 className="text-sm font-semibold text-gray-900 mb-4">Personal Information</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">Full name</label>
-            <input value={form.fullName ?? ''} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
+            <label htmlFor="profile-full-name" className="mb-1 block text-xs font-medium text-gray-600">Full name</label>
+            <input id="profile-full-name" value={form.fullName ?? ''} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Phone (M-Pesa)</label>
@@ -469,13 +469,17 @@ function IdentityDocsPanel() {
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   async function load() {
+    setErr(null)
     try {
       const d = await api<{ documents: IdentityDoc[] }>('/member/identity-docs', { auth: true })
       setDocs(d.documents ?? [])
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Could not load documents.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -535,8 +539,22 @@ function IdentityDocsPanel() {
     <section className="mt-6 glass-panel p-6">
       <h3 className="text-sm font-semibold text-gray-900">Identity documents</h3>
       <p className="mt-1 text-xs text-gray-500">Upload PDF copies of your National ID and KRA certificate. Files stay private and are never published.</p>
-      {err && <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">{err}</div>}
+      {err && (
+        <div className="mt-3">
+          <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">{err}</div>
+          <button type="button" onClick={() => { setLoading(true); void load() }} className="mt-2 min-h-11 text-sm font-medium text-luma-700 hover:underline">
+            Retry
+          </button>
+        </div>
+      )}
       {msg && <div className="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700" role="status">{msg}</div>}
+      {loading && (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="h-28 rounded-lg luma-skeleton" />
+          <div className="h-28 rounded-lg luma-skeleton" />
+        </div>
+      )}
+      {!loading && !err && (
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         {([
           ['national_id', identityDocLabel('national_id')],
@@ -584,6 +602,7 @@ function IdentityDocsPanel() {
           )
         })}
       </div>
+      )}
     </section>
   )
 }

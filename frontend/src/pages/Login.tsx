@@ -202,7 +202,6 @@ export function Login() {
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError(null) }}
                   placeholder="you@example.com"
-                  error={error && !needsVerification ? error : undefined}
                 />
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">
@@ -220,9 +219,15 @@ export function Login() {
                     onChange={(e) => { setPassword(e.target.value); setError(null) }}
                     placeholder="••••••••"
                     aria-invalid={error && !needsVerification ? true : undefined}
-                    aria-describedby={error && !needsVerification ? 'login-email-error' : undefined}
+                    aria-describedby={error && !needsVerification ? 'login-form-error' : undefined}
                   />
                 </div>
+
+                {error && !needsVerification && (
+                  <div id="login-form-error" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                    {error}
+                  </div>
+                )}
 
                 {passwordReset && (
                   <div className={alertSuccessClass} role="status">

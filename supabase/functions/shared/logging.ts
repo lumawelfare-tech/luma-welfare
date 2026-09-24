@@ -78,7 +78,7 @@ const SENSITIVE_FIELDS = [
   'cookie', 'access_token', 'refresh_token', 'service_role',
   'mpesa_consumer_key', 'mpesa_consumer_secret', 'mpesa_passkey',
   'otp', 'two_factor_secret', 'two_factor_recovery_codes',
-  'phone', 'id_number', 'national_id', 'alt_phone',
+  'phone', 'id_number', 'national_id', 'alt_phone', 'kra_pin',
 ]
 
 const PII_VALUE_RE =

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -229,8 +230,18 @@ export function Claims() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
-          <h1 className="text-lg font-semibold text-gray-900">Registration Fee Required</h1>
-          <p className="mt-2 text-sm text-gray-600">Please pay the registration fee before filing claims.</p>
+          <h1 className="text-lg font-semibold text-gray-900">Activation fee required</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Complete the one-time KSh 300 activation fee before filing claims. Online M-Pesa is launching soon; an administrator can verify your fee from the dashboard.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+            <Link to="/dashboard" className="inline-flex items-center justify-center rounded-lg bg-luma-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-luma-800 min-h-[44px]">
+              Back to Dashboard
+            </Link>
+            <Link to="/contact" className="inline-flex items-center justify-center rounded-lg border border-amber-300 px-4 py-2.5 text-sm font-medium text-amber-950 hover:bg-amber-100 min-h-[44px]">
+              Contact the office
+            </Link>
+          </div>
         </div>
       </div>
     )

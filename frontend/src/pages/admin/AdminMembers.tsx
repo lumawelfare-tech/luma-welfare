@@ -124,6 +124,7 @@ export function AdminMembers() {
     identity_documents?: Record<string, unknown>[]
   } | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
   const [docBusyId, setDocBusyId] = useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = useState<{ id: string; type: string } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -239,6 +240,7 @@ export function AdminMembers() {
   async function viewMember(member: Member) {
     setDetailMember(member)
     setDetailData(null)
+    setDetailError(null)
     setLoadingDetail(true)
     try {
       const d = await api<{
@@ -253,6 +255,7 @@ export function AdminMembers() {
       setRejectTarget(null)
       setRejectReason('')
     } catch {
+      setDetailError('Could not load member details.')
       addToast('warning', 'Could not load member details.')
     } finally {
       setLoadingDetail(false)
@@ -1164,26 +1167,40 @@ export function AdminMembers() {
 
       {/* Member Detail Drawer */}
       {detailMember && (
-        <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/40" onClick={() => setDetailMember(null)}>
-          <div className="h-full w-full max-w-lg bg-white shadow-2xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-end bg-black/40"
+          onClick={() => setDetailMember(null)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setDetailMember(null) }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${detailMember.full_name} details`}
+            className="h-full w-full max-w-lg bg-white shadow-2xl overflow-y-auto overflow-x-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">{detailMember.full_name}</h3>
-                <p className="text-sm text-gray-500">{detailMember.email ?? detailMember.phone}</p>
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold text-gray-900 truncate">{detailMember.full_name}</h3>
+                <p className="text-sm text-gray-500 truncate">{detailMember.email ?? detailMember.phone}</p>
               </div>
-              <button onClick={() => setDetailMember(null)} aria-label="Close" className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
+              <button onClick={() => setDetailMember(null)} aria-label="Close" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 min-h-11 min-w-11">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
             {loadingDetail ? (
               <div className="p-12 text-center text-gray-400">Loading member details…</div>
+            ) : detailError ? (
+              <div className="p-6">
+                <ErrorState message={detailError} onRetry={() => void viewMember(detailMember)} />
+              </div>
             ) : detailData ? (
               <div className="p-6 space-y-6">
                 {/* Member Info */}
                 <div className="rounded-xl border border-gray-200 p-4">
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Member Info</h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm min-w-0 break-words">
                     <div><span className="text-gray-400">Status</span><div className="font-medium capitalize">{String(detailData.member.status ?? '').replace(/_/g, ' ')}</div></div>
                     <div><span className="text-gray-400">Phone</span><div className="font-medium">{String(detailData.member.phone ?? '')}</div></div>
                     <div><span className="text-gray-400">Email</span><div className="font-medium">{String(detailData.member.email ?? '—')}</div></div>

@@ -98,15 +98,16 @@ Deno.serve(async (req) => {
         resource_id: resourceId,
       })
 
-      const { kra_pin: kraRaw, ...memberRest } = member as Record<string, unknown>
+      const { kra_pin: kraRaw, id_number: idRaw, ...memberRest } = member as Record<string, unknown>
       const familySafe = (family.data ?? []).map((row: Record<string, unknown>) => {
-        const idRaw = typeof row.id_number === 'string' ? row.id_number : null
+        const famId = typeof row.id_number === 'string' ? row.id_number : null
         const { id_number: _omit, ...rest } = row
-        return { ...rest, id_number_masked: maskIdNumberLast4(idRaw) }
+        return { ...rest, id_number_masked: maskIdNumberLast4(famId) }
       })
       return new Response(JSON.stringify({
         member: {
           ...memberRest,
+          id_number_masked: maskIdNumberLast4(typeof idRaw === 'string' ? idRaw : null),
           kra_pin_masked: maskIdNumberLast4(typeof kraRaw === 'string' ? kraRaw : null),
         },
         subscriptions: subs.data ?? [],

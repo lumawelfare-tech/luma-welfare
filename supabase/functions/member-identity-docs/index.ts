@@ -13,6 +13,7 @@ import {
   ValidationError,
 } from '../shared/validate.ts'
 import { maskIdNumberLast4 } from '../shared/pii.ts'
+import { assertMemberActive } from '../shared/member-status.ts'
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -95,6 +96,8 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === 'POST') {
+      const inactive = await assertMemberActive(adminClient, user.id, { allowPending: true })
+      if (inactive) return inactive
       const rl = await rateLimitAsync(req, 'member-identity-docs', { userId: user.id, adminClient })
       if (!rl.ok) return rl.response!
 
