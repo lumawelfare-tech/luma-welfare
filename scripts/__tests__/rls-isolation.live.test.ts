@@ -5,7 +5,10 @@
  *   Tables: members, claims, contributions, subscriptions, family_members,
  *           notifications, registration_fees, data_deletion_requests,
  *           member_legal_acceptances, financial_ledger, admins, audit_logs,
- *           complaints, community_support_records, kb_documents, kb_chunks
+ *           complaints, community_support_records, kb_documents, kb_chunks,
+ *           member_documents
+ *   Storage: claim-documents, member-documents
+ *   Column: members.kra_pin (anon/authenticated SELECT revoked)
  *   Edge:   admin-claims (member JWT → 401/403)
  *
  * Actors: anonymous · member A · member B · (admin tables denied to members)
@@ -75,6 +78,8 @@ describeLive('RLS isolation (live)', () => {
   let communityRecordId = ''
   let packageId: string | null = null
   let claimDocPath = ''
+  let memberDocA = ''
+  let memberDocPath = ''
 
   beforeAll(async () => {
     const a = admin()
@@ -239,6 +244,29 @@ describeLive('RLS isolation (live)', () => {
     }).select('id').single()
     if (chunkErr) console.warn('[rls] kb_chunks fixture skipped:', chunkErr.message)
     else kbChunkId = chunk.id
+
+    memberDocPath = `${idA}/national_id/rls-${randomUUID().slice(0, 8)}.pdf`
+    const pdf = new TextEncoder().encode('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n')
+    const uploadedDoc = await a.storage.from('member-documents').upload(memberDocPath, pdf, {
+      contentType: 'application/pdf',
+      upsert: true,
+    })
+    if (uploadedDoc.error) {
+      console.warn('[rls] member-documents upload skipped:', uploadedDoc.error.message)
+    } else {
+      const { data: docRow, error: docErr } = await a.from('member_documents').insert({
+        member_id: idA,
+        document_type: 'national_id',
+        storage_path: memberDocPath,
+        original_filename: 'rls-id.pdf',
+        mime_type: 'application/pdf',
+        size_bytes: pdf.byteLength,
+        uploaded_by: idA,
+        verification_status: 'pending',
+      }).select('id').single()
+      if (docErr) console.warn('[rls] member_documents fixture skipped:', docErr.message)
+      else memberDocA = docRow.id
+    }
   }, 90_000)
 
   afterAll(async () => {
@@ -254,6 +282,10 @@ describeLive('RLS isolation (live)', () => {
     if (regFeeA) await a.from('registration_fees').delete().eq('id', regFeeA)
     if (notifA) await a.from('notifications').delete().eq('id', notifA)
     if (familyA) await a.from('family_members').delete().eq('id', familyA)
+    if (memberDocA) await a.from('member_documents').delete().eq('id', memberDocA)
+    if (memberDocPath) {
+      await a.storage.from('member-documents').remove([memberDocPath]).catch(() => {})
+    }
     if (contribA) await a.from('contributions').delete().eq('id', contribA)
     if (claimA) await a.from('claims').delete().eq('id', claimA)
     if (subA) await a.from('subscriptions').delete().eq('id', subA)
@@ -284,6 +316,7 @@ describeLive('RLS isolation (live)', () => {
       'complaints',
       'community_support_records',
       'kb_chunks',
+      'member_documents',
     ] as const) {
       const res = await c.from(table).select('id').limit(5)
       expect(res.data ?? [], `${table} should be empty for anon`).toEqual([])
@@ -313,6 +346,9 @@ describeLive('RLS isolation (live)', () => {
     }
     if (familyA) {
       expect((await b.from('family_members').select('id').eq('id', familyA)).data ?? []).toEqual([])
+    }
+    if (memberDocA) {
+      expect((await b.from('member_documents').select('id').eq('id', memberDocA)).data ?? []).toEqual([])
     }
     if (notifA) {
       expect((await b.from('notifications').select('id').eq('id', notifA)).data ?? []).toEqual([])
@@ -368,6 +404,11 @@ describeLive('RLS isolation (live)', () => {
     if (familyA) {
       expect((await a.from('family_members').select('id').eq('id', familyA)).data?.[0]?.id).toBe(familyA)
     }
+    if (memberDocA) {
+      expect((await a.from('member_documents').select('id').eq('id', memberDocA)).data?.[0]?.id).toBe(memberDocA)
+      const mutated = await a.from('member_documents').update({ verification_status: 'verified' }).eq('id', memberDocA).select()
+      expect(mutated.data ?? []).toEqual([])
+    }
     if (complaintA) {
       expect((await a.from('complaints').select('id').eq('id', complaintA)).data?.[0]?.id).toBe(complaintA)
     }
@@ -420,6 +461,52 @@ describeLive('RLS isolation (live)', () => {
     }
   })
 
+  it('member B cannot read member A identity documents; JWT cannot download member-documents', async () => {
+    if (!memberDocA || !memberDocPath) {
+      console.warn('[rls] member_documents isolation skipped — fixture unavailable')
+      return
+    }
+
+    const b = await userClient(emailB, password)
+    expect((await b.from('member_documents').select('id, storage_path').eq('id', memberDocA)).data ?? []).toEqual([])
+    const stolenMeta = await b.from('member_documents').select('id').eq('member_id', idA)
+    expect(stolenMeta.data ?? []).toEqual([])
+    const stolenFile = await b.storage.from('member-documents').download(memberDocPath)
+    expect(stolenFile.data).toBeNull()
+
+    const a = await userClient(emailA, password)
+    expect((await a.from('member_documents').select('id').eq('id', memberDocA)).data?.[0]?.id).toBe(memberDocA)
+    const ownerDownload = await a.storage.from('member-documents').download(memberDocPath)
+    expect(ownerDownload.data).toBeNull()
+
+    const anonDl = await anonClient().storage.from('member-documents').download(memberDocPath)
+    expect(anonDl.data).toBeNull()
+
+    const adminFile = await admin().storage.from('member-documents').download(memberDocPath)
+    expect(adminFile.error).toBeNull()
+    expect(adminFile.data).toBeTruthy()
+  })
+
+  it('authenticated members cannot select kra_pin via PostgREST; service_role still can', async () => {
+    const a = await userClient(emailA, password)
+    const own = await a.from('members').select('kra_pin').eq('id', idA).maybeSingle()
+    if (own.error) {
+      expect(own.error).toBeTruthy()
+    } else {
+      expect(own.data).not.toHaveProperty('kra_pin')
+    }
+
+    const b = await userClient(emailB, password)
+    expect((await b.from('members').select('kra_pin').eq('id', idA)).data ?? []).toEqual([])
+
+    const anonPin = await anonClient().from('members').select('kra_pin').eq('id', idA)
+    expect(anonPin.data ?? []).toEqual([])
+
+    const adminPin = await admin().from('members').select('kra_pin').eq('id', idA).maybeSingle()
+    expect(adminPin.error).toBeNull()
+    expect(adminPin.data).toHaveProperty('kra_pin')
+  })
+
   it('support / finance / claims_reviewer are not granted settings, reveal, or exports', async () => {
     const a = admin()
     const { data, error } = await a
@@ -427,12 +514,15 @@ describeLive('RLS isolation (live)', () => {
       .select('name, permissions(resource, action)')
       .in('name', ['support', 'finance', 'claims_reviewer'])
     if (error) throw error
-    const forbidden = new Set(['settings:read', 'settings:update', 'members:reveal', 'exports:create'])
+    const forbidden = new Set(['settings:read', 'settings:update', 'members:reveal', 'exports:create', 'documents:verify'])
     for (const role of data ?? []) {
       const keys = ((role.permissions ?? []) as { resource: string; action: string }[])
         .map((p) => `${p.resource}:${p.action}`)
       for (const key of forbidden) {
         expect(keys, `${role.name} must not have ${key}`).not.toContain(key)
+      }
+      if (role.name === 'finance' || role.name === 'claims_reviewer') {
+        expect(keys, `${role.name} must not have documents:read`).not.toContain('documents:read')
       }
     }
   })

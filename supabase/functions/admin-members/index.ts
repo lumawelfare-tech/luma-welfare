@@ -10,6 +10,7 @@ import {
   loadRegistrationFeeConfig,
   RegistrationFeeConfigError,
 } from '../shared/registration-fee.ts'
+import { invalidateUserSessionsWithRetry } from '../shared/session-invalidate.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -330,7 +331,25 @@ Deno.serve(async (req) => {
         },
       })
 
-      return new Response(JSON.stringify({ member: data }), {
+      let sessionInvalidated: boolean | undefined
+      if (memberStatus === 'suspended' || memberStatus === 'closed') {
+        sessionInvalidated = await invalidateUserSessionsWithRetry(adminClient, resourceId, 'admin-members')
+        if (!sessionInvalidated) {
+          await logAudit(adminClient, {
+            actor_id: session.id,
+            actor_role: session.role_name,
+            action: 'member.session_invalidate_incomplete',
+            resource: 'member',
+            resource_id: resourceId,
+            meta: { status: memberStatus },
+          })
+        }
+      }
+
+      return new Response(JSON.stringify({
+        member: data,
+        ...(sessionInvalidated !== undefined ? { session_invalidated: sessionInvalidated } : {}),
+      }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

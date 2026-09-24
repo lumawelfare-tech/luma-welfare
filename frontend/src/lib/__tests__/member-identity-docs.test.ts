@@ -124,10 +124,23 @@ describe('admin identity document contracts', () => {
     expect(src).not.toMatch(/members:reveal/)
   })
 
+  it('suspend and close revoke Auth sessions after the status write', () => {
+    const src = read('supabase/functions/admin-members/index.ts')
+    expect(src).toContain('invalidateUserSessionsWithRetry')
+    expect(src).toContain('member.session_invalidate_incomplete')
+    expect(src).toContain('session_invalidated')
+  })
+
   it('family and identity mutations block suspended or closed members', () => {
     expect(read('supabase/functions/member-family/index.ts')).toContain('assertMemberActive')
     expect(read('supabase/functions/member-identity-docs/index.ts')).toContain('assertMemberActive')
     expect(read('supabase/functions/member-profile/index.ts')).toContain('assertMemberActive')
     expect(read('supabase/functions/shared/member-status.ts')).toContain('allowPending')
+  })
+
+  it('family add/update returns 409 on duplicate active ID', () => {
+    const src = read('supabase/functions/member-family/index.ts')
+    expect(src).toContain("error?.code === '23505'")
+    expect(src).toContain('FAMILY_ID_DUPLICATE')
   })
 })

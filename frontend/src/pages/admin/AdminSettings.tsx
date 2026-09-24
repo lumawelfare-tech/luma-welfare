@@ -7,6 +7,14 @@ import { WebhookSettings } from '../../components/WebhookSettings'
 
 type Setting = { key: string; value: unknown; description: string | null }
 
+type OpenQuestion = {
+  id: string
+  section_number: number | null
+  question: string
+  answer: string | null
+  status: string
+}
+
 export function AdminSettings() {
   useHead('Settings', undefined, { noindex: true })
   const { addToast } = useToast()
@@ -15,6 +23,10 @@ export function AdminSettings() {
   const [editing, setEditing] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState('general')
+  const [questions, setQuestions] = useState<OpenQuestion[]>([])
+  const [questionsError, setQuestionsError] = useState<string | null>(null)
+  const [resolveDraft, setResolveDraft] = useState<Record<string, string>>({})
+  const [resolvingId, setResolvingId] = useState<string | null>(null)
 
   // 2FA state
   const [twoFAEnabled, setTwoFAEnabled] = useState(false)
@@ -52,8 +64,45 @@ export function AdminSettings() {
     finally { setTwoFALoading(false) }
   }
 
+  async function loadQuestions() {
+    try {
+      const d = await api<{ open_questions?: OpenQuestion[] }>('/admin/settings?resource=open-questions', { auth: true })
+      setQuestions(d.open_questions ?? [])
+      setQuestionsError(null)
+    } catch (e) {
+      setQuestionsError(reportLoadError(e, { page: 'admin-open-questions' }, 'Could not load open questions.'))
+    }
+  }
+
   // eslint-disable-next-line oxc/react/set-state-in-effect
-  useEffect(() => { load(); load2FA() }, [])
+  useEffect(() => { load(); load2FA(); loadQuestions() }, [])
+
+  async function resolveQuestion(id: string) {
+    const answer = (resolveDraft[id] ?? '').trim()
+    if (!answer) {
+      addToast('error', 'Record the confirmed decision before resolving. Do not invent an answer.')
+      return
+    }
+    setResolvingId(id)
+    try {
+      await api(`/admin/settings?action=resolve&id=${encodeURIComponent(id)}`, {
+        method: 'POST',
+        auth: true,
+        body: { answer: answer.slice(0, 4000) },
+      })
+      addToast('success', 'Open question marked resolved.')
+      setResolveDraft((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      await loadQuestions()
+    } catch (e) {
+      addToast('error', reportLoadError(e, { page: 'admin-open-questions' }, 'Could not resolve the question.'))
+    } finally {
+      setResolvingId(null)
+    }
+  }
 
   async function save() {
     setSaving(true)
@@ -150,7 +199,13 @@ export function AdminSettings() {
     }
   }
 
-  const tabs = ['general', 'security', 'webhooks', 'announce']
+  const tabs: { id: string; label: string }[] = [
+    { id: 'general', label: 'General' },
+    { id: 'security', label: 'Security' },
+    { id: 'webhooks', label: 'Webhooks' },
+    { id: 'announce', label: 'Announce' },
+    { id: 'questions', label: 'Open questions' },
+  ]
   const filtered = tab === 'general'
     ? settings.filter(s => ['org_contact', 'stats', 'mpesa'].includes(s.key))
     : []
@@ -216,8 +271,8 @@ export function AdminSettings() {
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg border border-gray-200 bg-white p-1">
         {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-luma-50 text-luma-700' : 'text-gray-500 hover:bg-gray-50'}`}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+          <button key={t.id} onClick={() => setTab(t.id)} className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${tab === t.id ? 'bg-luma-50 text-luma-700' : 'text-gray-500 hover:bg-gray-50'}`}>
+            {t.label}
           </button>
         ))}
       </div>
@@ -292,6 +347,53 @@ export function AdminSettings() {
       )}
 
       {/* Webhooks */}
+      {tab === 'questions' && (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            These items stay open until Luma confirms them. The platform does not pick a package count or payout model.
+          </div>
+          {questionsError && <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{questionsError}</div>}
+          {questions.length === 0 && !questionsError && (
+            <div className="glass-panel p-10 text-center text-gray-500">No open questions are stored.</div>
+          )}
+          {questions.map((q) => (
+            <div key={q.id} className="glass-panel p-5 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${q.status === 'open' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                  {q.status === 'open' ? 'Open' : 'Resolved'}
+                </span>
+                {q.section_number != null && <span className="text-xs text-gray-500">Section {q.section_number}</span>}
+              </div>
+              <p className="text-sm text-gray-900">{q.question}</p>
+              {q.answer ? <p className="text-sm text-gray-600">Recorded answer: {q.answer}</p> : null}
+              {q.status === 'open' && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-gray-600" htmlFor={`open-q-${q.id}`}>
+                    Confirmed decision (do not invent)
+                  </label>
+                  <textarea
+                    id={`open-q-${q.id}`}
+                    value={resolveDraft[q.id] ?? ''}
+                    onChange={(e) => setResolveDraft((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                    rows={2}
+                    maxLength={4000}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-luma-500"
+                  />
+                  <button
+                    type="button"
+                    disabled={resolvingId === q.id}
+                    onClick={() => resolveQuestion(q.id)}
+                    className="rounded-lg bg-luma-700 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {resolvingId === q.id ? 'Saving…' : 'Resolve with recorded decision'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {tab === 'webhooks' && (
         <div className="glass-panel p-6">
           <WebhookSettings />

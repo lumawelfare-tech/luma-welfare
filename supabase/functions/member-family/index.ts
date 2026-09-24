@@ -48,6 +48,12 @@ Deno.serve(async (req) => {
           tier: parsed.tier,
           beneficiary_status: parsed.beneficiaryStatus,
         }).select().single()
+      if (error?.code === '23505') {
+        return new Response(JSON.stringify({
+          message: 'This ID number is already listed for an active family member.',
+          code: 'FAMILY_ID_DUPLICATE',
+        }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
       if (error) throw new Error(error.message)
       await logAudit(adminClient, { actor_id: user.id, action: 'added_family_member', resource: 'family_member', resource_id: data.id })
       return new Response(JSON.stringify({ family_member: maskFamilyRow(data as Record<string, unknown>) }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -69,6 +75,12 @@ Deno.serve(async (req) => {
       }
       const { data, error } = await adminClient
         .from('family_members').update(allowedFields).eq('id', resourceId).eq('member_id', user.id).select().single()
+      if (error?.code === '23505') {
+        return new Response(JSON.stringify({
+          message: 'This ID number is already listed for an active family member.',
+          code: 'FAMILY_ID_DUPLICATE',
+        }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
       if (error) throw new Error('Family member not found')
       await logAudit(adminClient, { actor_id: user.id, action: 'updated_family_member', resource: 'family_member', resource_id: data.id })
       return new Response(JSON.stringify({ family_member: maskFamilyRow(data as Record<string, unknown>) }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

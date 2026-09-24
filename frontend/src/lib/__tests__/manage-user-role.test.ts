@@ -131,10 +131,11 @@ describe('manage-user-role contracts', () => {
     expect(src).toContain('invalidateUserSessionsWithRetry')
     expect(src).toContain('session_invalidated')
     expect(src).toContain('SESSION_INVALIDATE_INCOMPLETE')
-    expect(src).toContain('generateLink')
-    expect(src).toContain('verifyOtp')
-    expect(src).toContain("signOut(jwt, 'global')")
-    expect(src).not.toContain('ban_duration')
+    const helper = read('supabase/functions/shared/session-invalidate.ts')
+    expect(helper).toContain('generateLink')
+    expect(helper).toContain('verifyOtp')
+    expect(helper).toContain("signOut(jwt, 'global')")
+    expect(helper).not.toContain('ban_duration')
   })
 
   it('keeps Option A RBAC (no user_roles / role_audit_log)', () => {

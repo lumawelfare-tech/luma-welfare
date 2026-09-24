@@ -343,7 +343,7 @@ export function AdminMembers() {
   ) {
     setBusyId(id)
     try {
-      await api(`/admin/members/${id}`, {
+      const result = await api<{ session_invalidated?: boolean }>(`/admin/members/${id}`, {
         method: 'PATCH',
         auth: true,
         body: {
@@ -362,6 +362,9 @@ export function AdminMembers() {
               ? 'Application rejected.'
               : 'Member closed.',
       )
+      if ((status === 'suspended' || status === 'closed') && result.session_invalidated === false) {
+        addToast('warning', 'Status saved, but the member session could not be revoked. Ask them to sign out, or retry later.')
+      }
       setDecisionTarget(null)
       await load()
     } catch (e) {
