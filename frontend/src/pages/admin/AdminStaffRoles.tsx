@@ -145,13 +145,22 @@ export function AdminStaffRoles() {
       if (reason.trim()) body.reason = reason.trim()
       if (roleName === 'superadmin') body.confirmSuperadmin = confirmSuper
 
-      const res = await api<{ action?: string; message?: string }>('/admin/manage-user-role', {
+      const res = await api<{
+        action?: string
+        message?: string
+        session_invalidated?: boolean
+      }>('/admin/manage-user-role', {
         method: 'POST',
         auth: true,
         body,
       })
       if (res.action === 'noop') {
         addToast('info', res.message ?? 'Already assigned.')
+      } else if (res.session_invalidated === false) {
+        addToast(
+          'warning',
+          'Role updated, but their existing sessions could not be signed out. Ask them to sign in again.',
+        )
       } else if (res.action === 'reactivate') {
         addToast('success', 'Staff reactivated with the selected role.')
       } else if (res.action === 'change_role') {
@@ -176,12 +185,19 @@ export function AdminStaffRoles() {
     if (!revokeTarget) return
     setRevoking(true)
     try {
-      await api('/admin/manage-user-role', {
+      const res = await api<{ session_invalidated?: boolean }>('/admin/manage-user-role', {
         method: 'POST',
         auth: true,
         body: { action: 'revoke', targetId: revokeTarget.id },
       })
-      addToast('success', `Removed admin access for ${revokeTarget.display_name}.`)
+      if (res.session_invalidated === false) {
+        addToast(
+          'warning',
+          `Removed admin access for ${revokeTarget.display_name}, but their existing sessions could not be signed out.`,
+        )
+      } else {
+        addToast('success', `Removed admin access for ${revokeTarget.display_name}.`)
+      }
       setRevokeTarget(null)
       await refresh()
     } catch (err) {

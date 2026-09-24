@@ -4,6 +4,7 @@ import { detectAllowedUpload, looksLikeScriptableMarkup } from '../shared/file-u
 import { assertMemberActive } from '../shared/member-status.ts'
 import { withSignedClaimDocumentUrls } from '../shared/storage-signed.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
+import { parseOptionalMoneyAmount, ValidationError } from '../shared/validate.ts'
 
 /**
  * Member Claims — Submit, List, Detail, Document Upload
@@ -121,7 +122,8 @@ Deno.serve(async (req) => {
       if (inactive) return inactive
 
       const body = await req.json()
-      const { status: newStatus, description, amountRequested } = body
+      const { status: newStatus, description, amountRequested: amountRequestedRaw } = body
+      const amountRequested = parseOptionalMoneyAmount(amountRequestedRaw, 'amount requested')
 
       if (newStatus !== 'Submitted') {
         return new Response(JSON.stringify({ message: 'Only draft-to-submitted transition is supported' }), {
@@ -335,7 +337,8 @@ Deno.serve(async (req) => {
       if (inactive) return inactive
 
       const body = await req.json()
-      const { subscriptionId, claimType, description, amountRequested, submit } = body
+      const { subscriptionId, claimType, description, amountRequested: amountRequestedRaw, submit } = body
+      const amountRequested = parseOptionalMoneyAmount(amountRequestedRaw, 'amount requested')
 
       if (!subscriptionId || !claimType) {
         return new Response(JSON.stringify({ message: 'subscriptionId and claimType are required' }), {
@@ -416,6 +419,11 @@ Deno.serve(async (req) => {
       status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
+    if (err instanceof ValidationError) {
+      return new Response(JSON.stringify({ message: err.message, code: 'VALIDATION' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     console.error('member-claims error:', err instanceof Error ? err.name : 'unknown')
     return new Response(JSON.stringify({
       message: 'An unexpected error occurred.',

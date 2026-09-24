@@ -17,6 +17,13 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       include: ['src/lib/**', 'src/hooks/**', 'src/context/**'],
       exclude: ['src/**/*.test.*', 'src/**/*.d.ts'],
+      // Floor only — measured ~47% lines / ~45% functions on 23 Sep 2026.
+      thresholds: {
+        statements: 40,
+        branches: 40,
+        functions: 40,
+        lines: 40,
+      },
     },
   },
   build: {

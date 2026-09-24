@@ -640,3 +640,49 @@ export function parseImportMemberRow(input: unknown, rowLabel = 'Row'): ImportMe
   return { email, fullName, phone, idNumber }
 }
 
+/** Upper bound for claim / payout amounts (KES). Prevents overflow and absurd client values. */
+export const MAX_MONEY_AMOUNT_KES = 10_000_000
+const MONEY_STRING_RE = /^\d+(\.\d{1,2})?$/
+
+function assertMoneyRange(n: number, label: string): number {
+  if (!Number.isFinite(n)) {
+    throw new ValidationError(`Enter a valid ${label}.`)
+  }
+  const rounded = Math.round(n * 100) / 100
+  if (rounded <= 0) {
+    throw new ValidationError(`${label} must be greater than zero.`)
+  }
+  if (rounded > MAX_MONEY_AMOUNT_KES) {
+    throw new ValidationError(
+      `${label} exceeds the maximum of ${MAX_MONEY_AMOUNT_KES.toLocaleString('en-KE')}.`,
+    )
+  }
+  return rounded
+}
+
+/**
+ * Optional money field. `null` / `undefined` / `''` → `null`.
+ * Rejects non-finite values, scientific notation strings, negatives, and amounts above the cap.
+ */
+export function parseOptionalMoneyAmount(raw: unknown, label = 'amount'): number | null {
+  if (raw == null || raw === '') return null
+  if (typeof raw === 'number') return assertMoneyRange(raw, label)
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+    if (!MONEY_STRING_RE.test(trimmed)) {
+      throw new ValidationError(`Enter a valid ${label}.`)
+    }
+    return assertMoneyRange(Number(trimmed), label)
+  }
+  throw new ValidationError(`${label} must be a number.`)
+}
+
+export function parseRequiredMoneyAmount(raw: unknown, label = 'amount'): number {
+  const parsed = parseOptionalMoneyAmount(raw, label)
+  if (parsed == null) {
+    throw new ValidationError(`${label} is required.`)
+  }
+  return parsed
+}
+

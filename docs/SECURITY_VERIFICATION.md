@@ -9,7 +9,7 @@ Last updated: 2026-09-22 (Phase 1 blueprint — schema foundation migration)
 | Static contracts | `npm test` (validate, auth-validate, edge-auth-contracts, rate-limit-core, …) | none | `🧪 Tests` |
 | Qualification engine | `npm run test:qualify` | none | `🧪 Tests` |
 | Live RLS isolation | `npm run test:rls` | `SUPABASE_URL` + anon + service_role | `🧪 Tests` (self-skips without secrets; **fails the job** when secrets set and suite fails) |
-| Vitest coverage | `npm run test:coverage -w frontend` | none | Informational artifact |
+| Vitest coverage | `npm run test:coverage -w frontend` | none | Enforced floor (`vite.config.ts` thresholds) |
 | Client bundle scan | `npm run build && npm run scan:bundle` | build output | `🏗️ Build` |
 | Playwright E2E | `npx playwright test` | `BASE_URL` + optional `E2E_*` / Supabase secrets | `🎭 E2E Tests` (PRs + `main`) |
 | SQL inventory helpers | `scripts/verify-rls-inventory.sql` | SQL editor / `psql` | Manual |

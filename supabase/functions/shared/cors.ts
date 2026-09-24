@@ -8,10 +8,30 @@
 
 import { CSP_DIRECTIVES } from './security.ts'
 
+const PRODUCTION_ORIGIN = 'https://luma-welfare.vercel.app'
+const LOCAL_DEV_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:4173',
+]
+
+function isHostedSupabase(): boolean {
+  const url = Deno.env.get('SUPABASE_URL') ?? ''
+  return url.includes('.supabase.co')
+}
+
 function getAllowedOrigins(): string[] {
   const raw = Deno.env.get('CORS_ALLOWED_ORIGIN')
-    ?? 'https://luma-welfare.vercel.app,http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,http://127.0.0.1:4173'
-  return raw.split(',').map((o) => o.trim()).filter(Boolean)
+  if (raw?.trim()) {
+    return raw.split(',').map((o) => o.trim()).filter(Boolean)
+  }
+  // Hosted Edge must not fall back to localhost. Local `supabase functions serve`
+  // uses 127.0.0.1:54321 and keeps the localhost origins for Vite.
+  if (isHostedSupabase()) {
+    return [PRODUCTION_ORIGIN]
+  }
+  return [PRODUCTION_ORIGIN, ...LOCAL_DEV_ORIGINS]
 }
 
 function resolveAllowOrigin(reqOrigin: string | null): string {

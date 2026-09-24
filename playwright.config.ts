@@ -33,5 +33,10 @@ export default defineConfig({
       },
       testMatch: /member-mobile\.spec\.ts/,
     },
+    {
+      name: 'firefox-security-api',
+      use: { ...devices['Desktop Firefox'] },
+      testMatch: /security-api\.spec\.ts/,
+    },
   ],
 })

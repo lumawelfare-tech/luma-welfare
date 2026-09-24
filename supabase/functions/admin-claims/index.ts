@@ -4,6 +4,7 @@ import { sendNotification } from '../shared/notifications.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
 import { withSignedClaimDocumentUrls } from '../shared/storage-signed.ts'
+import { parseOptionalMoneyAmount, parseRequiredMoneyAmount, ValidationError } from '../shared/validate.ts'
 
 /** Claim review checklist complete when all three ops stages are true and named officers recorded. */
 function checklistComplete(c: {
@@ -360,12 +361,9 @@ Deno.serve(async (req) => {
           })
         }
 
-        const amountRaw = body.amount != null ? Number(body.amount) : Number(existing.approved_amount ?? existing.amount_requested)
-        if (!Number.isFinite(amountRaw) || amountRaw <= 0) {
-          return new Response(JSON.stringify({ message: 'A valid payout amount is required.', code: 'VALIDATION' }), {
-            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          })
-        }
+        const amountRaw = body.amount != null && body.amount !== ''
+          ? parseRequiredMoneyAmount(body.amount, 'payout amount')
+          : parseRequiredMoneyAmount(existing.approved_amount ?? existing.amount_requested, 'payout amount')
         const reference = sanitizeText(body.reference, 120) || null
         const notes = sanitizeText(body.notes, 2000) || null
         const method = sanitizeText(body.method, 40) || 'manual'
@@ -425,7 +423,8 @@ Deno.serve(async (req) => {
 
       // --- Decision: approve / reject / request-info ---
       requirePermission(session, 'claims', 'approve')
-      const { decision, adminNotes, amount } = body
+      const { decision, adminNotes, amount: amountRaw } = body
+      const amount = parseOptionalMoneyAmount(amountRaw, 'approved amount')
       const statusMap: Record<string, string> = { approve: 'Approved', reject: 'Rejected', 'request-info': 'Additional Information Required' }
       if (!statusMap[decision]) {
         return new Response(JSON.stringify({ message: 'Invalid decision' }), {
@@ -486,7 +485,7 @@ Deno.serve(async (req) => {
         updates.decided_at = new Date().toISOString()
         updates.decided_by = session.id
       }
-      if (amount) updates.approved_amount = amount
+      if (amount != null) updates.approved_amount = amount
 
       const { data, error } = await adminClient.from('claims').update(updates).eq('id', claimId).select('*, members(full_name)').single()
       if (error) throw new Error('Claim not found')
@@ -519,6 +518,11 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
+    if (err instanceof ValidationError) {
+      return new Response(JSON.stringify({ message: err.message, code: 'VALIDATION' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     return handleAdminError(err, 'admin-claims')
   }
 })

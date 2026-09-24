@@ -121,6 +121,42 @@ async function invalidateUserSessions(
   }
 }
 
+/** One retry, then report incomplete — role write already committed. */
+async function invalidateUserSessionsWithRetry(
+  adminClient: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await invalidateUserSessions(adminClient, userId)
+      return true
+    } catch (err) {
+      console.error(`manage-user-role: session invalidate attempt ${attempt}`, err)
+    }
+  }
+  return false
+}
+
+async function invalidateAfterRoleChange(
+  adminClient: SupabaseClient,
+  actor: { id: string; role_name: string },
+  targetId: string,
+  op: string,
+): Promise<boolean> {
+  const ok = await invalidateUserSessionsWithRetry(adminClient, targetId)
+  if (!ok) {
+    await logAudit(adminClient, {
+      actor_id: actor.id,
+      actor_role: actor.role_name,
+      action: 'staff.session_invalidate_incomplete',
+      resource: 'admin',
+      resource_id: targetId,
+      meta: { target_id: targetId, op },
+    })
+  }
+  return ok
+}
+
 type EligibilityOk = {
   ok: true
   member: { id: string; full_name: string; email: string | null; status: string }
@@ -404,25 +440,20 @@ Deno.serve(async (req) => {
         },
       })
 
-      try {
-        await invalidateUserSessions(adminClient, parsed.targetId)
-      } catch (sessErr) {
-        console.error('manage-user-role: session invalidate after revoke', sessErr)
-        await logAudit(adminClient, {
-          actor_id: session.id,
-          actor_role: session.role_name,
-          action: 'staff.session_invalidate_incomplete',
-          resource: 'admin',
-          resource_id: parsed.targetId,
-          meta: { target_id: parsed.targetId, op: 'revoke' },
-        })
-      }
+      const sessionInvalidated = await invalidateAfterRoleChange(
+        adminClient,
+        session,
+        parsed.targetId,
+        'revoke',
+      )
 
       return json({
         ok: true,
         action: 'revoke',
         target_id: parsed.targetId,
         previous_role: previousRole,
+        session_invalidated: sessionInvalidated,
+        ...(sessionInvalidated ? {} : { code: 'SESSION_INVALIDATE_INCOMPLETE' }),
       })
     }
 
@@ -549,20 +580,14 @@ Deno.serve(async (req) => {
       !existing ||
       (existing && existing.is_superadmin !== wantSuper)
 
+    let sessionInvalidated = true
     if (material) {
-      try {
-        await invalidateUserSessions(adminClient, parsed.targetId)
-      } catch (sessErr) {
-        console.error('manage-user-role: session invalidate after grant/change', sessErr)
-        await logAudit(adminClient, {
-          actor_id: session.id,
-          actor_role: session.role_name,
-          action: 'staff.session_invalidate_incomplete',
-          resource: 'admin',
-          resource_id: parsed.targetId,
-          meta: { target_id: parsed.targetId, op: auditAction },
-        })
-      }
+      sessionInvalidated = await invalidateAfterRoleChange(
+        adminClient,
+        session,
+        parsed.targetId,
+        auditAction,
+      )
     }
 
     return json({
@@ -571,6 +596,8 @@ Deno.serve(async (req) => {
       target_id: parsed.targetId,
       previous_role: previousRole,
       new_role: roleName,
+      session_invalidated: sessionInvalidated,
+      ...(sessionInvalidated ? {} : { code: 'SESSION_INVALIDATE_INCOMPLETE' }),
     })
   } catch (err) {
     if (err instanceof ValidationError) {

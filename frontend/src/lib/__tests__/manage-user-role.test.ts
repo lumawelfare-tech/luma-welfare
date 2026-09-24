@@ -128,6 +128,9 @@ describe('manage-user-role contracts', () => {
   it('invalidates sessions via Auth Admin signOut global', () => {
     const src = read('supabase/functions/manage-user-role/index.ts')
     expect(src).toContain('invalidateUserSessions')
+    expect(src).toContain('invalidateUserSessionsWithRetry')
+    expect(src).toContain('session_invalidated')
+    expect(src).toContain('SESSION_INVALIDATE_INCOMPLETE')
     expect(src).toContain('generateLink')
     expect(src).toContain('verifyOtp')
     expect(src).toContain("signOut(jwt, 'global')")
@@ -189,6 +192,12 @@ describe('frontend Staff & Roles wiring', () => {
 
     expect(existsSync(resolve(root, 'frontend/src/components/RequireSuperadmin.tsx'))).toBe(true)
     expect(existsSync(resolve(root, 'frontend/src/pages/admin/AdminStaffRoles.tsx'))).toBe(true)
+  })
+
+  it('warns when session invalidation is incomplete', () => {
+    const page = read('frontend/src/pages/admin/AdminStaffRoles.tsx')
+    expect(page).toContain('session_invalidated')
+    expect(page).toContain('existing sessions could not be signed out')
   })
 })
 

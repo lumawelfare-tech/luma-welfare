@@ -40,9 +40,9 @@ CI job `🔐 Live Secrets Gate` runs only on that repository:
 
 Also add `🔐 Live Secrets Gate` to required checks once hard mode is enabled (optional while soft).
 
-## Coverage (informational)
+## Coverage (floor)
 
-The `🧪 Tests` job uploads Vitest coverage (`lcov`) as an artifact. It is **informational** — coverage thresholds are not enforced yet. Review the artifact on PRs that touch `frontend/src/lib`, hooks, or auth context.
+The `🧪 Tests` job runs `npm run test:coverage` with Vitest thresholds in `frontend/vite.config.ts`. Falling below the floor fails the job. The `lcov` artifact is still uploaded for review.
 
 ## Local equivalents
 
