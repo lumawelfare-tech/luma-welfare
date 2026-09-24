@@ -2,9 +2,8 @@
 
 **Date:** 23 Sep 2026  
 **Scope:** Vite/React SPA (Vercel) + Supabase (Postgres / RLS / Auth / Storage) + Edge Functions  
-**This document is Stage 5** — leftover product/ops remediations after Stages 1–4.  
-**Payments:** M-Pesa / Daraja remain **read-only**. No payment initiate/callback changes.  
-**Do not start Stage 6 (maintenance doc) until you approve.**
+**This document is Stages 1–5 findings.** Ongoing operations: `docs/SECURITY_MAINTENANCE.md` (Stage 6, 24 Sep 2026).  
+**Payments:** M-Pesa / Daraja remain **read-only**. No payment initiate/callback changes.
 
 Prior cycle (21 Sep 2026) High/Medium patches (H-01–H-04, M-02–M-06, M-08, M-10, L-05) stay in force. Contracts: `frontend/src/lib/__tests__/owasp-stage5-fixes.test.ts`.
 
@@ -79,9 +78,9 @@ Playwright is Chromium + Pixel 5 + Firefox (`security-api` only). Coverage is a 
 
 ---
 
-## Remaining open (Stage 6 candidates / ops)
+## Remaining open (ops / product decisions)
 
-Do not implement these until you approve Stage 6. No exploit PoCs.
+Tracked for operators in `docs/SECURITY_MAINTENANCE.md`. Stage 6 did not implement these.
 
 | ID | Severity | Item |
 |----|----------|------|
@@ -90,15 +89,6 @@ Do not implement these until you approve Stage 6. No exploit PoCs.
 | O-09 | Info | Malware scan of valid PDFs (vendor) |
 | P-* | Deferred | Daraja / M-Pesa — report only until full secrets + GO |
 | WebKit | Info | Extra Playwright project (skipped to keep CI time) |
-
----
-
-## GO decisions before Stage 6
-
-1. Stage 6 is a **maintenance document** only — no more product remediations in that stage unless you expand scope.  
-2. Populate `E2E_ADMIN_TOTP_SECRET` and flip `ENFORCE_LIVE_SECRETS=true` when you want live suites to fail closed.  
-3. Payments stay frozen unless you explicitly say otherwise.  
-4. Deploy / commit Stage 5 only when you ask.
 
 ---
 

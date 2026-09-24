@@ -1,6 +1,8 @@
 # Security verification notes
 
-Last updated: 2026-09-22 (Phase 1 blueprint — schema foundation migration)
+Last updated: 2026-09-24 (Stage 6 maintenance playbook)
+
+Ongoing operator cadence (monthly gate, do-not-weaken rules): `docs/SECURITY_MAINTENANCE.md`.
 
 ## Automated coverage
 
