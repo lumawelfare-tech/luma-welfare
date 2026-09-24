@@ -19,3 +19,4 @@ supabase/supabase/
 test-results/
 lighthouse-report.json
 lighthouse-report.html
+frontend/coverage/
