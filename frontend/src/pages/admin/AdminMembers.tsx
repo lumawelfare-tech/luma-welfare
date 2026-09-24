@@ -20,6 +20,13 @@ import { ErrorState } from '../../components/ErrorState'
 import { SkeletonTable } from '../../components/Skeleton'
 import { reportLoadError } from '../../lib/userFacingError'
 import { formatApplicationProgramCodes } from '../../lib/applicationPrograms'
+import { hasAdminPermission } from '../../lib/adminPermissions'
+import {
+  beneficiaryStatusLabel,
+  familyTierLabel,
+  identityDocLabel,
+  identityDocStatusLabel,
+} from '../../lib/identityDocs'
 
 /** Typed confirmation matches member full name (case-insensitive) or the word DELETE. */
 export function matchesDeleteConfirmation(typed: string, fullName: string): boolean {
@@ -62,7 +69,9 @@ const ALLOWED_MEMBER_STATUS = new Set<string>([
 export function AdminMembers() {
   useHead('Members', undefined, { noindex: true })
   const { addToast } = useToast()
-  const { isSuperadmin } = useAuth()
+  const { isSuperadmin, adminPermissions } = useAuth()
+  const canViewIdentityDocs = hasAdminPermission(adminPermissions, isSuperadmin, 'documents:read')
+  const canVerifyIdentityDocs = hasAdminPermission(adminPermissions, isSuperadmin, 'documents:verify')
   const memberStatusFilters = isSuperadmin
     ? [...BASE_MEMBER_STATUS_FILTERS, ANONYMIZED_FILTER]
     : BASE_MEMBER_STATUS_FILTERS
@@ -112,8 +121,12 @@ export function AdminMembers() {
     family_members: Record<string, unknown>[]
     contributions: Record<string, unknown>[]
     registration_fees?: Record<string, unknown>[]
+    identity_documents?: Record<string, unknown>[]
   } | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [docBusyId, setDocBusyId] = useState<string | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<{ id: string; type: string } | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   // Application approve / reject dialog
   const [decisionTarget, setDecisionTarget] = useState<{ member: Member; action: 'approve' | 'reject' } | null>(null)
@@ -234,12 +247,84 @@ export function AdminMembers() {
         family_members: Record<string, unknown>[]
         contributions: Record<string, unknown>[]
         registration_fees?: Record<string, unknown>[]
+        identity_documents?: Record<string, unknown>[]
       }>(`/admin/members/${member.id}`, { auth: true })
       setDetailData(d)
+      setRejectTarget(null)
+      setRejectReason('')
     } catch {
       addToast('warning', 'Could not load member details.')
     } finally {
       setLoadingDetail(false)
+    }
+  }
+
+  async function refreshDetail() {
+    if (!detailMember) return
+    const d = await api<{
+      member: Record<string, unknown>
+      subscriptions: Record<string, unknown>[]
+      family_members: Record<string, unknown>[]
+      contributions: Record<string, unknown>[]
+      registration_fees?: Record<string, unknown>[]
+      identity_documents?: Record<string, unknown>[]
+    }>(`/admin/members/${detailMember.id}`, { auth: true })
+    setDetailData(d)
+  }
+
+  async function viewIdentityDocument(docId: string) {
+    setDocBusyId(docId)
+    try {
+      const d = await api<{ file_url: string }>('/admin/members?action=view-identity-document', {
+        method: 'POST',
+        auth: true,
+        body: { documentId: docId },
+      })
+      if (d.file_url) window.open(d.file_url, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not open the document.')
+    } finally {
+      setDocBusyId(null)
+    }
+  }
+
+  async function verifyIdentityDocument(docId: string) {
+    setDocBusyId(docId)
+    try {
+      await api('/admin/members?action=verify-identity-document', {
+        method: 'POST',
+        auth: true,
+        body: { documentId: docId },
+      })
+      addToast('success', 'Document verified. The member will be notified.')
+      await refreshDetail()
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not verify the document.')
+    } finally {
+      setDocBusyId(null)
+    }
+  }
+
+  async function rejectIdentityDocument() {
+    if (!rejectTarget || !rejectReason.trim()) {
+      addToast('warning', 'A rejection reason is required.')
+      return
+    }
+    setDocBusyId(rejectTarget.id)
+    try {
+      await api('/admin/members?action=reject-identity-document', {
+        method: 'POST',
+        auth: true,
+        body: { documentId: rejectTarget.id, reason: rejectReason.trim() },
+      })
+      addToast('success', 'Document rejected. The member will be notified.')
+      setRejectTarget(null)
+      setRejectReason('')
+      await refreshDetail()
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not reject the document.')
+    } finally {
+      setDocBusyId(null)
     }
   }
 
@@ -1110,6 +1195,7 @@ export function AdminMembers() {
                     <div className="col-span-2"><span className="text-gray-400">Residential address</span><div className="font-medium">{String(detailData.member.residential_address ?? '—')}</div></div>
                     <div><span className="text-gray-400">WhatsApp</span><div className="font-medium">{String(detailData.member.whatsapp_phone ?? '—')}</div></div>
                     <div><span className="text-gray-400">Family coverage</span><div className="font-medium capitalize">{String(detailData.member.family_coverage ?? '—')}</div></div>
+                    <div><span className="text-gray-400">KRA PIN</span><div className="font-medium tabular-nums">{String(detailData.member.kra_pin_masked ?? '—')}</div></div>
                     <div className="col-span-2">
                       <span className="text-gray-400">Programs of interest</span>
                       <div className="font-medium">
@@ -1178,7 +1264,7 @@ export function AdminMembers() {
 
                 {/* Recent Contributions */}
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Contributions ({detailData.contributions.length})</h4>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Package payments ({detailData.contributions.length})</h4>
                   {detailData.contributions.length === 0 ? (
                     <p className="text-sm text-gray-400">No contributions</p>
                   ) : (
@@ -1197,20 +1283,148 @@ export function AdminMembers() {
                   )}
                 </div>
 
-                {/* Family Members */}
-                {detailData.family_members.length > 0 && (
-                  <div className="rounded-xl border border-gray-200 p-4">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Family Members ({detailData.family_members.length})</h4>
-                    <div className="space-y-1">
-                      {detailData.family_members.map((f: Record<string, unknown>) => (
-                        <div key={String(f.id)} className="text-sm py-1.5 border-b border-gray-100 last:border-0">
-                          <span className="font-medium">{String(f.full_name ?? '')}</span>
-                          <span className="text-gray-400 ml-2">{String(f.relationship ?? '')}</span>
-                        </div>
-                      ))}
+                {/* Identity documents */}
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">
+                    Identity documents ({(detailData.identity_documents ?? []).length})
+                  </h4>
+                  {(detailData.identity_documents ?? []).length === 0 ? (
+                    <p className="text-sm text-gray-400">No National ID or KRA documents uploaded yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {(detailData.identity_documents ?? []).map((doc) => {
+                        const docId = String(doc.id)
+                        const docType = String(doc.document_type ?? '')
+                        const status = String(doc.verification_status ?? 'pending')
+                        const familyId = doc.family_member_id ? String(doc.family_member_id) : null
+                        const owner = familyId
+                          ? String(detailData.family_members.find((f) => String(f.id) === familyId)?.full_name ?? 'Beneficiary')
+                          : 'Member'
+                        return (
+                          <div key={docId} className="rounded-lg border border-gray-100 p-3">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{identityDocLabel(docType)}</p>
+                                <p className="mt-0.5 text-xs text-gray-500">
+                                  {owner}
+                                  {doc.created_at ? ` · ${new Date(String(doc.created_at)).toLocaleDateString()}` : ''}
+                                  {doc.original_filename ? ` · ${String(doc.original_filename)}` : ''}
+                                </p>
+                              </div>
+                              <StatusBadge status={status}>{identityDocStatusLabel(status)}</StatusBadge>
+                            </div>
+                            {doc.rejection_reason ? (
+                              <p className="mt-1 text-xs text-red-600">Reason: {String(doc.rejection_reason)}</p>
+                            ) : null}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {canViewIdentityDocs && (
+                                <button
+                                  type="button"
+                                  disabled={docBusyId === docId}
+                                  onClick={() => void viewIdentityDocument(docId)}
+                                  className="min-h-11 rounded-md border border-gray-200 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                                >
+                                  {docBusyId === docId ? 'Opening…' : 'View document'}
+                                </button>
+                              )}
+                              {canVerifyIdentityDocs && status === 'pending' && (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={docBusyId === docId}
+                                    onClick={() => void verifyIdentityDocument(docId)}
+                                    className="min-h-11 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-60"
+                                  >
+                                    Verify
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={docBusyId === docId}
+                                    onClick={() => { setRejectTarget({ id: docId, type: docType }); setRejectReason('') }}
+                                    className="min-h-11 rounded-md border border-red-200 px-3 text-xs font-medium text-red-700"
+                                  >
+                                    Reject
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                            {rejectTarget?.id === docId && (
+                              <div className="mt-3 space-y-2">
+                                <label className="block text-xs font-medium text-gray-600">
+                                  Reason for rejection
+                                  <select
+                                    value={['Unclear document', 'Wrong document', 'Expired document', 'Information does not match', 'Other'].includes(rejectReason) ? rejectReason : rejectReason ? 'Other' : ''}
+                                    onChange={(e) => setRejectReason(e.target.value === 'Other' ? '' : e.target.value)}
+                                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                                  >
+                                    <option value="">Select a reason</option>
+                                    <option value="Unclear document">Unclear document</option>
+                                    <option value="Wrong document">Wrong document</option>
+                                    <option value="Expired document">Expired document</option>
+                                    <option value="Information does not match">Information does not match</option>
+                                    <option value="Other">Other</option>
+                                  </select>
+                                </label>
+                                {(!['Unclear document', 'Wrong document', 'Expired document', 'Information does not match'].includes(rejectReason) || rejectReason === '') && (
+                                  <input
+                                    value={['Unclear document', 'Wrong document', 'Expired document', 'Information does not match'].includes(rejectReason) ? '' : rejectReason}
+                                    onChange={(e) => setRejectReason(e.target.value)}
+                                    placeholder="Describe the issue"
+                                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                                  />
+                                )}
+                                <div className="flex gap-2">
+                                  <button type="button" onClick={() => void rejectIdentityDocument()} disabled={!rejectReason.trim() || docBusyId === docId} className="min-h-11 rounded-md bg-red-600 px-3 text-xs font-semibold text-white disabled:opacity-60">
+                                    Confirm rejection
+                                  </button>
+                                  <button type="button" onClick={() => { setRejectTarget(null); setRejectReason('') }} className="min-h-11 rounded-md border border-gray-200 px-3 text-xs">
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+
+                {/* Family & beneficiaries */}
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">
+                    Family &amp; beneficiaries ({detailData.family_members.length})
+                  </h4>
+                  {detailData.family_members.length === 0 ? (
+                    <p className="text-sm text-gray-400">No family members on file.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {(['nuclear', 'extended'] as const).map((tier) => {
+                        const list = detailData.family_members.filter((f) => String(f.tier ?? 'nuclear') === tier)
+                        if (list.length === 0) return null
+                        return (
+                          <div key={tier}>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{familyTierLabel(tier)}</p>
+                            <div className="space-y-1">
+                              {list.map((f) => (
+                                <div key={String(f.id)} className="flex flex-wrap items-center justify-between gap-2 text-sm py-1.5 border-b border-gray-100 last:border-0">
+                                  <div>
+                                    <span className="font-medium">{String(f.full_name ?? '')}</span>
+                                    <span className="text-gray-400 ml-2 capitalize">{String(f.relationship ?? '')}</span>
+                                    {f.id_number_masked ? <span className="text-gray-400 ml-2 tabular-nums">ID {String(f.id_number_masked)}</span> : null}
+                                  </div>
+                                  <StatusBadge status={String(f.beneficiary_status ?? 'active')}>
+                                    {beneficiaryStatusLabel(String(f.beneficiary_status ?? 'active'))}
+                                  </StatusBadge>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             ) : null}
           </div>

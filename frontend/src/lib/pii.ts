@@ -26,6 +26,10 @@ export function maskIdNumber(value: string | null | undefined): string {
   return `${trimmed.slice(0, 2)}${'•'.repeat(trimmed.length - 4)}${trimmed.slice(-2)}`
 }
 
+export function maskKraPin(value: string | null | undefined): string {
+  return maskIdNumberLast4(value)
+}
+
 export function maskEmail(value: string | null | undefined): string {
   if (!value) return '—'
   const at = value.indexOf('@')

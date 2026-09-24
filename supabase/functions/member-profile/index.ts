@@ -5,6 +5,7 @@ import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { withLogging } from '../shared/logging.ts'
 import { PRIVACY_POLICY_VERSION, TERMS_VERSION } from '../shared/legal-versions.ts'
 import { parseMemberProfilePatchBody, ValidationError } from '../shared/validate.ts'
+import { maskIdNumberLast4 } from '../shared/pii.ts'
 import { detectAllowedImage, looksLikeScriptableMarkup } from '../shared/file-upload.ts'
 
 /**
@@ -458,6 +459,7 @@ Deno.serve(withLogging('member-profile', async (req) => {
           location: patch.location,
           occupation: patch.occupation,
           photo_url: patch.photoUrl || undefined,
+          kra_pin: patch.kraPin === undefined ? undefined : patch.kraPin,
         }).eq('id', user.id).select().single()
       if (error) {
         if ((error as { code?: string }).code === '23505') {
@@ -472,7 +474,13 @@ Deno.serve(withLogging('member-profile', async (req) => {
       }
 
       await logAudit(adminClient, { actor_id: user.id, action: 'updated_profile', resource: 'member', resource_id: user.id })
-      return new Response(JSON.stringify({ member: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      const { kra_pin: kraRaw, ...memberRest } = (data ?? {}) as Record<string, unknown>
+      return new Response(JSON.stringify({
+        member: {
+          ...memberRest,
+          kra_pin_masked: maskIdNumberLast4(typeof kraRaw === 'string' ? kraRaw : null),
+        },
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     return new Response(JSON.stringify({ message: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

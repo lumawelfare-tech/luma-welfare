@@ -1,5 +1,7 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, logAudit, handleUnexpectedError } from '../shared/supabase.ts'
+import { parseFamilyMemberBody, ValidationError } from '../shared/validate.ts'
+import { maskIdNumberLast4 } from '../shared/pii.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -19,16 +21,27 @@ Deno.serve(async (req) => {
       const { data, error } = await adminClient
         .from('family_members').select('*').eq('member_id', user.id).eq('is_active', true).order('created_at')
       if (error) throw new Error(error.message)
-      return new Response(JSON.stringify({ family_members: data ?? [] }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      const family_members = (data ?? []).map((row: Record<string, unknown>) => {
+        const idRaw = typeof row.id_number === 'string' ? row.id_number : null
+        const { id_number: _omit, ...rest } = row
+        return { ...rest, id_number_masked: maskIdNumberLast4(idRaw) }
+      })
+      return new Response(JSON.stringify({ family_members }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // POST /member-family — add family member
     if (req.method === 'POST' && !resourceId) {
-      const body = await req.json()
+      const parsed = parseFamilyMemberBody(await req.json())
       const { data, error } = await adminClient
         .from('family_members').insert({
-          member_id: user.id, full_name: body.fullName, relationship: body.relationship,
-          id_number: body.idNumber, date_of_birth: body.dateOfBirth, tier: body.tier ?? 'nuclear',
+          member_id: user.id,
+          full_name: parsed.fullName,
+          relationship: parsed.relationship,
+          id_number: parsed.idNumber,
+          date_of_birth: parsed.dateOfBirth,
+          phone: parsed.phone,
+          tier: parsed.tier,
+          beneficiary_status: parsed.beneficiaryStatus,
         }).select().single()
       if (error) throw new Error(error.message)
       await logAudit(adminClient, { actor_id: user.id, action: 'added_family_member', resource: 'family_member', resource_id: data.id })
@@ -37,13 +50,16 @@ Deno.serve(async (req) => {
 
     // PATCH /member-family?id=xxx — update family member
     if (req.method === 'PATCH' && resourceId) {
-      const body = await req.json()
-      const allowedFields: Record<string, unknown> = {}
-      if (body.full_name !== undefined) allowedFields.full_name = body.full_name
-      if (body.relationship !== undefined) allowedFields.relationship = body.relationship
-      if (body.id_number !== undefined) allowedFields.id_number = body.id_number
-      if (body.date_of_birth !== undefined) allowedFields.date_of_birth = body.date_of_birth
-      if (body.tier !== undefined) allowedFields.tier = body.tier
+      const parsed = parseFamilyMemberBody(await req.json())
+      const allowedFields: Record<string, unknown> = {
+        full_name: parsed.fullName,
+        relationship: parsed.relationship,
+        id_number: parsed.idNumber,
+        date_of_birth: parsed.dateOfBirth,
+        phone: parsed.phone,
+        tier: parsed.tier,
+        beneficiary_status: parsed.beneficiaryStatus,
+      }
       const { data, error } = await adminClient
         .from('family_members').update(allowedFields).eq('id', resourceId).eq('member_id', user.id).select().single()
       if (error) throw new Error('Family member not found')
@@ -62,6 +78,11 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
+    if (err instanceof ValidationError) {
+      return new Response(JSON.stringify({ message: err.message, code: 'VALIDATION' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     return handleUnexpectedError(err, 'member-family')
   }
 })

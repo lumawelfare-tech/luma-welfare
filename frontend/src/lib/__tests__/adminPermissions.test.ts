@@ -30,6 +30,9 @@ describe('adminPermissions', () => {
     expect(hasAdminPermission(support, false, ADMIN_ROUTE_PERMISSIONS.settings)).toBe(false)
     expect(hasAdminPermission(support, false, 'members:reveal')).toBe(false)
     expect(hasAdminPermission(support, false, 'exports:create')).toBe(false)
+    expect(hasAdminPermission(support, false, 'documents:verify')).toBe(false)
+    expect(hasAdminPermission(['documents:read'], false, 'documents:verify')).toBe(false)
+    expect(hasAdminPermission(['documents:verify'], false, 'documents:verify')).toBe(true)
   })
 
   it('covers all sidebar-facing routes', () => {

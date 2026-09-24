@@ -30,6 +30,7 @@ export function pathToFunctionName(path: string): string | null {
   if (cleanPath === 'member/dashboard') return 'member-dashboard'
   if (cleanPath === 'member/profile') return 'member-profile'
   if (cleanPath.startsWith('member/family')) return 'member-family'
+  if (cleanPath.startsWith('member/identity-docs')) return 'member-identity-docs'
   if (cleanPath.startsWith('member/subscriptions')) return 'member-subscriptions'
   if (cleanPath.startsWith('member/registration-fee')) return 'member-registration-fee'
   if (cleanPath === 'contributions') return 'member-contributions'

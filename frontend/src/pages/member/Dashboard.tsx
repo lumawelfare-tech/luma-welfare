@@ -775,19 +775,33 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Quick profile */}
+      {/* Quick profile + family / documents */}
       {!loading && member && (
         <div className="mb-6 glass-panel p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-gray-900">Profile</h2>
+              <h2 className="text-sm font-semibold text-gray-900">My profile</h2>
               <p className="mt-0.5 text-sm text-gray-600">{member.full_name} · {member.phone}</p>
+              {member.membership_number && (
+                <p className="mt-0.5 text-xs text-gray-500">Membership #{member.membership_number} · {member.status.replace(/_/g, ' ')}</p>
+              )}
             </div>
             <Link
               to="/profile"
               className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]"
             >
-              Update name & phone
+              Profile &amp; documents
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Link to="/profile" className="rounded-lg bg-gray-50 px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-100 min-h-[44px] flex items-center">
+              National ID &amp; KRA
+            </Link>
+            <Link to="/family" className="rounded-lg bg-gray-50 px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-100 min-h-[44px] flex items-center">
+              Family &amp; beneficiaries
+            </Link>
+            <Link to="/contributions" className="rounded-lg bg-gray-50 px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-100 min-h-[44px] flex items-center">
+              Family payments
             </Link>
           </div>
         </div>

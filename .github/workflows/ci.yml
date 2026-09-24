@@ -440,6 +440,7 @@ jobs:
             "auth-verify-email"
             "member-dashboard"
             "member-profile"
+            "member-identity-docs"
             "member-push-subscriptions"
             "member-claims"
             "member-complaints"

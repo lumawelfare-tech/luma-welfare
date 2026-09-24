@@ -4,6 +4,8 @@ import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useHead } from '../../lib/seo'
 import { formatApplicationProgramCodes } from '../../lib/applicationPrograms'
+import { identityDocLabel, identityDocStatusLabel } from '../../lib/identityDocs'
+import { StatusBadge } from '../../components/StatusBadge'
 
 export function Profile() {
   useHead('Profile', undefined, { noindex: true })
@@ -40,6 +42,8 @@ export function Profile() {
         phone: member.phone ?? '',
         idNumber: (member.id_number as string) ?? '',
         altPhone: (member.alt_phone as string) ?? '',
+        dateOfBirth: (member.date_of_birth as string) ?? '',
+        kraPin: '',
         county: (member.county as string) ?? '',
         location: (member.location as string) ?? '',
         occupation: (member.occupation as string) ?? '',
@@ -84,12 +88,21 @@ export function Profile() {
       return
     }
 
+    const kraPin = (form.kraPin ?? '').trim().toUpperCase()
+    if (kraPin && !/^[A-Z]\d{9}[A-Z]$/.test(kraPin)) {
+      setError('Enter a valid KRA PIN (e.g. A123456789X), or leave blank to keep the current value.')
+      return
+    }
+
     setSaving(true)
     try {
+      const body: Record<string, unknown> = { ...form, phone, idNumber }
+      if (kraPin) body.kraPin = kraPin
+      else delete body.kraPin
       await api('/member/profile', {
         method: 'PATCH',
         auth: true,
-        body: { ...form, phone, idNumber },
+        body,
       })
       setSaved(true)
     } catch (err) {
@@ -242,6 +255,25 @@ export function Profile() {
             />
           </div>
           <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Date of birth</label>
+            <input type="date" value={form.dateOfBirth ?? ''} onChange={(e) => setForm((f) => ({ ...f, dateOfBirth: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">KRA PIN</label>
+            <input
+              value={form.kraPin ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, kraPin: e.target.value.toUpperCase() }))}
+              placeholder={member?.kra_pin_masked && member.kra_pin_masked !== '—' ? member.kra_pin_masked : 'A123456789X'}
+              autoComplete="off"
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm uppercase outline-none focus:border-luma-500 focus:bg-white"
+            />
+            <p className="mt-1 text-[11px] text-gray-500">
+              {member?.kra_pin_masked && member.kra_pin_masked !== '—'
+                ? `On file: ${member.kra_pin_masked}. Enter a new PIN only to replace it.`
+                : 'Not provided. Enter a PIN if your package requires it. The full value is never shown after save.'}
+            </p>
+          </div>
+          <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Alternate phone</label>
             <input value={form.altPhone ?? ''} onChange={(e) => setForm((f) => ({ ...f, altPhone: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-luma-500 focus:bg-white" />
           </div>
@@ -266,6 +298,8 @@ export function Profile() {
           {saving ? 'Saving…' : 'Save Profile'}
         </button>
       </form>
+
+      <IdentityDocsPanel />
 
       {/* Change Password */}
       <form onSubmit={async (e) => {
@@ -418,5 +452,138 @@ export function Profile() {
         </p>
       </section>
     </div>
+  )
+}
+
+type IdentityDoc = {
+  id: string
+  document_type: string
+  verification_status: string
+  rejection_reason?: string | null
+  original_filename?: string | null
+  created_at: string
+}
+
+function IdentityDocsPanel() {
+  const [docs, setDocs] = useState<IdentityDoc[]>([])
+  const [busy, setBusy] = useState<string | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function load() {
+    try {
+      const d = await api<{ documents: IdentityDoc[] }>('/member/identity-docs', { auth: true })
+      setDocs(d.documents ?? [])
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Could not load documents.')
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  async function upload(documentType: 'national_id' | 'kra_certificate', file: File) {
+    setErr(null)
+    setMsg(null)
+    if (file.size > 10 * 1024 * 1024) {
+      setErr('PDF must be 10MB or smaller.')
+      return
+    }
+    setBusy(documentType)
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result ?? ''))
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      await api('/member/identity-docs', {
+        method: 'POST',
+        auth: true,
+        body: { documentType, fileBase64, fileName: file.name },
+      })
+      setMsg('Document uploaded successfully. Status is pending verification.')
+      await load()
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Upload failed. Try again.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  function current(type: string): IdentityDoc | undefined {
+    return docs.find((d) => d.document_type === type)
+  }
+
+  async function download(doc: IdentityDoc) {
+    setErr(null)
+    setBusy(doc.id)
+    try {
+      const d = await api<{ file_url: string }>('/member/identity-docs?action=download', {
+        method: 'POST',
+        auth: true,
+        body: { documentId: doc.id },
+      })
+      if (d.file_url) window.open(d.file_url, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Could not open the document.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <section className="mt-6 glass-panel p-6">
+      <h3 className="text-sm font-semibold text-gray-900">Identity documents</h3>
+      <p className="mt-1 text-xs text-gray-500">Upload PDF copies of your National ID and KRA certificate. Files stay private and are never published.</p>
+      {err && <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">{err}</div>}
+      {msg && <div className="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700" role="status">{msg}</div>}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        {([
+          ['national_id', identityDocLabel('national_id')],
+          ['kra_certificate', identityDocLabel('kra_certificate')],
+        ] as const).map(([type, label]) => {
+          const doc = current(type)
+          const status = identityDocStatusLabel(doc?.verification_status)
+          return (
+            <div key={type} className="rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-gray-900">{label}</p>
+                <StatusBadge status={doc?.verification_status ?? 'not_uploaded'}>{status}</StatusBadge>
+              </div>
+              {doc?.rejection_reason && (
+                <p className="mt-1 text-xs text-red-600">Needs correction: {doc.rejection_reason}</p>
+              )}
+              <label className="mt-3 block">
+                <span className="sr-only">Upload {label}</span>
+                <input
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  disabled={busy === type}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (file) void upload(type, file)
+                  }}
+                  className="block w-full text-xs text-gray-600"
+                />
+              </label>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                <span>{busy === type ? 'Uploading…' : doc ? `Current file: ${doc.original_filename ?? 'PDF'}` : 'Not uploaded'}</span>
+                {doc && (
+                  <button
+                    type="button"
+                    disabled={busy === doc.id}
+                    onClick={() => void download(doc)}
+                    className="font-medium text-luma-700 hover:underline min-h-11"
+                  >
+                    {busy === doc.id ? 'Opening…' : 'Open my file'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }

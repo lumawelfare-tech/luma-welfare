@@ -27,6 +27,7 @@ export const FAIL_CLOSED_IDENTIFIERS = new Set([
   'contact',
   'admin-2fa',
   'member-claims-upload',
+  'member-identity-docs',
   'payments-initiate',
   'admin-settings-mutation',
   'admin-members-mutation',

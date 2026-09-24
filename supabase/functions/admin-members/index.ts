@@ -2,8 +2,10 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
-import { prepareMemberListRow } from '../shared/pii.ts'
-import { parseImportMemberRow, ValidationError } from '../shared/validate.ts'
+import { prepareMemberListRow, maskIdNumberLast4 } from '../shared/pii.ts'
+import { parseImportMemberRow, parseUuid, ValidationError } from '../shared/validate.ts'
+import { sendNotification } from '../shared/notifications.ts'
+import { MEMBER_DOC_BUCKET, signPrivateStorageUrl, PRIVATE_SIGNED_URL_TTL_SECONDS } from '../shared/storage-signed.ts'
 import {
   loadRegistrationFeeConfig,
   RegistrationFeeConfigError,
@@ -80,11 +82,12 @@ Deno.serve(async (req) => {
         .single()
       if (error) throw new Error('Member not found')
 
-      const [subs, family, contribs, fees] = await Promise.all([
+      const [subs, family, contribs, fees, docs] = await Promise.all([
         adminClient.from('subscriptions').select('id, status, started_at, next_due_date, package_id, packages(code, name), package_tiers(name, amount)').eq('member_id', resourceId),
         adminClient.from('family_members').select('*').eq('member_id', resourceId).eq('is_active', true),
         adminClient.from('contributions').select('id, period, amount, amount_paid, status, package_id, created_at').eq('member_id', resourceId).order('period', { ascending: false }),
         adminClient.from('registration_fees').select('id, amount, status, paid_at, payment_reference, created_at').eq('member_id', resourceId).order('created_at', { ascending: false }).limit(5),
+        adminClient.from('member_documents').select('id, document_type, family_member_id, original_filename, verification_status, rejection_reason, is_current, created_at, expires_at, size_bytes').eq('member_id', resourceId).eq('is_current', true).order('created_at', { ascending: false }),
       ])
 
       await logAudit(adminClient, {
@@ -95,13 +98,114 @@ Deno.serve(async (req) => {
         resource_id: resourceId,
       })
 
+      const { kra_pin: kraRaw, ...memberRest } = member as Record<string, unknown>
+      const familySafe = (family.data ?? []).map((row: Record<string, unknown>) => {
+        const idRaw = typeof row.id_number === 'string' ? row.id_number : null
+        const { id_number: _omit, ...rest } = row
+        return { ...rest, id_number_masked: maskIdNumberLast4(idRaw) }
+      })
       return new Response(JSON.stringify({
-        member,
+        member: {
+          ...memberRest,
+          kra_pin_masked: maskIdNumberLast4(typeof kraRaw === 'string' ? kraRaw : null),
+        },
         subscriptions: subs.data ?? [],
-        family_members: family.data ?? [],
+        family_members: familySafe,
         contributions: contribs.data ?? [],
         registration_fees: fees.data ?? [],
+        identity_documents: docs.data ?? [],
       }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (req.method === 'POST' && action === 'view-identity-document') {
+      requirePermission(session, 'documents', 'read')
+      const body = await req.json()
+      const docId = parseUuid(body.documentId ?? body.document_id, 'document')
+      const { data: doc, error } = await adminClient
+        .from('member_documents')
+        .select('id, storage_path, member_id, document_type')
+        .eq('id', docId)
+        .maybeSingle()
+      if (error || !doc) {
+        return new Response(JSON.stringify({ message: 'Document not found', code: 'NOT_FOUND' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const signed = await signPrivateStorageUrl(adminClient, MEMBER_DOC_BUCKET, doc.storage_path)
+      if (!signed) {
+        return new Response(JSON.stringify({ message: 'Could not create a download link.', code: 'INTERNAL' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: 'view_member_document',
+        resource: 'member_document',
+        resource_id: doc.id,
+        meta: { member_id: doc.member_id, document_type: doc.document_type },
+      })
+      return new Response(JSON.stringify({
+        file_url: signed,
+        signed_url_expires_in: PRIVATE_SIGNED_URL_TTL_SECONDS,
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (req.method === 'POST' && (action === 'verify-identity-document' || action === 'reject-identity-document')) {
+      requirePermission(session, 'documents', 'verify')
+      const body = await req.json()
+      const docId = parseUuid(body.documentId ?? body.document_id, 'document')
+      const reject = action === 'reject-identity-document'
+      const reason = reject && typeof body.reason === 'string' ? body.reason.trim().slice(0, 500) : ''
+      if (reject && !reason) {
+        return new Response(JSON.stringify({ message: 'A rejection reason is required.', code: 'VALIDATION' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const { data: doc, error } = await adminClient
+        .from('member_documents')
+        .select('id, member_id, document_type, verification_status')
+        .eq('id', docId)
+        .maybeSingle()
+      if (error || !doc) {
+        return new Response(JSON.stringify({ message: 'Document not found', code: 'NOT_FOUND' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const { data: updated, error: updErr } = await adminClient
+        .from('member_documents')
+        .update({
+          verification_status: reject ? 'rejected' : 'verified',
+          verified_by: session.id,
+          verified_at: new Date().toISOString(),
+          rejection_reason: reject ? reason : null,
+        })
+        .eq('id', docId)
+        .select('id, verification_status, rejection_reason')
+        .single()
+      if (updErr) throw new Error(updErr.message)
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: reject ? 'member_document_rejected' : 'member_document_verified',
+        resource: 'member_document',
+        resource_id: doc.id,
+        meta: { member_id: doc.member_id, document_type: doc.document_type },
+      })
+      await sendNotification(adminClient, {
+        memberId: doc.member_id,
+        subject: reject ? 'Document needs correction' : 'Document verified',
+        body: reject
+          ? `Your ${doc.document_type.replace(/_/g, ' ')} was rejected. Reason: ${reason}`
+          : `Your ${doc.document_type.replace(/_/g, ' ')} has been verified.`,
+        type: 'system',
+        meta: { document_id: doc.id },
+      })
+      return new Response(JSON.stringify({ document: updated }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

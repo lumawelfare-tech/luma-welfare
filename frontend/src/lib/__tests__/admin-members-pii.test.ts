@@ -28,10 +28,13 @@ describe('prepareMemberListRow', () => {
       phone: '0712345678',
       email: 't@example.com',
       id_number: '12345678',
+      kra_pin: 'A123456789X',
       status: 'active',
     })
     expect(row).not.toHaveProperty('id_number')
     expect(row.id_number_masked).toBe(maskIdNumberLast4('12345678'))
+    expect(row).not.toHaveProperty('kra_pin')
+    expect(row.kra_pin_masked).toBe(maskIdNumberLast4('A123456789X'))
     expect(row.phone).toBe('0712345678')
     expect(row.profile_incomplete).toBe(false)
   })

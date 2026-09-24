@@ -27,6 +27,8 @@ export type Member = {
   location: string | null
   occupation: string | null
   date_of_birth?: string | null
+  /** Masked last-4 only. Full KRA PIN is never stored on the client session. */
+  kra_pin_masked?: string | null
   created_at: string | null
   updated_at: string | null
   privacy_accepted_at?: string | null

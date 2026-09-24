@@ -67,16 +67,23 @@ export function prepareMemberListRow(row: Record<string, unknown>): Record<strin
   const idRaw = typeof row.id_number === 'string' ? row.id_number.trim() : ''
   const anonymizedAt = row.anonymized_at ?? null
   const isAnonymized = anonymizedAt != null && anonymizedAt !== ''
+  const kraRaw = typeof row.kra_pin === 'string' ? row.kra_pin.trim() : ''
   const {
     id_number: _omitId,
     alt_phone: _omitAlt,
+    kra_pin: _omitKra,
     ...rest
   } = row
   return {
     ...rest,
     anonymized_at: anonymizedAt,
     id_number_masked: isAnonymized ? '—' : maskIdNumberLast4(idRaw || null),
+    kra_pin_masked: isAnonymized ? '—' : maskIdNumberLast4(kraRaw || null),
     profile_incomplete: isAnonymized ? false : !idRaw,
     is_anonymized: isAnonymized,
   }
+}
+
+export function maskKraPin(value: string | null | undefined): string {
+  return maskIdNumberLast4(value)
 }

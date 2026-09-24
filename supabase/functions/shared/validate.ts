@@ -383,6 +383,7 @@ export type MemberProfilePatchInput = {
   location?: string | null
   occupation?: string | null
   photoUrl?: string | null
+  kraPin?: string | null
 }
 
 export function parseMemberProfilePatchBody(input: unknown): MemberProfilePatchInput {
@@ -427,6 +428,9 @@ export function parseMemberProfilePatchBody(input: unknown): MemberProfilePatchI
     location: opt('location'),
     occupation: opt('occupation'),
     photoUrl: opt('photoUrl'),
+    kraPin: ('kraPin' in body || 'kra_pin' in body)
+      ? (parseOptionalKraPin(body.kraPin ?? body.kra_pin) ?? undefined)
+      : undefined,
   }
 }
 
@@ -684,5 +688,103 @@ export function parseRequiredMoneyAmount(raw: unknown, label = 'amount'): number
     throw new ValidationError(`${label} is required.`)
   }
   return parsed
+}
+
+const KRA_PIN_RE = /^[A-Z]\d{9}[A-Z]$/
+const FAMILY_RELATIONSHIPS = ['spouse', 'child', 'parent', 'sibling', 'other'] as const
+const FAMILY_TIERS = ['nuclear', 'extended'] as const
+const BENEFICIARY_STATUSES = ['pending', 'active', 'inactive', 'rejected'] as const
+export const IDENTITY_DOCUMENT_TYPES = [
+  'national_id',
+  'kra_certificate',
+  'beneficiary_id',
+  'beneficiary_kra',
+  'other',
+] as const
+export type IdentityDocumentType = (typeof IDENTITY_DOCUMENT_TYPES)[number]
+
+export function parseOptionalKraPin(raw: unknown): string | null {
+  if (raw == null || raw === '') return null
+  if (typeof raw !== 'string') throw new ValidationError('KRA PIN must be a string.')
+  const pin = raw.trim().toUpperCase().replace(/\s+/g, '')
+  if (!pin) return null
+  if (!KRA_PIN_RE.test(pin)) {
+    throw new ValidationError('Enter a valid KRA PIN (e.g. A123456789X).')
+  }
+  return pin
+}
+
+export type FamilyMemberInput = {
+  fullName: string
+  relationship: (typeof FAMILY_RELATIONSHIPS)[number]
+  tier: (typeof FAMILY_TIERS)[number]
+  idNumber: string | null
+  dateOfBirth: string | null
+  phone: string | null
+  beneficiaryStatus: (typeof BENEFICIARY_STATUSES)[number]
+}
+
+export function parseFamilyMemberBody(input: unknown): FamilyMemberInput {
+  if (input == null || typeof input !== 'object' || Array.isArray(input)) {
+    throw new ValidationError('Invalid family member.')
+  }
+  const body = input as Record<string, unknown>
+  const fullRaw = body.fullName ?? body.full_name
+  if (typeof fullRaw !== 'string' || !fullRaw.trim()) {
+    throw new ValidationError('Full name is required.')
+  }
+  const fullName = fullRaw.trim().slice(0, 120)
+  const relRaw = String(body.relationship ?? '').trim().toLowerCase()
+  if (!FAMILY_RELATIONSHIPS.includes(relRaw as (typeof FAMILY_RELATIONSHIPS)[number])) {
+    throw new ValidationError('Relationship must be spouse, child, parent, sibling, or other.')
+  }
+  const tierRaw = String(body.tier ?? 'nuclear').trim().toLowerCase()
+  if (!FAMILY_TIERS.includes(tierRaw as (typeof FAMILY_TIERS)[number])) {
+    throw new ValidationError('Cover tier must be nuclear or extended.')
+  }
+  const statusRaw = String(body.beneficiaryStatus ?? body.beneficiary_status ?? 'active')
+    .trim()
+    .toLowerCase()
+  if (!BENEFICIARY_STATUSES.includes(statusRaw as (typeof BENEFICIARY_STATUSES)[number])) {
+    throw new ValidationError('Invalid beneficiary status.')
+  }
+  let idNumber: string | null = null
+  const idRaw = body.idNumber ?? body.id_number
+  if (idRaw != null && idRaw !== '') {
+    idNumber = parseKenyanNationalId(idRaw, 'ID number')
+  }
+  let phone: string | null = null
+  const phoneRaw = body.phone
+  if (typeof phoneRaw === 'string' && phoneRaw.trim()) {
+    const normalized = normalizeKenyanPhone(phoneRaw)
+    if (!KENYA_PHONE_RE.test(normalized)) {
+      throw new ValidationError('Enter a valid Kenyan phone number.')
+    }
+    phone = normalized
+  }
+  const dobRaw = body.dateOfBirth ?? body.date_of_birth
+  let dateOfBirth: string | null = null
+  if (typeof dobRaw === 'string' && dobRaw.trim()) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dobRaw.trim())) {
+      throw new ValidationError('Date of birth must be YYYY-MM-DD.')
+    }
+    dateOfBirth = dobRaw.trim()
+  }
+  return {
+    fullName,
+    relationship: relRaw as FamilyMemberInput['relationship'],
+    tier: tierRaw as FamilyMemberInput['tier'],
+    idNumber,
+    dateOfBirth,
+    phone,
+    beneficiaryStatus: statusRaw as FamilyMemberInput['beneficiaryStatus'],
+  }
+}
+
+export function parseIdentityDocumentType(raw: unknown): IdentityDocumentType {
+  if (typeof raw !== 'string' || !IDENTITY_DOCUMENT_TYPES.includes(raw as IdentityDocumentType)) {
+    throw new ValidationError('Invalid document type.')
+  }
+  return raw as IdentityDocumentType
 }
 

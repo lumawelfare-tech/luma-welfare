@@ -3,6 +3,7 @@ import {
   maskPhone,
   maskIdNumber,
   maskIdNumberLast4,
+  maskKraPin,
   maskEmail,
   displayEmail,
   formatKenyanPhone,
@@ -28,6 +29,11 @@ describe('PII masking', () => {
 
   it('masks email local part', () => {
     expect(maskEmail('jane@example.com')).toBe('ja••@example.com')
+  })
+
+  it('masks KRA PIN to last 4', () => {
+    expect(maskKraPin('A123456789X')).toBe('••••6789')
+    expect(maskKraPin(null)).toBe('—')
   })
 
   it('handles empty values', () => {

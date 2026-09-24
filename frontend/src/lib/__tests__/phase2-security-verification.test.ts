@@ -98,6 +98,7 @@ describe('Phase 2 — edge auth contracts (critical functions)', () => {
     'member-claims',
     'member-contributions',
     'member-receipts',
+    'member-identity-docs',
   ]
 
   for (const fn of memberFns) {

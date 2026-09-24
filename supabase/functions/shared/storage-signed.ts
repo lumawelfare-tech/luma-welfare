@@ -13,6 +13,7 @@ export const CLAIM_DOC_SIGNED_URL_TTL_SECONDS = PRIVATE_SIGNED_URL_TTL_SECONDS
 
 const CLAIM_DOC_BUCKET = 'claim-documents'
 export const KB_DOC_BUCKET = 'kb-documents'
+export const MEMBER_DOC_BUCKET = 'member-documents'
 
 /**
  * Extract a storage object path from either a raw path or a full Supabase Storage URL.

@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient } from '../shared/supabase.ts'
+import { maskIdNumberLast4 } from '../shared/pii.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -76,8 +77,17 @@ Deno.serve(async (req) => {
     const { data: authUserData } = await adminClient.auth.admin.getUserById(userId)
     const emailConfirmed = Boolean(authUserData?.user?.email_confirmed_at)
 
+    let memberSafe: Record<string, unknown> | null = null
+    if (member) {
+      const { kra_pin: kraRaw, ...memberRest } = member as Record<string, unknown>
+      memberSafe = {
+        ...memberRest,
+        kra_pin_masked: maskIdNumberLast4(typeof kraRaw === 'string' ? kraRaw : null),
+      }
+    }
+
     return new Response(JSON.stringify({
-      member: member ?? null,
+      member: memberSafe,
       subscriptions: subscriptions ?? [],
       isAdmin,
       adminRole,

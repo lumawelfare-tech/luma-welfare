@@ -34,6 +34,8 @@ const MEMBER_FNS = [
   'member-complaints',
   'member-documents',
   'member-assistant',
+  'member-identity-docs',
+  'member-family',
 ]
 
 function readFn(name: string): string {

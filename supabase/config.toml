@@ -80,6 +80,9 @@ verify_jwt = true
 [functions.member-family]
 verify_jwt = true
 
+[functions.member-identity-docs]
+verify_jwt = true
+
 [functions.member-subscriptions]
 verify_jwt = true
 

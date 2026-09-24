@@ -137,6 +137,7 @@ ALL_FUNCTIONS=(
   member-documents
   member-assistant
   member-family
+  member-identity-docs
   member-notification-prefs
   member-notifications
   member-profile

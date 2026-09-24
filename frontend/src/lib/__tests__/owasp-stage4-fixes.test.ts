@@ -22,6 +22,7 @@ const MEMBER_FNS = [
   'member-notification-prefs',
   'member-push-subscriptions',
   'member-registration-fee',
+  'member-identity-docs',
 ]
 
 describe('Stage 4 — unexpected errors stay generic', () => {

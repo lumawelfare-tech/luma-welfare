@@ -5,6 +5,10 @@ import { describe, it, expect } from 'vitest'
 import {
   parseLoginBody,
   parseRegisterBody,
+  parseOptionalKraPin,
+  parseFamilyMemberBody,
+  parseIdentityDocumentType,
+  parseMemberProfilePatchBody,
   ValidationError,
 } from '../../../../supabase/functions/shared/validate.ts'
 
@@ -88,5 +92,71 @@ describe('parseRegisterBody', () => {
     expect(() => parseRegisterBody({ ...good, acceptedTerms: false })).toThrow(ValidationError)
     expect(() => parseRegisterBody({ ...good, acceptedConstitution: false })).toThrow(ValidationError)
     expect(() => parseRegisterBody({ ...good, confirmSelfSubmission: false })).toThrow(ValidationError)
+  })
+})
+
+describe('parseOptionalKraPin', () => {
+  it('accepts a Kenyan KRA PIN', () => {
+    expect(parseOptionalKraPin('a123456789x')).toBe('A123456789X')
+    expect(parseOptionalKraPin(null)).toBeNull()
+    expect(parseOptionalKraPin('')).toBeNull()
+  })
+
+  it('rejects malformed pins', () => {
+    expect(() => parseOptionalKraPin('123456789')).toThrow(ValidationError)
+    expect(() => parseOptionalKraPin('A123X')).toThrow(ValidationError)
+  })
+})
+
+describe('parseFamilyMemberBody', () => {
+  it('accepts camelCase and snake_case', () => {
+    const camel = parseFamilyMemberBody({
+      fullName: 'Jane Doe',
+      relationship: 'spouse',
+      tier: 'nuclear',
+      dateOfBirth: '1992-01-02',
+    })
+    expect(camel.fullName).toBe('Jane Doe')
+    expect(camel.tier).toBe('nuclear')
+    expect(camel.beneficiaryStatus).toBe('active')
+
+    const snake = parseFamilyMemberBody({
+      full_name: 'John Doe',
+      relationship: 'child',
+      tier: 'extended',
+      id_number: '12345678',
+    })
+    expect(snake.fullName).toBe('John Doe')
+    expect(snake.idNumber).toBe('12345678')
+    expect(snake.tier).toBe('extended')
+  })
+
+  it('rejects invented relationships and tiers', () => {
+    expect(() => parseFamilyMemberBody({ fullName: 'X', relationship: 'cousin', tier: 'nuclear' })).toThrow(ValidationError)
+    expect(() => parseFamilyMemberBody({ fullName: 'X', relationship: 'spouse', tier: 'household' })).toThrow(ValidationError)
+  })
+})
+
+describe('parseIdentityDocumentType', () => {
+  it('allows organization document types only', () => {
+    expect(parseIdentityDocumentType('national_id')).toBe('national_id')
+    expect(parseIdentityDocumentType('beneficiary_id')).toBe('beneficiary_id')
+    expect(() => parseIdentityDocumentType('passport_scan')).toThrow(ValidationError)
+  })
+})
+
+describe('parseMemberProfilePatchBody', () => {
+  const base = {
+    fullName: 'Jane Doe',
+    phone: '0712345678',
+    idNumber: '12345678',
+  }
+
+  it('leaves KRA PIN unchanged when omitted', () => {
+    expect(parseMemberProfilePatchBody(base).kraPin).toBeUndefined()
+  })
+
+  it('updates KRA PIN when provided', () => {
+    expect(parseMemberProfilePatchBody({ ...base, kraPin: 'A123456789X' }).kraPin).toBe('A123456789X')
   })
 })
