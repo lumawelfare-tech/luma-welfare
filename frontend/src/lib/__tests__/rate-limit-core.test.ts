@@ -58,5 +58,7 @@ describe('FAIL_CLOSED_IDENTIFIERS', () => {
     expect(FAIL_CLOSED_IDENTIFIERS.has('admin-2fa')).toBe(true)
     expect(FAIL_CLOSED_IDENTIFIERS.has('admin-claims-mutation')).toBe(true)
     expect(FAIL_CLOSED_IDENTIFIERS.has('member-identity-docs')).toBe(true)
+    expect(FAIL_CLOSED_IDENTIFIERS.has('member-assistant')).toBe(true)
+    expect(FAIL_CLOSED_IDENTIFIERS.has('admin-kb-ingest')).toBe(true)
   })
 })

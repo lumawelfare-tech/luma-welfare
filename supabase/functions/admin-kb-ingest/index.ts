@@ -18,6 +18,9 @@ import {
   getOpenAiApiKey,
   hashContent,
   normalizeKbText,
+  MAX_INGEST_CHUNKS,
+  MAX_INGEST_DOCUMENTS,
+  MAX_PDF_EXTRACT_CHARS,
 } from '../shared/kb-rag.ts'
 
 /**
@@ -119,10 +122,16 @@ Deno.serve(async (req) => {
       .in('access_level', ['public', 'member'])
     if (docsErr) throw new Error(docsErr.message)
 
+    const approvedDocs = (docs ?? []) as DocRow[]
+    if (approvedDocs.length > MAX_INGEST_DOCUMENTS) {
+      warnings.push(`document_cap:${approvedDocs.length}>${MAX_INGEST_DOCUMENTS}`)
+    }
+    const docsToProcess = approvedDocs.slice(0, MAX_INGEST_DOCUMENTS)
+
     let pdfExtracted = 0
     let pdfFailed = 0
 
-    for (const doc of (docs ?? []) as DocRow[]) {
+    for (const doc of docsToProcess) {
       const meta = {
         category: doc.category,
         version: doc.version,
@@ -145,6 +154,10 @@ Deno.serve(async (req) => {
           }
           const bytes = new Uint8Array(await file.arrayBuffer())
           bodyText = await extractPdfText(bytes)
+          if (bodyText.length > MAX_PDF_EXTRACT_CHARS) {
+            bodyText = bodyText.slice(0, MAX_PDF_EXTRACT_CHARS)
+            warnings.push(`pdf_truncated:${doc.id}`)
+          }
           if (bodyText.length < 40) {
             throw new Error('extracted text too short')
           }
@@ -166,7 +179,13 @@ Deno.serve(async (req) => {
 
       if (bodyText.length < 3) continue
 
-      const pieces = chunkKbText(bodyText)
+      if (rows.length >= MAX_INGEST_CHUNKS) {
+        warnings.push(`chunk_cap:${MAX_INGEST_CHUNKS}`)
+        break
+      }
+
+      const remaining = MAX_INGEST_CHUNKS - rows.length
+      const pieces = chunkKbText(bodyText).slice(0, remaining)
       pieces.forEach((content, chunkIndex) => {
         rows.push({
           source_type: 'kb_document',

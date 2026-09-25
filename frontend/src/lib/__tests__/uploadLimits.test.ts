@@ -71,6 +71,15 @@ describe('document upload size', () => {
     expect(read('supabase/migrations/20260922200000_phase6_kb_documents.sql')).toContain('20971520')
   })
 
+  it('later hardening sets new-upload bucket caps to 5MB without rewriting history', () => {
+    const mig = read('supabase/migrations/20260925160000_pre_deploy_hardening.sql')
+    expect(mig).toContain('file_size_limit = 5242880')
+    expect(mig).toContain("WHERE id = 'member-documents'")
+    expect(mig).toContain("WHERE id = 'claim-documents'")
+    expect(mig).toContain("WHERE id = 'kb-documents'")
+    expect(mig).toContain('Historical CHECKs stay at 10MB')
+  })
+
   it('leaves media library videos and profile avatars on their own limits', () => {
     expect(read('frontend/src/pages/admin/AdminMedia.tsx')).toContain('50 * 1024 * 1024')
     expect(read('supabase/functions/admin-media/index.ts')).toContain('50 * 1024 * 1024')

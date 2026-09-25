@@ -451,6 +451,16 @@ describeLive('RLS isolation (live)', () => {
     const stolen = await b.storage.from('claim-documents').download(claimDocPath)
     expect(stolen.data).toBeNull()
 
+    const owner = await userClient(emailA, password)
+    const ownerDl = await owner.storage.from('claim-documents').download(claimDocPath)
+    expect(ownerDl.data).toBeNull()
+    const ownerUp = await owner.storage.from('claim-documents').upload(
+      `${claimA}/rls-denied-${randomUUID().slice(0, 8)}.jpg`,
+      jpeg,
+      { contentType: 'image/jpeg', upsert: false },
+    )
+    expect(ownerUp.error, 'claim-documents must reject member JWT upload').toBeTruthy()
+
     const a = await userClient(emailA, password)
     for (const bucket of ['media', 'exports', 'kb-documents', 'report-files'] as const) {
       const write = await a.storage.from(bucket).upload(`rls-${randomUUID().slice(0, 8)}.jpg`, jpeg, {
@@ -505,6 +515,11 @@ describeLive('RLS isolation (live)', () => {
     const adminPin = await admin().from('members').select('kra_pin').eq('id', idA).maybeSingle()
     expect(adminPin.error).toBeNull()
     expect(adminPin.data).toHaveProperty('kra_pin')
+
+    const selfUpdate = await a.from('members').update({ kra_pin: 'A000000000Z' }).eq('id', idA)
+    expect(selfUpdate.error, 'members.kra_pin must not be updatable by JWT').toBeTruthy()
+    const after = await admin().from('members').select('kra_pin').eq('id', idA).maybeSingle()
+    expect(after.data?.kra_pin).toBe(adminPin.data?.kra_pin)
   })
 
   it('support / finance / claims_reviewer are not granted settings, reveal, or exports', async () => {

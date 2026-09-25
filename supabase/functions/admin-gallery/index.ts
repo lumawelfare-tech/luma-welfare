@@ -33,9 +33,8 @@ async function uploadBase64(
   const bytes = new Uint8Array(binaryStr.length)
   for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i)
 
-  // Limit: 10MB (base64 is ~33% larger than binary)
-  if (bytes.length > 10 * 1024 * 1024) {
-    throw new Error('File too large. Maximum size is 10MB.')
+  if (bytes.length > 5 * 1024 * 1024) {
+    throw new Error('File too large. Maximum size is 5MB.')
   }
 
   if (looksLikeScriptableMarkup(bytes)) {

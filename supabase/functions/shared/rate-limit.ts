@@ -72,6 +72,10 @@ export const ENDPOINT_LIMITS: Record<string, { windowMs: number; max: number }> 
   // Payments (kill-switch still applies separately)
   'payments-initiate': { windowMs: 60_000, max: 5 },
 
+  // Metered OpenAI — tighter than the 60/min default; fail-closed in core
+  'member-assistant': { windowMs: 60_000, max: 10 },
+  'admin-kb-ingest': { windowMs: 300_000, max: 3 },
+
   // Admin mutations
   'admin-settings-mutation': { windowMs: 60_000, max: 30 },
   'admin-members-mutation': { windowMs: 60_000, max: 30 },
