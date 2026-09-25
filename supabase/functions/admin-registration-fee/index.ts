@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       // Check existing record
       const { data: existing } = await adminClient
         .from('registration_fees')
-        .select('status')
+        .select('status, amount')
         .eq('member_id', memberId)
         .eq('fee_type', 'registration')
         .maybeSingle()

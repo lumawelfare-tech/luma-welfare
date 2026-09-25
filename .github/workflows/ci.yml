@@ -489,7 +489,7 @@ jobs:
           echo "✅ Migration files look correct."
 
   # ============================================================================
-  # DEPLOY EDGE FUNCTIONS — same deploy path as deploy-functions.yml; gated when
+  # DEPLOY EDGE FUNCTIONS — gated when (main push or CI workflow_dispatch)
   # ============================================================================
   deploy-edge-functions:
     name: "🚀 Deploy Edge Functions"

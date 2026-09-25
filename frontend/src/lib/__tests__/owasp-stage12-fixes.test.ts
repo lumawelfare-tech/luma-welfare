@@ -130,8 +130,8 @@ describe('Stage 2 — uploads, CORS, signup, audit, CI', () => {
   })
 
   it('deploy workflow does not interpolate function_name into the shell', () => {
-    const wf = read('.github/workflows/deploy-functions.yml')
-    expect(wf).toContain('FUNCTION_NAME: ${{ inputs.function_name }}')
+    const wf = read('.github/workflows/ci.yml')
+    expect(wf).toContain('FUNCTION_NAME: ${{ github.event.inputs.function_name }}')
     expect(wf).not.toContain('if [ -n "${{ inputs.function_name }}" ]')
     expect(wf).toContain('auth-forgot-password')
   })
