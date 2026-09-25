@@ -20,17 +20,20 @@ Deno.serve(async (req) => {
     const resource = url.searchParams.get('resource') ?? 'packages'
 
     if (resource === 'packages') {
-      const { data: packages } = await adminClient
+      const { data: packages, error: packagesErr } = await adminClient
         .from('packages')
         .select('id, code, name, description, coverage, waiting_period_months, sort_order, parent_package_id')
         .eq('is_active', true)
         .order('sort_order')
-      const { data: tiers } = await adminClient
+      if (packagesErr) throw new Error(packagesErr.message)
+      const { data: tiers, error: tiersErr } = await adminClient
         .from('package_tiers')
         .select('id, package_id, name, amount, min_age, max_age, sort_order')
         .eq('is_active', true)
         .order('sort_order')
-      const { data: rules } = await adminClient.from('package_rules').select('package_id, key, value')
+      if (tiersErr) throw new Error(tiersErr.message)
+      const { data: rules, error: rulesErr } = await adminClient.from('package_rules').select('package_id, key, value')
+      if (rulesErr) throw new Error(rulesErr.message)
 
       const rulesByPackage = new Map<string, Record<string, unknown>>()
       for (const r of rules ?? []) {

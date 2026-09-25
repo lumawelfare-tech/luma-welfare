@@ -8,7 +8,11 @@
 
 import { CSP_DIRECTIVES } from './security.ts'
 
-const PRODUCTION_ORIGIN = 'https://luma-welfare.vercel.app'
+const PRODUCTION_ORIGINS = [
+  'https://luma-welfare.vercel.app',
+  'https://www.lumawelfare.or.ke',
+  'https://lumawelfare.or.ke',
+] as const
 const LOCAL_DEV_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:4173',
@@ -22,23 +26,23 @@ function isHostedSupabase(): boolean {
 }
 
 function getAllowedOrigins(): string[] {
-  const raw = Deno.env.get('CORS_ALLOWED_ORIGIN')
-  if (raw?.trim()) {
-    return raw.split(',').map((o) => o.trim()).filter(Boolean)
-  }
+  const extra = (Deno.env.get('CORS_ALLOWED_ORIGIN') ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
   // Hosted Edge must not fall back to localhost. Local `supabase functions serve`
   // uses 127.0.0.1:54321 and keeps the localhost origins for Vite.
-  if (isHostedSupabase()) {
-    return [PRODUCTION_ORIGIN]
-  }
-  return [PRODUCTION_ORIGIN, ...LOCAL_DEV_ORIGINS]
+  const base = isHostedSupabase()
+    ? [...PRODUCTION_ORIGINS]
+    : [...PRODUCTION_ORIGINS, ...LOCAL_DEV_ORIGINS]
+  return [...new Set([...base, ...extra])]
 }
 
 function resolveAllowOrigin(reqOrigin: string | null): string {
   const allowed = getAllowedOrigins()
   if (reqOrigin && allowed.includes(reqOrigin)) return reqOrigin
   // Fall back to primary configured origin for non-browser / same-origin tooling
-  return allowed[0] ?? 'https://luma-welfare.vercel.app'
+  return allowed[0] ?? PRODUCTION_ORIGINS[0]
 }
 
 export function isOriginAllowed(origin: string | null): boolean {

@@ -82,6 +82,8 @@ export function parseLoginBody(input: unknown): LoginInput {
 const RESET_REDIRECT_PATH = '/reset-password'
 const RESET_REDIRECT_ORIGINS = new Set([
   'https://luma-welfare.vercel.app',
+  'https://www.lumawelfare.or.ke',
+  'https://lumawelfare.or.ke',
   'http://localhost:5173',
   'http://localhost:4173',
   'http://127.0.0.1:5173',
