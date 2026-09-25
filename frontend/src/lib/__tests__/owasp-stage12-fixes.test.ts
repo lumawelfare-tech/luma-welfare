@@ -134,6 +134,10 @@ describe('Stage 2 — uploads, CORS, signup, audit, CI', () => {
     expect(wf).toContain('FUNCTION_NAME: ${{ github.event.inputs.function_name }}')
     expect(wf).not.toContain('if [ -n "${{ inputs.function_name }}" ]')
     expect(wf).toContain('auth-forgot-password')
+    expect(wf).toContain('VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}')
+    const verify = read('scripts/verify-deploy.sh')
+    expect(verify).toContain('VITE_SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_ANON_KEY')
+    expect(verify).not.toContain('grep \'VITE_SUPABASE_PUBLISHABLE_KEY\' .env.local')
   })
 
   it('auth-forgot-password function exists', () => {

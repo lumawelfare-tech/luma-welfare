@@ -541,6 +541,9 @@ jobs:
         run: npm run verify:deploy
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: mkbxigxmhqdhxmptanqr
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
   # ============================================================================
   # SECURITY SCORECARD (summary) — always runs; handles skipped/cancelled/missing

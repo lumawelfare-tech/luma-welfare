@@ -13,27 +13,35 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Load project reference from supabase linked project or config
-if [ -f "supabase/.temp/project-ref" ]; then
+# Project ref: CI env, linked project, config.toml, then the hosted fallback.
+PROJECT_REF="${SUPABASE_PROJECT_REF:-}"
+if [ -z "$PROJECT_REF" ] && [ -f "supabase/.temp/project-ref" ]; then
   PROJECT_REF=$(cat supabase/.temp/project-ref)
-elif [ -f "supabase/.temp/linked-project.json" ]; then
+fi
+if [ -z "$PROJECT_REF" ] && [ -f "supabase/.temp/linked-project.json" ]; then
   PROJECT_REF=$(node -e "console.log(JSON.parse(require('fs').readFileSync('supabase/.temp/linked-project.json','utf8')).project_ref)" 2>/dev/null || echo "")
-else
+fi
+if [ -z "$PROJECT_REF" ] && [ -f "supabase/config.toml" ]; then
   PROJECT_REF=$(grep 'project_id' supabase/config.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/' 2>/dev/null || echo "")
 fi
 if [ -z "$PROJECT_REF" ]; then
-  echo -e "${RED}ERROR: Could not find project_id in supabase/config.toml${NC}"
-  exit 1
+  PROJECT_REF="mkbxigxmhqdhxmptanqr"
 fi
 
-# Load API key from .env.local or frontend/.env
-if [ -f "frontend/.env" ]; then
-  API_KEY=$(grep 'VITE_SUPABASE_PUBLISHABLE_KEY' frontend/.env | head -1 | cut -d= -f2 2>/dev/null || echo "")
-else
-  API_KEY=$(grep 'VITE_SUPABASE_PUBLISHABLE_KEY' .env.local | head -1 | cut -d= -f2 2>/dev/null || echo "")
+# Publishable/anon key: env first (CI), then gitignored local files. Never require a committed .env.
+API_KEY="${VITE_SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_ANON_KEY:-${SUPABASE_PUBLISHABLE_KEY:-}}}"
+if [ -z "$API_KEY" ]; then
+  for envfile in frontend/.env frontend/.env.local .env.local .env; do
+    if [ -f "$envfile" ]; then
+      API_KEY=$(grep -E '^[[:space:]]*VITE_SUPABASE_PUBLISHABLE_KEY=' "$envfile" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '\r' || true)
+      if [ -n "$API_KEY" ]; then
+        break
+      fi
+    fi
+  done
 fi
 if [ -z "$API_KEY" ]; then
-  echo -e "${RED}ERROR: Could not find VITE_SUPABASE_PUBLISHABLE_KEY in .env.local${NC}"
+  echo -e "${RED}ERROR: Set VITE_SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY (env or gitignored .env.local)${NC}"
   exit 1
 fi
 
