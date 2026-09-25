@@ -9,6 +9,8 @@ import { ErrorState } from '../../components/ErrorState'
 import { reportLoadError } from '../../lib/userFacingError'
 import { useToast } from '../../components/Toast'
 import { formatApplicationProgramCodes, memberStatusLabel } from '../../lib/applicationPrograms'
+import { identityDocLabel, identityDocStatusLabel } from '../../lib/identityDocs'
+import { StatusBadge } from '../../components/StatusBadge'
 
 type ClaimDocument = {
   id: string
@@ -44,9 +46,18 @@ export function MemberDocuments() {
   const navigate = useNavigate()
   const [documents, setDocuments] = useState<ClaimDocument[]>([])
   const [orgDocs, setOrgDocs] = useState<OrgDocument[]>([])
+  const [identityDocs, setIdentityDocs] = useState<{
+    id: string
+    document_type: string
+    verification_status: string
+    original_filename?: string | null
+    created_at: string
+  }[]>([])
   const [loading, setLoading] = useState(true)
   const [orgLoading, setOrgLoading] = useState(true)
+  const [identityLoading, setIdentityLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [identityBusy, setIdentityBusy] = useState<string | null>(null)
 
   function load() {
     setLoading(true)
@@ -63,10 +74,32 @@ export function MemberDocuments() {
       .then((d) => setOrgDocs(d.documents ?? []))
       .catch(() => setOrgDocs([]))
       .finally(() => setOrgLoading(false))
+
+    setIdentityLoading(true)
+    api<{ documents: typeof identityDocs }>('/member/identity-docs', { auth: true })
+      .then((d) => setIdentityDocs(d.documents ?? []))
+      .catch(() => setIdentityDocs([]))
+      .finally(() => setIdentityLoading(false))
   }
 
   // eslint-disable-next-line oxc/react/set-state-in-effect — load on mount
   useEffect(() => { load() }, [])
+
+  async function openIdentityDoc(id: string) {
+    setIdentityBusy(id)
+    try {
+      const d = await api<{ file_url: string }>('/member/identity-docs?action=download', {
+        method: 'POST',
+        auth: true,
+        body: { documentId: id },
+      })
+      if (d.file_url) window.open(d.file_url, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      addToast('error', e instanceof ApiError ? e.message : 'Could not open document.')
+    } finally {
+      setIdentityBusy(null)
+    }
+  }
 
   async function downloadOrg(id: string) {
     try {
@@ -132,6 +165,44 @@ export function MemberDocuments() {
             Profile &amp; data export
           </Link>
         </div>
+      </section>
+
+      <section className="mb-8" aria-labelledby="identity-docs-heading">
+        <h2 id="identity-docs-heading" className="text-sm font-semibold text-gray-900 mb-3">Identity documents</h2>
+        {identityLoading ? (
+          <p className="text-sm text-gray-500">Loading…</p>
+        ) : identityDocs.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            No National ID or KRA PDF uploaded yet.{' '}
+            <Link to="/profile" className="font-medium text-luma-700 hover:underline">Upload on your profile</Link>.
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+            {identityDocs.map((doc) => (
+              <li key={doc.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">{identityDocLabel(doc.document_type)}</p>
+                  <p className="text-xs text-gray-500">
+                    {doc.original_filename ?? 'PDF'}
+                    {' · '}
+                    {new Date(doc.created_at).toLocaleDateString('en-KE')}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status={doc.verification_status}>{identityDocStatusLabel(doc.verification_status)}</StatusBadge>
+                  <button
+                    type="button"
+                    disabled={identityBusy === doc.id}
+                    onClick={() => void openIdentityDoc(doc.id)}
+                    className="inline-flex min-h-11 items-center rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    {identityBusy === doc.id ? 'Opening…' : 'Open'}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="mb-8" aria-labelledby="org-docs-heading">

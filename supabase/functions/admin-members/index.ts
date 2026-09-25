@@ -2,7 +2,7 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient, loadAdminSession, adminSessionDeniedResponse, requirePermission, handleAdminError, logAudit } from '../shared/supabase.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { sanitizeSearch } from '../shared/search.ts'
-import { prepareMemberListRow, maskIdNumberLast4 } from '../shared/pii.ts'
+import { prepareMemberListRow, maskIdNumberLast4, stripAuthSecretsFromMember } from '../shared/pii.ts'
 import { parseImportMemberRow, parseUuid, ValidationError } from '../shared/validate.ts'
 import { sendNotification } from '../shared/notifications.ts'
 import { MEMBER_DOC_BUCKET, signPrivateStorageUrl, PRIVATE_SIGNED_URL_TTL_SECONDS } from '../shared/storage-signed.ts'
@@ -39,6 +39,27 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const resourceId = url.searchParams.get('resource_id')
     const action = url.searchParams.get('action')
+
+    // GET /admin-members?action=identity-documents — current member ID/KRA uploads
+    if (req.method === 'GET' && !resourceId && action === 'identity-documents') {
+      requirePermission(session, 'members', 'read')
+      const { data, error } = await adminClient
+        .from('member_documents')
+        .select('id, member_id, document_type, family_member_id, original_filename, verification_status, rejection_reason, created_at, members(full_name, email)')
+        .eq('is_current', true)
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (error) throw new Error(error.message)
+      await logAudit(adminClient, {
+        actor_id: session.id,
+        actor_role: session.role_name,
+        action: 'listed_member_identity_documents',
+        resource: 'member_document',
+      })
+      return new Response(JSON.stringify({ documents: data ?? [] }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     // GET /admin-members — list members with optimized search
     if (req.method === 'GET' && !resourceId) {
@@ -83,12 +104,26 @@ Deno.serve(async (req) => {
         .single()
       if (error) throw new Error('Member not found')
 
-      const [subs, family, contribs, fees, docs] = await Promise.all([
+      const programCodes = Array.isArray((member as { application_program_codes?: unknown }).application_program_codes)
+        ? ((member as { application_program_codes: string[] }).application_program_codes)
+        : []
+      const approvedBy = typeof (member as { approved_by?: unknown }).approved_by === 'string'
+        ? (member as { approved_by: string }).approved_by
+        : null
+
+      const [subs, family, contribs, fees, docs, legal, pkgs, approver] = await Promise.all([
         adminClient.from('subscriptions').select('id, status, started_at, next_due_date, package_id, packages(code, name), package_tiers(name, amount)').eq('member_id', resourceId),
         adminClient.from('family_members').select('*').eq('member_id', resourceId).eq('is_active', true),
         adminClient.from('contributions').select('id, period, amount, amount_paid, status, package_id, created_at').eq('member_id', resourceId).order('period', { ascending: false }),
         adminClient.from('registration_fees').select('id, amount, status, paid_at, payment_reference, created_at').eq('member_id', resourceId).order('created_at', { ascending: false }).limit(5),
         adminClient.from('member_documents').select('id, document_type, family_member_id, original_filename, verification_status, rejection_reason, is_current, created_at, expires_at, size_bytes').eq('member_id', resourceId).eq('is_current', true).order('created_at', { ascending: false }),
+        adminClient.from('member_legal_acceptances').select('document_type, document_version, accepted_at, source').eq('member_id', resourceId).order('accepted_at', { ascending: false }),
+        programCodes.length > 0
+          ? adminClient.from('packages').select('code, name').in('code', programCodes)
+          : Promise.resolve({ data: [] as { code: string; name: string }[] }),
+        approvedBy
+          ? adminClient.from('admins').select('display_name').eq('id', approvedBy).maybeSingle()
+          : Promise.resolve({ data: null as { display_name?: string } | null }),
       ])
 
       await logAudit(adminClient, {
@@ -99,7 +134,18 @@ Deno.serve(async (req) => {
         resource_id: resourceId,
       })
 
-      const { kra_pin: kraRaw, id_number: idRaw, ...memberRest } = member as Record<string, unknown>
+      const { kra_pin: kraRaw, id_number: idRaw, ...memberRest } = stripAuthSecretsFromMember(
+        member as Record<string, unknown>,
+      )
+      const packageNameByCode = Object.fromEntries(
+        ((pkgs.data ?? []) as { code?: string; name?: string }[])
+          .filter((p) => typeof p.code === 'string' && typeof p.name === 'string')
+          .map((p) => [p.code as string, p.name as string]),
+      )
+      const applicationPrograms = programCodes.map((code) => ({
+        code,
+        name: packageNameByCode[code] ?? code,
+      }))
       const familySafe = (family.data ?? []).map((row: Record<string, unknown>) => {
         const famId = typeof row.id_number === 'string' ? row.id_number : null
         const { id_number: _omit, ...rest } = row
@@ -110,12 +156,15 @@ Deno.serve(async (req) => {
           ...memberRest,
           id_number_masked: maskIdNumberLast4(typeof idRaw === 'string' ? idRaw : null),
           kra_pin_masked: maskIdNumberLast4(typeof kraRaw === 'string' ? kraRaw : null),
+          approved_by_name: approver.data?.display_name ?? null,
+          application_programs: applicationPrograms,
         },
+        legal_acceptances: legal.data ?? [],
         subscriptions: subs.data ?? [],
         family_members: familySafe,
         contributions: contribs.data ?? [],
         registration_fees: fees.data ?? [],
-        identity_documents: docs.data ?? [],
+        identity_documents: docs.error ? [] : (docs.data ?? []),
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

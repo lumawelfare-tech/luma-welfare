@@ -47,6 +47,15 @@ describe('routing + deploy inventory', () => {
   it('maps SPA paths to member-identity-docs', () => {
     expect(pathToFunctionName('member/identity-docs')).toBe('member-identity-docs')
     expect(pathToFunctionName('admin/members')).toBe('admin-members')
+    expect(pathToFunctionName('admin/audit-logs')).toBe('admin-settings')
+  })
+
+  it('member and admin document pages surface identity uploads', () => {
+    expect(read('frontend/src/pages/member/MemberDocuments.tsx')).toContain('/member/identity-docs')
+    expect(read('frontend/src/pages/admin/AdminDocuments.tsx')).toContain("action=identity-documents")
+    expect(read('frontend/src/pages/member/Family.tsx')).toContain('await load()')
+    expect(read('frontend/src/pages/admin/AdminAuditLogs.tsx')).toContain('/admin/audit-logs?')
+    expect(read('supabase/functions/admin-settings/index.ts')).toContain("resource === 'audit-logs'")
   })
 
   it('registers JWT-on function and CI inventory', () => {
@@ -102,6 +111,7 @@ describe('admin identity document contracts', () => {
     expect(src).toContain('identity_documents')
     expect(src).toContain('kra_pin_masked')
     expect(src).toContain('id_number_masked')
+    expect(src).toContain("action === 'identity-documents'")
     expect(src).toContain("action === 'view-identity-document'")
     expect(src).toContain("requirePermission(session, 'documents', 'read')")
     expect(src).toContain("requirePermission(session, 'documents', 'verify')")

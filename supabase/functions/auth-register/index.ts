@@ -4,7 +4,12 @@ import { sendEmail, buildOtpEmail } from '../shared/email.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { generateOtp, hashOtp, OTP_TTL_MINUTES, OtpConfigError } from '../shared/otp.ts'
 import { parseRegisterBody, ValidationError } from '../shared/validate.ts'
-import { PRIVACY_POLICY_VERSION, TERMS_VERSION } from '../shared/legal-versions.ts'
+import {
+  PRIVACY_POLICY_VERSION,
+  TERMS_VERSION,
+  CONSTITUTION_VERSION,
+  SELF_SUBMISSION_VERSION,
+} from '../shared/legal-versions.ts'
 import {
   loadRegistrationFeeConfig,
   RegistrationFeeConfigError,
@@ -51,10 +56,14 @@ Deno.serve(async (req) => {
       whatsappPhone, altPhone,
       emergencyContactName, emergencyContactRelationship, emergencyContactPhone, emergencyContactAltPhone,
       familyCoverage, applicationProgramCodes,
-      privacyPolicyVersion, termsVersion,
+      privacyPolicyVersion, termsVersion, constitutionVersion,
     } = parseRegisterBody(raw)
 
-    if (privacyPolicyVersion !== PRIVACY_POLICY_VERSION || termsVersion !== TERMS_VERSION) {
+    if (
+      privacyPolicyVersion !== PRIVACY_POLICY_VERSION
+      || termsVersion !== TERMS_VERSION
+      || constitutionVersion !== CONSTITUTION_VERSION
+    ) {
       return json(400, {
         message: 'Please refresh the page and accept the current Privacy Policy and Terms.',
         code: 'LEGAL_VERSION_MISMATCH',
@@ -142,8 +151,10 @@ Deno.serve(async (req) => {
       privacy_accepted_at: consentAt,
       terms_accepted_at: consentAt,
       constitution_accepted_at: consentAt,
+      self_submission_confirmed_at: consentAt,
       privacy_policy_version: privacyPolicyVersion,
       terms_version: termsVersion,
+      constitution_version: constitutionVersion,
     })
 
     if (memberError) {
@@ -175,6 +186,27 @@ Deno.serve(async (req) => {
         source: 'registration',
       },
     ])
+    // Constitution + self-submission require the expanded document_type check.
+    // Isolated so an older schema cannot discard privacy/terms history.
+    const { error: extraLegalErr } = await adminClient.from('member_legal_acceptances').insert([
+      {
+        member_id: userId,
+        document_type: 'constitution',
+        document_version: constitutionVersion,
+        accepted_at: consentAt,
+        source: 'registration',
+      },
+      {
+        member_id: userId,
+        document_type: 'self_submission',
+        document_version: SELF_SUBMISSION_VERSION,
+        accepted_at: consentAt,
+        source: 'registration',
+      },
+    ])
+    if (extraLegalErr) {
+      console.error('auth-register: extra legal acceptances', extraLegalErr.code ?? 'LEGAL')
+    }
 
     await logAudit(adminClient, {
       actor_id: userId,

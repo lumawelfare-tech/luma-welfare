@@ -12,6 +12,7 @@ describe('legalConfig', () => {
     expect(legalConfig.draftPendingLegalReview).toBe(true)
     expect(legalConfig.privacyPolicyVersion.length).toBeGreaterThan(0)
     expect(legalConfig.termsVersion.length).toBeGreaterThan(0)
+    expect(legalConfig.constitutionVersion.length).toBeGreaterThan(0)
   })
 
   it('hides placeholder values from display helpers', () => {

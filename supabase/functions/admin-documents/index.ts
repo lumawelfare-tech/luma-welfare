@@ -12,6 +12,7 @@ import { buildIlikeOrFilter } from '../shared/search.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { detectAllowedUpload, looksLikeScriptableMarkup } from '../shared/file-upload.ts'
 import { KB_DOC_BUCKET, withSignedKbDocumentUrls } from '../shared/storage-signed.ts'
+import { MAX_DOCUMENT_BYTES, documentTooLargeMessage } from '../shared/upload-limits.ts'
 
 /**
  * Admin Knowledge-Base Documents — ACL + lifecycle (Phase 6).
@@ -162,8 +163,8 @@ Deno.serve(async (req) => {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
-      if (bytes.length > 20 * 1024 * 1024) {
-        return new Response(JSON.stringify({ message: 'File too large (max 20MB).', code: 'VALIDATION' }), {
+      if (bytes.length > MAX_DOCUMENT_BYTES) {
+        return new Response(JSON.stringify({ message: documentTooLargeMessage('File'), code: 'VALIDATION' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }

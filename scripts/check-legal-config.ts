@@ -27,6 +27,7 @@ function main() {
   )
   const edgePrivacy = extractExport(edgeSrc, 'PRIVACY_POLICY_VERSION')
   const edgeTerms = extractExport(edgeSrc, 'TERMS_VERSION')
+  const edgeConstitution = extractExport(edgeSrc, 'CONSTITUTION_VERSION')
 
   let failures = 0
 
@@ -39,6 +40,12 @@ function main() {
   if (edgeTerms !== legalConfig.termsVersion) {
     console.error(
       `FAIL terms version mismatch: frontend=${legalConfig.termsVersion} edge=${edgeTerms}`,
+    )
+    failures++
+  }
+  if (edgeConstitution !== legalConfig.constitutionVersion) {
+    console.error(
+      `FAIL constitution version mismatch: frontend=${legalConfig.constitutionVersion} edge=${edgeConstitution}`,
     )
     failures++
   }
@@ -71,7 +78,7 @@ function main() {
   }
 
   console.log(
-    `Legal config OK (privacy=${legalConfig.privacyPolicyVersion}, terms=${legalConfig.termsVersion}, draft=${legalConfig.draftPendingLegalReview})`,
+    `Legal config OK (privacy=${legalConfig.privacyPolicyVersion}, terms=${legalConfig.termsVersion}, constitution=${legalConfig.constitutionVersion}, draft=${legalConfig.draftPendingLegalReview})`,
   )
 }
 

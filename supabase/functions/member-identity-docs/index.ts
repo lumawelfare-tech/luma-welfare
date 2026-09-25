@@ -14,8 +14,7 @@ import {
 } from '../shared/validate.ts'
 import { maskIdNumberLast4 } from '../shared/pii.ts'
 import { assertMemberActive } from '../shared/member-status.ts'
-
-const MAX_BYTES = 10 * 1024 * 1024
+import { MAX_DOCUMENT_BYTES, documentTooLargeMessage } from '../shared/upload-limits.ts'
 
 function folderForType(docType: string): string {
   if (docType === 'kra_certificate' || docType === 'beneficiary_kra') return 'tax'
@@ -129,7 +128,7 @@ Deno.serve(async (req) => {
       const b64 = comma >= 0 ? rawB64.slice(comma + 1) : rawB64
       if (!b64) throw new ValidationError('A PDF file is required.')
       const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
-      if (binary.byteLength > MAX_BYTES) throw new ValidationError('File must be 10MB or smaller.')
+      if (binary.byteLength > MAX_DOCUMENT_BYTES) throw new ValidationError(documentTooLargeMessage('PDF'))
       const detected = detectAllowedUpload(binary)
       if (!detected || detected.kind !== 'pdf') {
         throw new ValidationError('Only PDF files are accepted for identity documents.')

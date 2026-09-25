@@ -109,7 +109,7 @@ export function Register() {
         emergencyContactRelationship: form.emergencyContactRelationship.trim(),
         emergencyContactPhone: form.emergencyContactPhone.trim(),
         emergencyContactAltPhone: form.emergencyContactAltPhone.trim() || undefined,
-        familyCoverage: form.familyCoverage || undefined,
+        familyCoverage: form.familyCoverage,
         applicationProgramCodes: programs,
         password: form.password,
         acceptedPrivacy: true as const,
@@ -118,6 +118,7 @@ export function Register() {
         confirmSelfSubmission: true as const,
         privacyPolicyVersion: legalConfig.privacyPolicyVersion,
         termsVersion: legalConfig.termsVersion,
+        constitutionVersion: legalConfig.constitutionVersion,
       })
       if (result.applicationNumber) {
         writePendingApplication({

@@ -5,7 +5,7 @@
  * Production builds fail when draft is false and placeholders remain
  * (see scripts/check-legal-config.ts).
  *
- * Keep privacyPolicyVersion / termsVersion in sync with
+ * Keep privacyPolicyVersion / termsVersion / constitutionVersion in sync with
  * supabase/functions/shared/legal-versions.ts
  */
 
@@ -18,6 +18,8 @@ export type LegalConfig = {
   privacyPolicyVersion: string
   /** Bump when Terms text changes in a material way. */
   termsVersion: string
+  /** Bump when the Constitution / Membership Terms text changes in a material way. */
+  constitutionVersion: string
   /** Displayed effective date — leave placeholder until counsel confirms. */
   effectiveDateDisplay: string
   legalEntityName: string
@@ -40,6 +42,7 @@ export const legalConfig: LegalConfig = {
   draftPendingLegalReview: true,
   privacyPolicyVersion: '2026-09-23.1',
   termsVersion: '2026-09-23.1',
+  constitutionVersion: '2026-09-23.1',
   effectiveDateDisplay: 'PLACEHOLDER_EFFECTIVE_DATE',
   legalEntityName: 'PLACEHOLDER_LEGAL_ENTITY_NAME',
   tradingName: 'Luma Welfare',

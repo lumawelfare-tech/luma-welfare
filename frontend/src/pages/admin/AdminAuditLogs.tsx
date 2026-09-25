@@ -37,13 +37,12 @@ export function AdminAuditLogs() {
     setError(null)
     try {
       const qs = new URLSearchParams()
-      qs.set('resource_id', 'audit_logs')
       qs.set('page', String(page))
       qs.set('per_page', String(PAGE_SIZE))
       if (filter) qs.set('action', filter)
       if (debouncedSearch.trim()) qs.set('q', debouncedSearch.trim())
       const d = await api<{ items: AuditLog[]; total?: number; pages?: number; actions?: string[] }>(
-        `/admin/settings?${qs.toString()}`,
+        `/admin/audit-logs?${qs.toString()}`,
         { auth: true }
       )
       setLogs(d.items ?? [])
@@ -65,17 +64,15 @@ export function AdminAuditLogs() {
 
   const fetchedActionsRef = useRef(false)
 
-  // Fetch unique actions for filter dropdown (if not provided by API)
   useEffect(() => {
-    if (fetchedActionsRef.current) return
+    if (fetchedActionsRef.current || uniqueActions.length > 0) return
     fetchedActionsRef.current = true
-    api<{ items: AuditLog[] }>('/admin/settings?resource_id=audit_logs&per_page=1000', { auth: true })
-      .then(d => {
-        const actions = [...new Set((d.items ?? []).map(l => l.action))].sort()
-        setUniqueActions(actions)
+    api<{ items: AuditLog[]; actions?: string[] }>('/admin/audit-logs?per_page=1', { auth: true })
+      .then((d) => {
+        if (d.actions?.length) setUniqueActions(d.actions)
       })
       .catch(() => {})
-  }, [])
+  }, [uniqueActions.length])
 
   return (
     <div className="py-6">

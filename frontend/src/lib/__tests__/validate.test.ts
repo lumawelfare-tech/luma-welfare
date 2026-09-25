@@ -51,6 +51,7 @@ describe('parseRegisterBody', () => {
     confirmSelfSubmission: true as const,
     privacyPolicyVersion: '2026-09-21.1',
     termsVersion: '2026-09-21.1',
+    constitutionVersion: '2026-09-21.1',
   }
 
   it('accepts a valid Kenya registration payload', () => {
@@ -92,6 +93,21 @@ describe('parseRegisterBody', () => {
     expect(() => parseRegisterBody({ ...good, acceptedTerms: false })).toThrow(ValidationError)
     expect(() => parseRegisterBody({ ...good, acceptedConstitution: false })).toThrow(ValidationError)
     expect(() => parseRegisterBody({ ...good, confirmSelfSubmission: false })).toThrow(ValidationError)
+    expect(() => parseRegisterBody({ ...good, acceptedPrivacy: undefined })).toThrow(ValidationError)
+    expect(() => parseRegisterBody({ ...good, confirmSelfSubmission: undefined })).toThrow(ValidationError)
+  })
+
+  it('requires family coverage and constitution version', () => {
+    const { familyCoverage: _fc, ...noCoverage } = good
+    expect(() => parseRegisterBody(noCoverage)).toThrow(ValidationError)
+    expect(() => parseRegisterBody({ ...good, familyCoverage: 'household' })).toThrow(ValidationError)
+    const { constitutionVersion: _cv, ...noConst } = good
+    expect(() => parseRegisterBody(noConst)).toThrow(ValidationError)
+  })
+
+  it('persists every coverage option', () => {
+    expect(parseRegisterBody({ ...good, familyCoverage: 'nuclear' }).familyCoverage).toBe('nuclear')
+    expect(parseRegisterBody({ ...good, familyCoverage: 'extended' }).familyCoverage).toBe('extended')
   })
 })
 

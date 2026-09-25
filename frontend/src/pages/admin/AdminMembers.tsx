@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useHead } from '../../lib/seo'
@@ -19,7 +19,7 @@ import { exportMemberRecordsCSV, exportMemberRecordsExcel, exportMemberRecordsPD
 import { ErrorState } from '../../components/ErrorState'
 import { SkeletonTable } from '../../components/Skeleton'
 import { reportLoadError } from '../../lib/userFacingError'
-import { formatApplicationProgramCodes } from '../../lib/applicationPrograms'
+import { formatApplicationProgramCodes, familyCoverageLabel, applicationProgramLabel } from '../../lib/applicationPrograms'
 import { hasAdminPermission } from '../../lib/adminPermissions'
 import {
   beneficiaryStatusLabel,
@@ -49,6 +49,65 @@ type Member = {
   anonymized_at?: string | null
   status: string
   joined_at: string | null
+  county?: string | null
+  family_coverage?: string | null
+  application_program_codes?: string[] | null
+  application_submitted_at?: string | null
+}
+
+function formatAdminDate(value: unknown): string {
+  if (value == null || value === '') return '—'
+  const s = String(value)
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
+  if (iso && !s.includes('T')) {
+    const d = new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])))
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString()
+  }
+  const d = new Date(s)
+  return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString()
+}
+
+function formatAdminDateTime(value: unknown): string {
+  if (value == null || value === '') return '—'
+  const d = new Date(String(value))
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString()
+}
+
+function DetailField({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
+  return (
+    <div className={wide ? 'col-span-2 min-w-0' : 'min-w-0'}>
+      <span className="text-gray-400">{label}</span>
+      <div className="font-medium break-words">{children ?? '—'}</div>
+    </div>
+  )
+}
+
+function ConsentRow({
+  label,
+  acceptedAt,
+  version,
+}: {
+  label: string
+  acceptedAt: unknown
+  version?: unknown
+}) {
+  const ok = Boolean(acceptedAt)
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm py-1.5 border-b border-gray-100 last:border-0">
+      <span className="text-gray-700">{label}</span>
+      <span className={ok ? 'font-medium text-emerald-700' : 'text-gray-400'}>
+        {ok ? `Accepted ${formatAdminDateTime(acceptedAt)}` : 'Not recorded'}
+        {version ? ` · v${String(version)}` : ''}
+      </span>
+    </div>
+  )
+}
+
+function latestLegalAcceptance(
+  rows: Record<string, unknown>[] | undefined,
+  documentType: string,
+): Record<string, unknown> | undefined {
+  return (rows ?? []).find((row) => String(row.document_type ?? '') === documentType)
 }
 
 const BASE_MEMBER_STATUS_FILTERS = [
@@ -122,6 +181,7 @@ export function AdminMembers() {
     contributions: Record<string, unknown>[]
     registration_fees?: Record<string, unknown>[]
     identity_documents?: Record<string, unknown>[]
+    legal_acceptances?: Record<string, unknown>[]
   } | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
@@ -631,6 +691,36 @@ export function AdminMembers() {
       },
     },
     {
+      key: 'county',
+      header: 'County',
+      sortable: true,
+      render: (m) => (
+        <span className="text-sm text-gray-700">{m.county?.trim() || '—'}</span>
+      ),
+    },
+    {
+      key: 'family_coverage',
+      header: 'Coverage',
+      sortable: true,
+      render: (m) => (
+        <span className="text-sm text-gray-700">{familyCoverageLabel(m.family_coverage)}</span>
+      ),
+    },
+    {
+      key: 'application_program_codes',
+      header: 'Programs',
+      sortable: false,
+      render: (m) => {
+        const codes = m.application_program_codes ?? []
+        if (codes.length === 0) return <span className="text-sm text-gray-400">—</span>
+        return (
+          <span className="text-sm text-gray-700" title={formatApplicationProgramCodes(codes)}>
+            {codes.length} selected
+          </span>
+        )
+      },
+    },
+    {
       key: 'status',
       header: 'Status',
       sortable: true,
@@ -641,12 +731,12 @@ export function AdminMembers() {
       ),
     },
     {
-      key: 'joined_at',
-      header: 'Joined',
+      key: 'application_submitted_at',
+      header: 'Applied',
       sortable: true,
       render: (m) => (
         <span className="text-gray-500 text-xs">
-          {m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}
+          {formatAdminDate(m.application_submitted_at || m.joined_at)}
         </span>
       ),
     },
@@ -885,6 +975,26 @@ export function AdminMembers() {
                     <div>
                       <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Email</div>
                       <div className={email === '—' ? 'text-gray-400' : 'text-gray-700'}>{email}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">County</div>
+                      <div className="text-gray-700">{m.county?.trim() || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Coverage</div>
+                      <div className="text-gray-700">{familyCoverageLabel(m.family_coverage)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Programs</div>
+                      <div className="text-gray-700">
+                        {(m.application_program_codes?.length ?? 0) > 0
+                          ? `${m.application_program_codes!.length} selected`
+                          : '—'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Applied</div>
+                      <div className="text-gray-700">{formatAdminDate(m.application_submitted_at || m.joined_at)}</div>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 pt-1">
@@ -1200,43 +1310,42 @@ export function AdminMembers() {
               </div>
             ) : detailData ? (
               <div className="p-6 space-y-6">
-                {/* Member Info */}
+                {(() => {
+                  const m = detailData.member
+                  const legal = detailData.legal_acceptances
+                  const constitution = latestLegalAcceptance(legal, 'constitution')
+                  const privacy = latestLegalAcceptance(legal, 'privacy')
+                  const terms = latestLegalAcceptance(legal, 'terms')
+                  const selfSub = latestLegalAcceptance(legal, 'self_submission')
+                  const programs = Array.isArray(m.application_programs)
+                    ? (m.application_programs as { code?: string; name?: string }[])
+                    : []
+                  const programCodes = Array.isArray(m.application_program_codes)
+                    ? (m.application_program_codes as string[])
+                    : []
+                  return (
+                    <>
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Member Info</h4>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Application status</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm min-w-0 break-words">
-                    <div><span className="text-gray-400">Status</span><div className="font-medium capitalize">{String(detailData.member.status ?? '').replace(/_/g, ' ')}</div></div>
-                    <div><span className="text-gray-400">Phone</span><div className="font-medium">{String(detailData.member.phone ?? '')}</div></div>
-                    <div><span className="text-gray-400">Email</span><div className="font-medium">{String(detailData.member.email ?? '—')}</div></div>
-                    <div><span className="text-gray-400">Application #</span><div className="font-medium">{String(detailData.member.application_number ?? '—')}</div></div>
-                    <div><span className="text-gray-400">Membership #</span><div className="font-medium">{String(detailData.member.membership_number ?? '—')}</div></div>
-                    <div><span className="text-gray-400">Joined</span><div className="font-medium">{detailData.member.joined_at ? new Date(String(detailData.member.joined_at)).toLocaleDateString() : '—'}</div></div>
-                    <div><span className="text-gray-400">Gender</span><div className="font-medium capitalize">{String(detailData.member.gender ?? '—').replace(/_/g, ' ')}</div></div>
-                    <div><span className="text-gray-400">Marital status</span><div className="font-medium capitalize">{String(detailData.member.marital_status ?? '—')}</div></div>
-                    <div className="col-span-2"><span className="text-gray-400">Residential address</span><div className="font-medium">{String(detailData.member.residential_address ?? '—')}</div></div>
-                    <div><span className="text-gray-400">WhatsApp</span><div className="font-medium">{String(detailData.member.whatsapp_phone ?? '—')}</div></div>
-                    <div><span className="text-gray-400">Family coverage</span><div className="font-medium capitalize">{String(detailData.member.family_coverage ?? '—')}</div></div>
-                    <div><span className="text-gray-400">KRA PIN</span><div className="font-medium tabular-nums">{String(detailData.member.kra_pin_masked ?? '—')}</div></div>
-                    <div className="col-span-2">
-                      <span className="text-gray-400">Programs of interest</span>
-                      <div className="font-medium">
-                        {Array.isArray(detailData.member.application_program_codes) && (detailData.member.application_program_codes as string[]).length > 0
-                          ? formatApplicationProgramCodes(detailData.member.application_program_codes as string[])
-                          : '—'}
-                      </div>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-gray-400">Emergency contact</span>
-                      <div className="font-medium">
-                        {[detailData.member.emergency_contact_name, detailData.member.emergency_contact_relationship, detailData.member.emergency_contact_phone]
-                          .filter(Boolean)
-                          .map(String)
-                          .join(' · ') || '—'}
-                      </div>
-                    </div>
-                    <div><span className="text-gray-400">Submitted</span><div className="font-medium">{detailData.member.application_submitted_at ? new Date(String(detailData.member.application_submitted_at)).toLocaleDateString() : '—'}</div></div>
-                    <div><span className="text-gray-400">Payment verified</span><div className="font-medium">{detailData.member.payment_verified_at ? new Date(String(detailData.member.payment_verified_at)).toLocaleDateString() : 'Not verified'}</div></div>
-                    {detailData.member.admin_remarks != null && String(detailData.member.admin_remarks) !== '' && (
-                      <div className="col-span-2"><span className="text-gray-400">Admin remarks</span><div className="font-medium whitespace-pre-wrap">{String(detailData.member.admin_remarks)}</div></div>
+                    <DetailField label="Status">
+                      <span className="capitalize">{String(m.status ?? '').replace(/_/g, ' ') || '—'}</span>
+                    </DetailField>
+                    <DetailField label="Application #">{String(m.application_number ?? '—')}</DetailField>
+                    <DetailField label="Membership #">{String(m.membership_number ?? '—')}</DetailField>
+                    <DetailField label="Application date">{formatAdminDate(m.application_submitted_at)}</DetailField>
+                    <DetailField label="Approval date">{formatAdminDate(m.approved_at)}</DetailField>
+                    <DetailField label="Approving administrator">
+                      {String(m.approved_by_name ?? (m.approved_by ? m.approved_by : '—'))}
+                    </DetailField>
+                    <DetailField label="Joined">{formatAdminDate(m.joined_at)}</DetailField>
+                    <DetailField label="Payment verified">
+                      {m.payment_verified_at ? formatAdminDate(m.payment_verified_at) : 'Not verified'}
+                    </DetailField>
+                    {m.admin_remarks != null && String(m.admin_remarks) !== '' && (
+                      <DetailField label="Admin remarks" wide>
+                        <span className="whitespace-pre-wrap">{String(m.admin_remarks)}</span>
+                      </DetailField>
                     )}
                   </div>
                   {detailMember.status === 'pending_approval' && (
@@ -1246,6 +1355,110 @@ export function AdminMembers() {
                     </div>
                   )}
                 </div>
+
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Applicant details</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm min-w-0 break-words">
+                    <DetailField label="Full name" wide>{String(m.full_name ?? '—')}</DetailField>
+                    <DetailField label="National ID / Passport">
+                      {detailMember.is_anonymized ? (
+                        '—'
+                      ) : (
+                        <IdRevealCell memberId={detailMember.id} masked={String(m.id_number_masked ?? '—')} />
+                      )}
+                    </DetailField>
+                    <DetailField label="Date of birth">{formatAdminDate(m.date_of_birth)}</DetailField>
+                    <DetailField label="Gender">
+                      <span className="capitalize">{String(m.gender ?? '—').replace(/_/g, ' ')}</span>
+                    </DetailField>
+                    <DetailField label="Marital status">
+                      <span className="capitalize">{String(m.marital_status ?? '—')}</span>
+                    </DetailField>
+                    <DetailField label="KRA PIN">
+                      <span className="tabular-nums">{String(m.kra_pin_masked ?? '—')}</span>
+                    </DetailField>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Address</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm min-w-0 break-words">
+                    <DetailField label="County">{String(m.county ?? '—')}</DetailField>
+                    <DetailField label="Town / area">{String(m.location ?? '—')}</DetailField>
+                    <DetailField label="Residential address" wide>{String(m.residential_address ?? '—')}</DetailField>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Contact</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm min-w-0 break-words">
+                    <DetailField label="Mobile number">{String(m.phone ?? '—')}</DetailField>
+                    <DetailField label="WhatsApp number">{String(m.whatsapp_phone ?? '—')}</DetailField>
+                    <DetailField label="Email">{String(m.email ?? '—')}</DetailField>
+                    <DetailField label="Alternative contact">{String(m.alt_phone ?? '—')}</DetailField>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Emergency / next of kin</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm min-w-0 break-words">
+                    <DetailField label="Full name" wide>{String(m.emergency_contact_name ?? '—')}</DetailField>
+                    <DetailField label="Relationship">{String(m.emergency_contact_relationship ?? '—')}</DetailField>
+                    <DetailField label="Phone">{String(m.emergency_contact_phone ?? '—')}</DetailField>
+                    <DetailField label="Alternative phone">{String(m.emergency_contact_alt_phone ?? '—')}</DetailField>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Programs</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm min-w-0 break-words">
+                    <DetailField label="Family coverage">{familyCoverageLabel(typeof m.family_coverage === 'string' ? m.family_coverage : null)}</DetailField>
+                    <DetailField label="Selected packages" wide>
+                      {programs.length > 0 ? (
+                        <ul className="mt-1 space-y-1">
+                          {programs.map((p) => (
+                            <li key={String(p.code)}>{p.name || applicationProgramLabel(String(p.code ?? ''))}</li>
+                          ))}
+                        </ul>
+                      ) : programCodes.length > 0 ? (
+                        <ul className="mt-1 space-y-1">
+                          {programCodes.map((code) => (
+                            <li key={code}>{formatApplicationProgramCodes([code])}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        '—'
+                      )}
+                    </DetailField>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Declarations</h4>
+                  <ConsentRow
+                    label="Constitution / Membership Terms accepted"
+                    acceptedAt={constitution?.accepted_at ?? m.constitution_accepted_at}
+                    version={constitution?.document_version ?? m.constitution_version}
+                  />
+                  <ConsentRow
+                    label="Privacy Policy accepted"
+                    acceptedAt={privacy?.accepted_at ?? m.privacy_accepted_at}
+                    version={privacy?.document_version ?? m.privacy_policy_version}
+                  />
+                  <ConsentRow
+                    label="Terms & Conditions accepted"
+                    acceptedAt={terms?.accepted_at ?? m.terms_accepted_at}
+                    version={terms?.document_version ?? m.terms_version}
+                  />
+                  <ConsentRow
+                    label="Self-submission confirmed"
+                    acceptedAt={selfSub?.accepted_at ?? m.self_submission_confirmed_at}
+                    version={selfSub?.document_version}
+                  />
+                </div>
+                    </>
+                  )
+                })()}
 
                 {(detailData.registration_fees?.length ?? 0) > 0 && (
                   <div className="rounded-xl border border-gray-200 p-4">

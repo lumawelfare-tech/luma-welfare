@@ -133,7 +133,7 @@ export type RegisterInput = {
   emergencyContactRelationship: string
   emergencyContactPhone: string
   emergencyContactAltPhone: string | null
-  familyCoverage: 'individual' | 'nuclear' | 'extended' | null
+  familyCoverage: 'individual' | 'nuclear' | 'extended'
   applicationProgramCodes: string[]
   acceptedPrivacy: true
   acceptedTerms: true
@@ -141,6 +141,7 @@ export type RegisterInput = {
   confirmSelfSubmission: true
   privacyPolicyVersion: string
   termsVersion: string
+  constitutionVersion: string
 }
 
 const GENDERS = new Set(['male', 'female', 'prefer_not_to_say'])
@@ -251,14 +252,11 @@ export function parseRegisterBody(input: unknown): RegisterInput {
     ? normalizeKenyanPhone(body.emergencyContactAltPhone)
     : null
 
-  let familyCoverage: RegisterInput['familyCoverage'] = null
-  if (typeof body.familyCoverage === 'string' && body.familyCoverage.trim()) {
-    const fc = body.familyCoverage.trim().toLowerCase()
-    if (!COVERAGE.has(fc)) {
-      throw new ValidationError('Select a valid family coverage option.')
-    }
-    familyCoverage = fc as RegisterInput['familyCoverage']
+  const familyCoverageRaw = requireString(body, 'familyCoverage', 'Family coverage').trim().toLowerCase()
+  if (!COVERAGE.has(familyCoverageRaw)) {
+    throw new ValidationError('Select a valid family coverage option.')
   }
+  const familyCoverage = familyCoverageRaw as RegisterInput['familyCoverage']
 
   const programCodesRaw = body.applicationProgramCodes ?? body.programCodes
   const applicationProgramCodes: string[] = []
@@ -321,7 +319,8 @@ export function parseRegisterBody(input: unknown): RegisterInput {
   }
   const privacyPolicyVersion = requireString(body, 'privacyPolicyVersion', 'Privacy Policy version')
   const termsVersion = requireString(body, 'termsVersion', 'Terms version')
-  if (privacyPolicyVersion.length > 64 || termsVersion.length > 64) {
+  const constitutionVersion = requireString(body, 'constitutionVersion', 'Constitution version')
+  if (privacyPolicyVersion.length > 64 || termsVersion.length > 64 || constitutionVersion.length > 64) {
     throw new ValidationError('Invalid legal document version.')
   }
 
@@ -351,6 +350,7 @@ export function parseRegisterBody(input: unknown): RegisterInput {
     confirmSelfSubmission: true,
     privacyPolicyVersion,
     termsVersion,
+    constitutionVersion,
   }
 }
 

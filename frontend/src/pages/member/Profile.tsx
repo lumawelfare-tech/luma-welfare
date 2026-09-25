@@ -6,6 +6,7 @@ import { useHead } from '../../lib/seo'
 import { formatApplicationProgramCodes } from '../../lib/applicationPrograms'
 import { identityDocLabel, identityDocStatusLabel } from '../../lib/identityDocs'
 import { StatusBadge } from '../../components/StatusBadge'
+import { isDocumentTooLarge, documentTooLargeMessage, MAX_DOCUMENT_LABEL } from '../../lib/uploadLimits'
 
 export function Profile() {
   useHead('Profile', undefined, { noindex: true })
@@ -488,8 +489,8 @@ function IdentityDocsPanel() {
   async function upload(documentType: 'national_id' | 'kra_certificate', file: File) {
     setErr(null)
     setMsg(null)
-    if (file.size > 10 * 1024 * 1024) {
-      setErr('PDF must be 10MB or smaller.')
+    if (isDocumentTooLarge(file.size)) {
+      setErr(documentTooLargeMessage('PDF'))
       return
     }
     setBusy(documentType)
@@ -538,7 +539,7 @@ function IdentityDocsPanel() {
   return (
     <section className="mt-6 glass-panel p-6">
       <h3 className="text-sm font-semibold text-gray-900">Identity documents</h3>
-      <p className="mt-1 text-xs text-gray-500">Upload PDF copies of your National ID and KRA certificate. Files stay private and are never published.</p>
+      <p className="mt-1 text-xs text-gray-500">Upload PDF copies of your National ID and KRA certificate ({MAX_DOCUMENT_LABEL} or smaller). Files stay private and are never published.</p>
       {err && (
         <div className="mt-3">
           <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">{err}</div>

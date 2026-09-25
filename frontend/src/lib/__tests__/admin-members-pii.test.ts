@@ -113,12 +113,14 @@ describe('registration ID validation', () => {
     emergencyContactName: 'John Doe',
     emergencyContactRelationship: 'spouse',
     emergencyContactPhone: '0798765432',
+    familyCoverage: 'individual' as const,
     acceptedPrivacy: true as const,
     acceptedTerms: true as const,
     acceptedConstitution: true as const,
     confirmSelfSubmission: true as const,
     privacyPolicyVersion: '2026-09-21.1',
     termsVersion: '2026-09-21.1',
+    constitutionVersion: '2026-09-21.1',
   }
 
   it('requires a 7–8 digit Kenyan National ID', () => {

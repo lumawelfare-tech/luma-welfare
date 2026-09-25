@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   applicationProgramLabel,
   formatApplicationProgramCodes,
+  familyCoverageLabel,
   memberStatusLabel,
 } from '../applicationPrograms'
 
@@ -18,5 +19,12 @@ describe('applicationPrograms', () => {
     )
     expect(memberStatusLabel('pending_approval')).toBe('Pending verification')
     expect(memberStatusLabel('active')).toBe('Active')
+  })
+
+  it('labels family coverage options', () => {
+    expect(familyCoverageLabel('individual')).toBe('Individual')
+    expect(familyCoverageLabel('nuclear')).toBe('Nuclear family')
+    expect(familyCoverageLabel('extended')).toBe('Extended family')
+    expect(familyCoverageLabel(null)).toBe('—')
   })
 })

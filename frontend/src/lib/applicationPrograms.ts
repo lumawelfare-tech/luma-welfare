@@ -48,6 +48,19 @@ export function formatApplicationProgramCodes(codes: readonly string[] | null | 
   return codes.map(applicationProgramLabel).join(', ')
 }
 
+export function familyCoverageLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'individual':
+      return 'Individual'
+    case 'nuclear':
+      return 'Nuclear family'
+    case 'extended':
+      return 'Extended family'
+    default:
+      return value ? value.replace(/_/g, ' ') : '—'
+  }
+}
+
 /** Member-facing status for DB enum `pending_approval` (official form: Pending Verification). */
 export function memberStatusLabel(status: string | null | undefined): string {
   switch (status) {

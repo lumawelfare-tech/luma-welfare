@@ -5,6 +5,7 @@ import { assertMemberActive } from '../shared/member-status.ts'
 import { withSignedClaimDocumentUrls } from '../shared/storage-signed.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
 import { parseOptionalMoneyAmount, ValidationError } from '../shared/validate.ts'
+import { MAX_DOCUMENT_BYTES, documentTooLargeMessage } from '../shared/upload-limits.ts'
 
 /**
  * Member Claims — Submit, List, Detail, Document Upload
@@ -243,10 +244,9 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Validate file size (base64 decoded size < 10MB)
       const decodedSize = Math.ceil((fileData.length * 3) / 4)
-      if (decodedSize > 10 * 1024 * 1024) {
-        return new Response(JSON.stringify({ message: 'File size exceeds 10MB limit' }), {
+      if (decodedSize > MAX_DOCUMENT_BYTES) {
+        return new Response(JSON.stringify({ message: documentTooLargeMessage('File') }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }

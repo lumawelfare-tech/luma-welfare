@@ -63,12 +63,14 @@ describe('parseRegisterBody', () => {
     emergencyContactName: 'John Doe',
     emergencyContactRelationship: 'spouse',
     emergencyContactPhone: '0798765432',
+    familyCoverage: 'individual',
     acceptedPrivacy: true,
     acceptedTerms: true,
     acceptedConstitution: true,
     confirmSelfSubmission: true,
     privacyPolicyVersion: '2026-09-21.1',
     termsVersion: '2026-09-21.1',
+    constitutionVersion: '2026-09-21.1',
   }
 
   it('accepts a valid Kenyan registration payload', () => {

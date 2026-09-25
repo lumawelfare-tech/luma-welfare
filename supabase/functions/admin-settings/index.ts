@@ -79,6 +79,39 @@ Deno.serve(async (req) => {
     // Also accept ?resource= query param for backward compatibility
     const resourceParam = url.searchParams.get("resource") ?? resource
 
+    // GET /admin-settings/audit-logs  (also ?resource_id=audit_logs)
+    // Must run before the settings catch-all so the audit page never receives a settings object.
+    if (req.method === 'GET' && (resource === 'audit-logs' || resourceParam === 'audit_logs')) {
+      requirePermission(session, 'audit_logs', 'read')
+      const pageParam = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1)
+      const perPage = Math.min(200, Math.max(1, parseInt(url.searchParams.get('per_page') ?? '50', 10) || 50))
+      const q = url.searchParams.get('q')
+      const actionFilter = url.searchParams.get('action')?.trim()
+      const from = (pageParam - 1) * perPage
+      const to = from + perPage - 1
+      let query = adminClient.from('audit_logs').select('*', { count: 'exact' })
+      if (actionFilter && actionFilter !== 'audit-logs' && actionFilter !== 'audit_logs') {
+        query = query.eq('action', actionFilter)
+      }
+      const orFilter = buildIlikeOrFilter(
+        ['action', 'resource', 'actor_role', 'resource_id'],
+        q,
+      )
+      if (orFilter) query = query.or(orFilter)
+      query = query.order('created_at', { ascending: false }).range(from, to)
+      const { data, error, count } = await query
+      if (error) throw new Error(error.message)
+      const { data: actionRows } = await adminClient
+        .from('audit_logs')
+        .select('action')
+        .order('action')
+        .limit(500)
+      const actions = [...new Set((actionRows ?? []).map((row: { action?: string }) => row.action).filter(Boolean))] as string[]
+      const total = count ?? (data?.length ?? 0)
+      const pages = Math.max(1, Math.ceil(total / perPage))
+      return new Response(JSON.stringify({ items: data ?? [], total, pages, actions }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     // GET /admin-settings?resource=settings — list all platform settings (admin only)
     // Explicit resource=settings (or bare /admin/settings with no query) only —
     // do not steal ?resource=webhooks / audit-logs / open-questions.
@@ -102,30 +135,6 @@ Deno.serve(async (req) => {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
-    }
-
-    // GET /admin-settings/audit-logs
-    if (req.method === 'GET' && (resource === 'audit-logs' || resourceParam === 'audit_logs')) {
-      requirePermission(session, 'audit_logs', 'read')
-      const pageParam = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1)
-      const perPage = Math.min(200, Math.max(1, parseInt(url.searchParams.get('per_page') ?? '50', 10) || 50))
-      const q = url.searchParams.get('q')
-      const actionFilter = url.searchParams.get('action')?.trim()
-      const from = (pageParam - 1) * perPage
-      const to = from + perPage - 1
-      let query = adminClient.from('audit_logs').select('*', { count: 'exact' })
-      if (actionFilter) query = query.eq('action', actionFilter)
-      const orFilter = buildIlikeOrFilter(
-        ['action', 'resource', 'actor_role', 'resource_id'],
-        q,
-      )
-      if (orFilter) query = query.or(orFilter)
-      query = query.order('created_at', { ascending: false }).range(from, to)
-      const { data, error, count } = await query
-      if (error) throw new Error(error.message)
-      const total = count ?? (data?.length ?? 0)
-      const pages = Math.max(1, Math.ceil(total / perPage))
-      return new Response(JSON.stringify({ items: data ?? [], total, pages }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // GET /admin-settings/open-questions

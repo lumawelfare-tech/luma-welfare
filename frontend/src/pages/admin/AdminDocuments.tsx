@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
+import { identityDocLabel, identityDocStatusLabel } from '../../lib/identityDocs'
 import { useHead } from '../../lib/seo'
 import { useToast } from '../../components/Toast'
 import { FilterBar } from '../../components/FilterBar'
@@ -10,6 +12,7 @@ import { EmptyState } from '../../components/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { reportLoadError } from '../../lib/userFacingError'
+import { isDocumentTooLarge, documentTooLargeMessage, MAX_DOCUMENT_LABEL } from '../../lib/uploadLimits'
 
 type KbDocument = {
   id: string
@@ -87,6 +90,16 @@ export function AdminDocuments() {
   const [category, setCategory] = useState('')
   const [accessLevel, setAccessLevel] = useState('member')
   const [file, setFile] = useState<File | null>(null)
+  const [identityDocs, setIdentityDocs] = useState<{
+    id: string
+    member_id: string
+    document_type: string
+    original_filename?: string | null
+    verification_status: string
+    created_at: string
+    members?: { full_name?: string; email?: string } | null
+  }[]>([])
+  const [identityBusy, setIdentityBusy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -94,8 +107,12 @@ export function AdminDocuments() {
       const qs = new URLSearchParams()
       if (filter) qs.set('status', filter)
       if (debouncedQuery.trim()) qs.set('q', debouncedQuery.trim())
-      const d = await api<{ documents: KbDocument[] }>(`/admin/documents?${qs}`, { auth: true })
+      const [d, identity] = await Promise.all([
+        api<{ documents: KbDocument[] }>(`/admin/documents?${qs}`, { auth: true }),
+        api<{ documents: typeof identityDocs }>('/admin/members?action=identity-documents', { auth: true }).catch(() => ({ documents: [] })),
+      ])
       setDocuments(d.documents ?? [])
+      setIdentityDocs(identity.documents ?? [])
       setError(null)
     } catch (e) {
       setError(reportLoadError(e, { page: 'admin-documents' }, 'Could not load documents.'))
@@ -111,6 +128,10 @@ export function AdminDocuments() {
     e.preventDefault()
     if (!file) {
       addToast('warning', 'Choose a file to upload.')
+      return
+    }
+    if (isDocumentTooLarge(file.size)) {
+      addToast('error', documentTooLargeMessage('File'))
       return
     }
     setBusy(true)
@@ -177,6 +198,22 @@ export function AdminDocuments() {
     }
   }
 
+  async function viewIdentity(docId: string) {
+    setIdentityBusy(docId)
+    try {
+      const d = await api<{ file_url: string }>('/admin/members?action=view-identity-document', {
+        method: 'POST',
+        auth: true,
+        body: { documentId: docId },
+      })
+      if (d.file_url) window.open(d.file_url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      addToast('error', err instanceof ApiError ? err.message : 'Could not open the document.')
+    } finally {
+      setIdentityBusy(null)
+    }
+  }
+
   async function download(id: string) {
     try {
       const d = await api<{ document: KbDocument }>(`/admin/documents/${id}`, { auth: true })
@@ -231,6 +268,50 @@ export function AdminDocuments() {
         search={<SearchInput value={query} onChange={setQuery} placeholder="Search title, category, file…" />}
       />
 
+      {identityDocs.length > 0 && (
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-gray-900">Member identity documents</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            National ID and KRA files members uploaded on their profile. Open a member to verify or reject.
+          </p>
+          <ul className="mt-3 divide-y divide-gray-100">
+            {identityDocs.map((doc) => {
+              const member = Array.isArray(doc.members) ? doc.members[0] : doc.members
+              return (
+              <li key={doc.id} className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">
+                    {member?.full_name ?? 'Member'} · {identityDocLabel(doc.document_type)}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {doc.original_filename ?? 'PDF'}
+                    {doc.created_at ? ` · ${new Date(doc.created_at).toLocaleDateString()}` : ''}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status={doc.verification_status}>{identityDocStatusLabel(doc.verification_status)}</StatusBadge>
+                  <button
+                    type="button"
+                    disabled={identityBusy === doc.id}
+                    onClick={() => void viewIdentity(doc.id)}
+                    className="min-h-11 rounded-md border border-gray-200 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    {identityBusy === doc.id ? 'Opening…' : 'View'}
+                  </button>
+                  <Link
+                    to={`/admin/members`}
+                    className="min-h-11 inline-flex items-center text-xs font-medium text-luma-700 hover:underline"
+                  >
+                    Open members
+                  </Link>
+                </div>
+              </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+
       {error && <ErrorState message={error} onRetry={load} />}
 
       {showForm && (
@@ -261,7 +342,7 @@ export function AdminDocuments() {
             </select>
           </div>
           <div className="sm:col-span-2">
-            <label className="mb-1 block text-xs font-medium text-gray-600" htmlFor="kb-file">File (PDF, DOCX, JPEG, PNG, WebP — max 20MB)</label>
+            <label className="mb-1 block text-xs font-medium text-gray-600" htmlFor="kb-file">File (PDF, DOCX, JPEG, PNG, WebP — max {MAX_DOCUMENT_LABEL})</label>
             <input id="kb-file" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-sm" />
           </div>
           <div className="sm:col-span-2">

@@ -7,6 +7,7 @@ import { ErrorState } from '../../components/ErrorState'
 import { reportLoadError } from '../../lib/userFacingError'
 import { identityDocStatusLabel } from '../../lib/identityDocs'
 import { StatusBadge } from '../../components/StatusBadge'
+import { isDocumentTooLarge, documentTooLargeMessage, MAX_DOCUMENT_LABEL } from '../../lib/uploadLimits'
 
 type FamilyMember = {
   id: string
@@ -116,8 +117,8 @@ export function Family() {
   async function uploadBeneficiaryDoc(familyMemberId: string, file: File) {
     setError(null)
     setMsg(null)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('PDF must be 10MB or smaller.')
+    if (isDocumentTooLarge(file.size)) {
+      setError(documentTooLargeMessage('PDF'))
       return
     }
     setDocBusy(familyMemberId)
@@ -135,6 +136,7 @@ export function Family() {
       })
       setError(null)
       setMsg('Beneficiary document uploaded. Status is pending verification.')
+      await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not upload the beneficiary document.')
     } finally {
@@ -259,7 +261,7 @@ export function Family() {
                         ) : null
                       })()}
                       <label className="mt-3 block text-[11px] text-gray-500">
-                        National ID PDF
+                        National ID PDF ({MAX_DOCUMENT_LABEL} or smaller)
                         <input
                           type="file"
                           accept="application/pdf,.pdf"

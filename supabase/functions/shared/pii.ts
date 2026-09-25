@@ -59,6 +59,26 @@ export function maskMemberListFields(row: Record<string, unknown>): Record<strin
   return next
 }
 
+/** Drop password / hash fields if a view or select ever includes them. */
+export function stripAuthSecretsFromMember(row: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...row }
+  for (const key of Object.keys(next)) {
+    const lower = key.toLowerCase()
+    if (
+      lower === 'password' ||
+      lower === 'password_hash' ||
+      lower === 'encrypted_password' ||
+      lower === 'confirm_password' ||
+      lower === 'confirm' ||
+      lower.endsWith('_password') ||
+      lower.endsWith('_password_hash')
+    ) {
+      delete next[key]
+    }
+  }
+  return next
+}
+
 /**
  * Admin members list row: keep full phone for admin ops; never send full id_number.
  * Anonymized shells are flagged explicitly (not as "incomplete profile").
@@ -73,7 +93,7 @@ export function prepareMemberListRow(row: Record<string, unknown>): Record<strin
     alt_phone: _omitAlt,
     kra_pin: _omitKra,
     ...rest
-  } = row
+  } = stripAuthSecretsFromMember(row)
   return {
     ...rest,
     anonymized_at: anonymizedAt,

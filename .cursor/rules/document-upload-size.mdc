@@ -1,0 +1,29 @@
+---
+description: Enforce the smallest document upload size (5MB) on every document upload path
+globs: frontend/src/pages/**/*.{ts,tsx},supabase/functions/**/*.ts
+alwaysApply: false
+---
+
+# Document upload size
+
+All **document** uploads (National ID, KRA, beneficiary ID, claim evidence, admin KB files) must use the shared smallest limit:
+
+- Frontend: `MAX_DOCUMENT_BYTES` from `frontend/src/lib/uploadLimits.ts` (5MB)
+- Edge: `MAX_DOCUMENT_BYTES` from `supabase/functions/shared/upload-limits.ts` (5MB)
+
+Do not raise this cap. Do not hardcode `10 * 1024 * 1024` or `20 * 1024 * 1024` on document paths.
+
+```ts
+// ❌ BAD
+if (file.size > 10 * 1024 * 1024) { ... }
+
+// ✅ GOOD
+import { isDocumentTooLarge, documentTooLargeMessage } from '../../lib/uploadLimits'
+if (isDocumentTooLarge(file.size)) {
+  setError(documentTooLargeMessage('PDF'))
+}
+```
+
+Existing files larger than 5MB stay readable. Only **new** uploads are rejected.
+
+Leave the media library (video) and profile avatars on their own limits. Do not change M-Pesa.
