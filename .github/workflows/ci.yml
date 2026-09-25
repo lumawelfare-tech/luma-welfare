@@ -10,6 +10,7 @@
 # 6. edge-function-check — Verify Edge Function sources exist
 # 7. e2e — Playwright smoke tests (requires a successful build)
 # 8. security-summary — Always runs; aggregates upstream results
+# 9. deploy-edge-functions — main only, after typecheck + lint + tests (build not required)
 
 name: CI
 
@@ -18,6 +19,12 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      function_name:
+        description: 'Function to deploy (leave empty for all). Only deploys when run on main, after typecheck, lint, and tests pass.'
+        required: false
+        type: string
 
 # Least privilege — jobs that need more must declare it explicitly.
 permissions:
@@ -480,6 +487,60 @@ jobs:
           fi
 
           echo "✅ Migration files look correct."
+
+  # ============================================================================
+  # DEPLOY EDGE FUNCTIONS — same deploy path as deploy-functions.yml; gated when
+  # ============================================================================
+  deploy-edge-functions:
+    name: "🚀 Deploy Edge Functions"
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint, test]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install Supabase CLI
+        run: npm install -g supabase
+
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: mkbxigxmhqdhxmptanqr
+          FUNCTION_NAME: ${{ github.event.inputs.function_name }}
+        run: |
+          FN="$FUNCTION_NAME"
+          if [ -n "$FN" ]; then
+            if ! printf '%s' "$FN" | grep -Eq '^[a-z0-9-]{1,64}$'; then
+              echo "Invalid function name"
+              exit 1
+            fi
+            echo "Deploying: $FN"
+            # Match scripts/deploy-edge-functions.sh JWT allowlist
+            case "$FN" in
+              auth-register|auth-verify-email|auth-login|auth-forgot-password|public-data|contact|payments-callback|send-report-email|admin-exports-worker|health)
+                supabase functions deploy "$FN" --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+                ;;
+              *)
+                supabase functions deploy "$FN" --project-ref "$SUPABASE_PROJECT_REF"
+                ;;
+            esac
+          else
+            echo "Deploying all functions..."
+            npm run deploy:functions
+          fi
+
+      - name: Verify deployment
+        run: npm run verify:deploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
   # ============================================================================
   # SECURITY SCORECARD (summary) — always runs; handles skipped/cancelled/missing

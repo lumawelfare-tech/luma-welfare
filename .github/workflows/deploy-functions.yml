@@ -1,13 +1,14 @@
-# Luma Welfare — Manual Edge Function Deployment
+# Luma Welfare — Manual Edge Function Deployment (emergency override)
 #
-# Trigger this workflow manually from the GitHub Actions tab.
+# Normal deploys run from CI on push to main after typecheck, lint, and tests.
+# Manual fallback without a fresh push: Actions → CI → Run workflow (on main).
+#
+# This workflow remains as an emergency override that does not wait on CI.
+# Prefer the gated CI job unless you explicitly need to redeploy without checks.
+#
 # Required secrets (set in repo Settings → Secrets → Actions):
 #   SUPABASE_ACCESS_TOKEN — Personal access token from Supabase dashboard
 #                          (https://supabase.com/dashboard/account/tokens)
-#
-# This is manual because Edge Function deployment requires a personal access token
-# that cannot be safely stored in a public repository. After setting the secret,
-# go to Actions → Deploy Edge Functions → Run workflow.
 
 name: Deploy Edge Functions
 
