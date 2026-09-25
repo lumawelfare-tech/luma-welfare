@@ -19,67 +19,19 @@
  *   5. Return success to frontend (user sees M-Pesa prompt on phone)
  */
 import { handleCors, corsHeaders } from '../shared/cors.ts'
-import { getAuthenticatedUser, createAdminClient, logAudit } from '../shared/supabase.ts'
+import { getAuthenticatedUser, createAdminClient, logAudit, handleUnexpectedError } from '../shared/supabase.ts'
 import { assertMemberActive } from '../shared/member-status.ts'
 import { rateLimitAsync } from '../shared/rate-limit.ts'
-
-const DARADA_BASE: Record<string, string> = {
-  sandbox: 'https://sandbox.safaricom.co.ke',
-  production: 'https://api.safaricom.co.ke',
-}
-
-/** Get M-Pesa OAuth token from Daraja API */
-async function getOAuthToken(): Promise<string> {
-  const env = Deno.env.get('MPESA_ENV') ?? 'sandbox'
-  const base = DARADA_BASE[env]
-  const consumerKey = Deno.env.get('MPESA_CONSUMER_KEY') ?? ''
-  const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET') ?? ''
-
-  if (!consumerKey || !consumerSecret) {
-    throw new Error('M-Pesa credentials not configured')
-  }
-
-  const auth = btoa(`${consumerKey}:${consumerSecret}`)
-  const res = await fetch(`${base}/oauth/v1/generate?grant_type=client_credentials`, {
-    method: 'GET',
-    headers: { Authorization: `Basic ${auth}` },
-  })
-
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`OAuth token request failed: ${res.status} ${text}`)
-  }
-
-  const data = await res.json()
-  return data.access_token
-}
-
-/** Generate M-Pesa password from shortcode, passkey, and timestamp */
-function generatePassword(shortcode: string, passkey: string, timestamp: string): string {
-  const dataToEncode = `${shortcode}${passkey}${timestamp}`
-  return btoa(dataToEncode)
-}
-
-/** Format phone number to 254XXXXXXXXX */
-function formatPhone(phone: string): string {
-  const cleaned = phone.replace(/[^0-9]/g, '')
-  if (cleaned.startsWith('254')) return cleaned
-  if (cleaned.startsWith('0')) return `254${cleaned.slice(1)}`
-  return cleaned
-}
-
-/** Generate timestamp in YYYYMMDDHHmmss format */
-function generateTimestamp(): string {
-  const now = new Date()
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-    String(now.getHours()).padStart(2, '0'),
-    String(now.getMinutes()).padStart(2, '0'),
-    String(now.getSeconds()).padStart(2, '0'),
-  ].join('')
-}
+import {
+  loadMpesaRuntime,
+  getDarajaAccessToken,
+  sendStkPush,
+  generateMpesaPassword,
+  generateMpesaTimestamp,
+  formatMpesaPhone,
+  DarajaRequestError,
+  darajaUserMessage,
+} from '../shared/mpesa-config.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -92,8 +44,27 @@ Deno.serve(async (req) => {
     })
   }
 
-  // Payments are disabled
   if (Deno.env.get('PAYMENTS_ENABLED') !== 'true') {
+    return new Response(JSON.stringify({
+      message: 'Payments are not currently enabled. M-Pesa integration will be activated in a future phase.',
+      code: 'PAYMENTS_DISABLED',
+    }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const runtime = loadMpesaRuntime()
+  if (!runtime.ok) {
+    return new Response(JSON.stringify({
+      message: runtime.message,
+      code: runtime.code,
+    }), {
+      status: 503,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  if (!runtime.enabled) {
     return new Response(JSON.stringify({
       message: 'Payments are not currently enabled. M-Pesa integration will be activated in a future phase.',
       code: 'PAYMENTS_DISABLED',
@@ -121,6 +92,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json()
     const { subscriptionId, phone, idempotencyKey } = body
+    // Never trust client amount / package / status / transaction id.
 
     if (!subscriptionId || !idempotencyKey) {
       return new Response(JSON.stringify({ message: 'subscriptionId and idempotencyKey are required' }), {
@@ -238,57 +210,36 @@ Deno.serve(async (req) => {
     }
     if (insertErr) throw new Error(insertErr.message)
 
-    // ── M-Pesa STK Push ──────────────────────────────────────────
-    const mpesaEnv = Deno.env.get('MPESA_ENV') ?? 'sandbox'
-    const base = DARADA_BASE[mpesaEnv]
-    const shortcode = Deno.env.get('MPESA_SHORTCODE') ?? ''
-    const passkey = Deno.env.get('MPESA_PASSKEY') ?? ''
-    const callbackUrl = Deno.env.get('MPESA_CALLBACK_URL') ?? ''
+    const accessToken = await getDarajaAccessToken(runtime)
+    const timestamp = generateMpesaTimestamp()
+    const password = generateMpesaPassword(runtime.shortcode, runtime.passkey, timestamp)
+    const formattedPhone = formatMpesaPhone(resolvedPhone)
 
-    if (!shortcode || !passkey || !callbackUrl) {
-      throw new Error('M-Pesa configuration incomplete. Check MPESA_SHORTCODE, MPESA_PASSKEY, MPESA_CALLBACK_URL.')
-    }
-
-    const accessToken = await getOAuthToken()
-    const timestamp = generateTimestamp()
-    const password = generatePassword(shortcode, passkey, timestamp)
-    const formattedPhone = formatPhone(resolvedPhone)
-
-    const stkPayload = {
-      BusinessShortCode: shortcode,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
-      Amount: Math.round(amount),
-      PartyA: formattedPhone,
-      PartyB: shortcode,
-      PhoneNumber: formattedPhone,
-      CallBackURL: callbackUrl,
-      AccountReference: `LUMA-${subDetail?.package_id?.slice(0, 8) ?? 'PAY'}`,
-      TransactionDesc: `Luma Welfare - ${subDetail?.packages?.[0]?.name ?? 'Payment'}`,
-    }
-
-    const stkRes = await fetch(`${base}/mpesa/stkpush/v1/processrequest`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(stkPayload),
-    })
-
-    const stkData = await stkRes.json()
-
-    if (stkData.ResponseCode !== '0') {
-      console.error('STK Push failed:', stkData)
-      // Update payment status to failed
+    let checkoutRequestId: string
+    try {
+      const stk = await sendStkPush(runtime, accessToken, {
+        BusinessShortCode: runtime.shortcode,
+        Password: password,
+        Timestamp: timestamp,
+        TransactionType: 'CustomerPayBillOnline',
+        Amount: Math.round(amount),
+        PartyA: formattedPhone,
+        PartyB: runtime.shortcode,
+        PhoneNumber: formattedPhone,
+        CallBackURL: runtime.callbackUrl,
+        AccountReference: `LUMA-${subDetail?.package_id?.slice(0, 8) ?? 'PAY'}`,
+        TransactionDesc: `Luma Welfare - ${subDetail?.packages?.[0]?.name ?? 'Payment'}`,
+      })
+      checkoutRequestId = stk.checkoutRequestId
+    } catch (stkErr) {
+      const kind = stkErr instanceof DarajaRequestError ? stkErr.kind : 'stk'
       await adminClient
         .from('payments')
-        .update({ status: 'Failed', failure_reason: stkData.ResponseDescription ?? 'STK Push failed' })
+        .update({ status: 'Failed', failure_reason: 'STK Push failed' })
         .eq('id', inserted.id)
 
       return new Response(JSON.stringify({
-        message: stkData.ResponseDescription ?? 'Failed to initiate M-Pesa payment. Please try again.',
+        message: darajaUserMessage(kind === 'stk' ? 'stk_rejected' : kind),
         code: 'STK_FAILED',
       }), {
         status: 502,
@@ -296,16 +247,14 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Update payment with checkout_request_id
     await adminClient
       .from('payments')
-      .update({ checkout_request_id: stkData.CheckoutRequestID })
+      .update({ checkout_request_id: checkoutRequestId })
       .eq('id', inserted.id)
 
-    // Record payment timeline
     await adminClient.rpc('record_payment_initiation', {
       p_payment_id: inserted.id,
-      p_checkout_request_id: stkData.CheckoutRequestID,
+      p_checkout_request_id: checkoutRequestId,
       p_actor: 'member',
     })
 
@@ -314,24 +263,27 @@ Deno.serve(async (req) => {
       action: 'payment_initiated',
       resource: 'payment',
       resource_id: inserted.id,
-      meta: { idempotencyKey, checkoutRequestId: stkData.CheckoutRequestID },
+      meta: { idempotencyKey, checkoutRequestId, mpesaEnv: runtime.env },
     })
 
     return new Response(JSON.stringify({
       message: 'Payment initiated. Check your phone for the M-Pesa prompt.',
       paymentId: inserted.id,
-      checkoutRequestId: stkData.CheckoutRequestID,
+      checkoutRequestId,
     }), {
       status: 201,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    console.error('Payment initiation error:', err)
-    return new Response(JSON.stringify({
-      message: err instanceof Error ? err.message : 'Internal error',
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    if (err instanceof DarajaRequestError) {
+      return new Response(JSON.stringify({
+        message: darajaUserMessage(err.kind),
+        code: 'STK_FAILED',
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    return handleUnexpectedError(err, 'payments-initiate')
   }
 })

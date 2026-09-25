@@ -1,5 +1,6 @@
 import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { getAuthenticatedUser, createAdminClient } from '../shared/supabase.ts'
+import { loadMpesaRuntime, publicPaymentGate } from '../shared/mpesa-config.ts'
 
 /** UI mapping — does not change DB payment_status values. */
 function mapPaymentUiStatus(
@@ -226,6 +227,7 @@ Deno.serve(async (req) => {
         registration_fee_paid: registrationFeePaid,
         summary: buildSummary(result),
         recent_payments: recentPayments,
+        ...publicPaymentGate(loadMpesaRuntime()),
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -246,6 +248,7 @@ Deno.serve(async (req) => {
       registration_fee_paid: registrationFeePaid,
       summary: buildSummary(cards),
       recent_payments: recentPayments,
+      ...publicPaymentGate(loadMpesaRuntime()),
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

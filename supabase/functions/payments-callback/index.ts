@@ -25,6 +25,7 @@ import { handleCors, corsHeaders } from '../shared/cors.ts'
 import { createAdminClient, logAudit } from '../shared/supabase.ts'
 import { safeLog } from '../shared/observability.ts'
 import { sendNotification } from '../shared/notifications.ts'
+import { loadMpesaRuntime } from '../shared/mpesa-config.ts'
 
 type MpesaCallback = {
   Body: {
@@ -124,6 +125,15 @@ Deno.serve(async (req) => {
   // Do not mutate financial state while payments are disabled.
   if (Deno.env.get('PAYMENTS_ENABLED') !== 'true') {
     safeLog('payments-callback', 'Payments disabled — acknowledging without processing')
+    return new Response(JSON.stringify({ message: 'Payments disabled', code: 'PAYMENTS_DISABLED' }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const runtime = loadMpesaRuntime()
+  if (!runtime.ok || !runtime.enabled) {
+    safeLog('payments-callback', 'Payments misconfigured — acknowledging without processing')
     return new Response(JSON.stringify({ message: 'Payments disabled', code: 'PAYMENTS_DISABLED' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

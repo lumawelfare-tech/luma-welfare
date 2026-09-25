@@ -35,8 +35,8 @@ export function isPaymentsUiMock(): boolean {
  * Only mock mode leads with STK; production defaults to honest disabled messaging
  * until the member explicitly tries online payment (server still gates Daraja).
  */
-export function preferStkPaymentUi(): boolean {
-  return isPaymentsUiMock()
+export function preferStkPaymentUi(serverPaymentsEnabled = false): boolean {
+  return isPaymentsUiMock() || serverPaymentsEnabled === true
 }
 
 export type PaymentFlowStep = 'phone' | 'waiting' | 'success' | 'failed' | 'expired' | 'disabled'

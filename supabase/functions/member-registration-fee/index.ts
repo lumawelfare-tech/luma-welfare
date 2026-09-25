@@ -4,6 +4,16 @@ import {
   loadRegistrationFeeConfig,
   RegistrationFeeConfigError,
 } from '../shared/registration-fee.ts'
+import {
+  loadMpesaRuntime,
+  getDarajaAccessToken,
+  sendStkPush,
+  generateMpesaPassword,
+  generateMpesaTimestamp,
+  formatMpesaPhone,
+  DarajaRequestError,
+  darajaUserMessage,
+} from '../shared/mpesa-config.ts'
 
 /**
  * Member Registration Fee — Check status, Initiate M-Pesa STK Push, Check status
@@ -15,50 +25,6 @@ import {
  * Amount is always loaded from platform_settings.registration_fee (fail closed).
  * PAYMENTS_ENABLED must stay false in production until Daraja go-live.
  */
-
-const DARADA_BASE: Record<string, string> = {
-  sandbox: 'https://sandbox.safaricom.co.ke',
-  production: 'https://api.safaricom.co.ke',
-}
-
-async function getOAuthToken(): Promise<string> {
-  const env = Deno.env.get('MPESA_ENV') ?? 'sandbox'
-  const base = DARADA_BASE[env]
-  const consumerKey = Deno.env.get('MPESA_CONSUMER_KEY') ?? ''
-  const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET') ?? ''
-  if (!consumerKey || !consumerSecret) throw new Error('M-Pesa credentials not configured')
-  const auth = btoa(`${consumerKey}:${consumerSecret}`)
-  const res = await fetch(`${base}/oauth/v1/generate?grant_type=client_credentials`, {
-    method: 'GET',
-    headers: { Authorization: `Basic ${auth}` },
-  })
-  if (!res.ok) throw new Error(`OAuth token request failed: ${res.status}`)
-  const data = await res.json()
-  return data.access_token
-}
-
-function generatePassword(shortcode: string, passkey: string, timestamp: string): string {
-  return btoa(`${shortcode}${passkey}${timestamp}`)
-}
-
-function formatPhone(phone: string): string {
-  const cleaned = phone.replace(/[^0-9]/g, '')
-  if (cleaned.startsWith('254')) return cleaned
-  if (cleaned.startsWith('0')) return `254${cleaned.slice(1)}`
-  return cleaned
-}
-
-function generateTimestamp(): string {
-  const now = new Date()
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-    String(now.getHours()).padStart(2, '0'),
-    String(now.getMinutes()).padStart(2, '0'),
-    String(now.getSeconds()).padStart(2, '0'),
-  ].join('')
-}
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -135,7 +101,7 @@ Deno.serve(async (req) => {
         })
       }
 
-      const formattedPhone = formatPhone(phone)
+      const formattedPhone = formatMpesaPhone(phone)
       if (!formattedPhone.match(/^254[17]\d{8}$/)) {
         return new Response(JSON.stringify({ message: 'Please enter a valid Safaricom phone number (07XXXXXXXX or 2547XXXXXXXX).' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -159,7 +125,6 @@ Deno.serve(async (req) => {
         ? Number(existing.amount)
         : feeConfig.amount
 
-      // Check if payments are enabled
       const paymentsEnabled = Deno.env.get('PAYMENTS_ENABLED') === 'true'
 
       if (!paymentsEnabled) {
@@ -201,15 +166,15 @@ Deno.serve(async (req) => {
         })
       }
 
-      // ── M-Pesa STK Push ──────────────────────────────────────────
-      const mpesaEnv = Deno.env.get('MPESA_ENV') ?? 'sandbox'
-      const base = DARADA_BASE[mpesaEnv]
-      const shortcode = Deno.env.get('MPESA_SHORTCODE') ?? ''
-      const passkey = Deno.env.get('MPESA_PASSKEY') ?? ''
-      const callbackUrl = Deno.env.get('MPESA_CALLBACK_URL') ?? ''
-
-      if (!shortcode || !passkey || !callbackUrl) {
-        throw new Error('M-Pesa configuration incomplete.')
+      const runtime = loadMpesaRuntime()
+      if (!runtime.ok || !runtime.enabled) {
+        return new Response(JSON.stringify({
+          message: runtime.ok ? 'Payments are not currently enabled.' : runtime.message,
+          code: runtime.ok ? 'PAYMENTS_DISABLED' : runtime.code,
+        }), {
+          status: runtime.ok ? 403 : 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
 
       // Create/update fee record as pending
@@ -232,37 +197,28 @@ Deno.serve(async (req) => {
           })
       }
 
-      const accessToken = await getOAuthToken()
-      const timestamp = generateTimestamp()
-      const password = generatePassword(shortcode, passkey, timestamp)
+      const accessToken = await getDarajaAccessToken(runtime)
+      const timestamp = generateMpesaTimestamp()
+      const password = generateMpesaPassword(runtime.shortcode, runtime.passkey, timestamp)
 
-      const stkPayload = {
-        BusinessShortCode: shortcode,
-        Password: password,
-        Timestamp: timestamp,
-        TransactionType: 'CustomerPayBillOnline',
-        Amount: chargeAmount,
-        PartyA: formattedPhone,
-        PartyB: shortcode,
-        PhoneNumber: formattedPhone,
-        CallBackURL: callbackUrl,
-        AccountReference: `LUMA-REG-${user.id.slice(0, 8)}`,
-        TransactionDesc: `Luma Welfare - KSh ${chargeAmount} Activation Fee`,
-      }
-
-      const stkRes = await fetch(`${base}/mpesa/stkpush/v1/processrequest`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(stkPayload),
-      })
-
-      const stkData = await stkRes.json()
-
-      if (stkData.ResponseCode !== '0') {
-        console.error('STK Push failed:', stkData)
+      let checkoutRequestId: string
+      try {
+        const stk = await sendStkPush(runtime, accessToken, {
+          BusinessShortCode: runtime.shortcode,
+          Password: password,
+          Timestamp: timestamp,
+          TransactionType: 'CustomerPayBillOnline',
+          Amount: chargeAmount,
+          PartyA: formattedPhone,
+          PartyB: runtime.shortcode,
+          PhoneNumber: formattedPhone,
+          CallBackURL: runtime.callbackUrl,
+          AccountReference: `LUMA-REG-${user.id.slice(0, 8)}`,
+          TransactionDesc: `Luma Welfare - KSh ${chargeAmount} Activation Fee`,
+        })
+        checkoutRequestId = stk.checkoutRequestId
+      } catch (stkErr) {
+        const kind = stkErr instanceof DarajaRequestError ? stkErr.kind : 'stk'
         await adminClient
           .from('registration_fees')
           .update({ status: 'failed' })
@@ -270,17 +226,16 @@ Deno.serve(async (req) => {
           .eq('fee_type', 'registration')
 
         return new Response(JSON.stringify({
-          message: stkData.ResponseDescription ?? 'Failed to initiate M-Pesa payment. Please try again.',
+          message: darajaUserMessage(kind === 'stk' ? 'stk_rejected' : kind),
           code: 'STK_FAILED',
         }), {
           status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      // Store checkout_request_id for callback matching
       await adminClient
         .from('registration_fees')
-        .update({ transaction_reference: stkData.CheckoutRequestID })
+        .update({ transaction_reference: checkoutRequestId })
         .eq('member_id', user.id)
         .eq('fee_type', 'registration')
 
@@ -289,13 +244,13 @@ Deno.serve(async (req) => {
         action: 'registration_fee_stk_sent',
         resource: 'registration_fee',
         resource_id: user.id,
-        meta: { amount: chargeAmount, phone: formattedPhone, checkoutRequestId: stkData.CheckoutRequestID },
+        meta: { amount: chargeAmount, phone: formattedPhone, checkoutRequestId, mpesaEnv: runtime.env },
       })
 
       return new Response(JSON.stringify({
         message: 'STK Push sent. Check your phone for the M-Pesa prompt.',
         status: 'pending',
-        checkout_request_id: stkData.CheckoutRequestID,
+        checkout_request_id: checkoutRequestId,
       }), {
         status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -305,6 +260,14 @@ Deno.serve(async (req) => {
       status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
+    if (err instanceof DarajaRequestError) {
+      return new Response(JSON.stringify({
+        message: darajaUserMessage(err.kind),
+        code: 'STK_FAILED',
+      }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     if (err instanceof RegistrationFeeConfigError) {
       return new Response(JSON.stringify({
         message: 'Registration fee is not configured. Please contact support.',

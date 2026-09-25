@@ -172,6 +172,7 @@ export function Dashboard() {
   const [payStep, setPayStep] = useState<'phone' | 'waiting' | 'success' | 'failed' | 'expired' | 'disabled'>('phone')
   const [payError, setPayError] = useState('')
   const [paymentsDisabled, setPaymentsDisabled] = useState(false)
+  const [serverPaymentsEnabled, setServerPaymentsEnabled] = useState(false)
 
   // Contribution STK flow
   const [contribPayOpen, setContribPayOpen] = useState(false)
@@ -203,6 +204,7 @@ export function Dashboard() {
           registration_fee_paid: boolean
           summary?: DashboardSummary
           recent_payments?: RecentPayment[]
+          payments_enabled?: boolean
         }>('/member/dashboard', { auth: true }),
         api<{ notifications: Notification[] }>('/member/notifications', { auth: true }).catch(() => ({ notifications: [] })),
       ])
@@ -210,6 +212,7 @@ export function Dashboard() {
       setRegistrationFeePaid(dashboard.registration_fee_paid ?? false)
       setSummary(dashboard.summary ?? null)
       setRecentPayments(dashboard.recent_payments ?? [])
+      setServerPaymentsEnabled(dashboard.payments_enabled === true)
       setNotifications((notifData.notifications ?? []).slice(0, 3))
       try {
         const docs = await api<{ documents: { document_type: string; verification_status: string }[] }>('/member/identity-docs', { auth: true })
@@ -313,10 +316,10 @@ export function Dashboard() {
   function openPayModal() {
     setShowPayModal(true)
     // Lead with honest disabled messaging unless mock STK preview is on.
-    setPayStep(preferStkPaymentUi() ? 'phone' : 'disabled')
+    setPayStep(preferStkPaymentUi(serverPaymentsEnabled) ? 'phone' : 'disabled')
     setPayError('')
     setPayPhone(member?.phone ?? '')
-    if (!preferStkPaymentUi()) setPaymentsDisabled(true)
+    if (!preferStkPaymentUi(serverPaymentsEnabled)) setPaymentsDisabled(true)
   }
 
   async function submitQuickClaim(e: React.FormEvent) {
@@ -623,7 +626,7 @@ export function Dashboard() {
         description="Here's an overview of your Luma Welfare membership."
         actions={
           activeCards.length > 0 ? (
-            preferStkPaymentUi() ? (
+            preferStkPaymentUi(serverPaymentsEnabled) ? (
               <button
                 type="button"
                 onClick={() => openContribPay()}

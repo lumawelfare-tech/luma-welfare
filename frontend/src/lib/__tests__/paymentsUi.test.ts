@@ -27,6 +27,7 @@ describe('paymentsUi', () => {
     vi.stubEnv('VITE_PAYMENTS_UI_MOCK', '')
     expect(isPaymentsUiMock()).toBe(false)
     expect(preferStkPaymentUi()).toBe(false)
+    expect(preferStkPaymentUi(true)).toBe(true)
   })
 
   it('isPaymentsUiMock is true when env is true', () => {
