@@ -84,4 +84,8 @@ describe('RAG pipeline contracts', () => {
     expect(rag).toContain(`CHUNK_SIZE = ${CHUNK_SIZE}`)
     expect(rag).toContain(`CHUNK_OVERLAP = ${CHUNK_OVERLAP}`)
   })
+
+  it('pins unpdf 1.8.1 for PDF extract', () => {
+    expect(rag).toContain("import('npm:unpdf@1.8.1')")
+  })
 })

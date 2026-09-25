@@ -60,12 +60,9 @@ export function chunkKbText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVE
 }
 
 export async function extractPdfText(bytes: Uint8Array): Promise<string> {
-  const { extractText, getDocumentProxy } = await import('npm:unpdf@0.12.1')
+  const { extractText, getDocumentProxy } = await import('npm:unpdf@1.8.1')
   const pdf = await getDocumentProxy(bytes)
-  const result = await extractText(pdf, { mergePages: true })
-  const text = typeof result === 'string'
-    ? result
-    : (result as { text?: string | string[] }).text
+  const { text } = await extractText(pdf, { mergePages: true })
   if (Array.isArray(text)) return normalizeKbText(text.join('\n\n'))
   if (typeof text === 'string') return normalizeKbText(text)
   return ''
