@@ -17,13 +17,13 @@ import {
 import { ErrorState } from '../../components/ErrorState'
 import { MobileCardTable } from '../../components/MobileCardTable'
 import { PaymentStatusPanel } from '../../components/PaymentStatusPanel'
+import { PaymentsModeBanner, PaymentsSandboxBadge } from '../../components/PaymentsModeBanner'
 import {
   isPaymentsUiMock,
   preferStkPaymentUi,
   PAYMENTS_DISABLED_COPY,
-  PAYMENTS_MOCK_COPY,
-  ACTIVATION_FEE_HONEST_COPY,
   MANUAL_CONTRIBUTION_HINT,
+  activationFeeCopy,
 } from '../../lib/paymentsUi'
 import { reportLoadError } from '../../lib/userFacingError'
 import { identityDocsNextStep, type IdentityDocsNextStep } from '../../lib/identityDocs'
@@ -173,6 +173,7 @@ export function Dashboard() {
   const [payError, setPayError] = useState('')
   const [paymentsDisabled, setPaymentsDisabled] = useState(false)
   const [serverPaymentsEnabled, setServerPaymentsEnabled] = useState(false)
+  const [serverMpesaEnv, setServerMpesaEnv] = useState<string | null>(null)
 
   // Contribution STK flow
   const [contribPayOpen, setContribPayOpen] = useState(false)
@@ -183,6 +184,10 @@ export function Dashboard() {
   const [contribPaying, setContribPaying] = useState(false)
   const [contribMockStep, setContribMockStep] = useState<'idle' | 'waiting' | 'success' | 'failed' | 'expired'>('idle')
   const contribTracker = usePaymentTracker(contribPaymentId)
+
+  // Effective online-payment state: server flag, minus any explicit denial
+  // returned by a payment attempt since the last dashboard load.
+  const paymentsOn = serverPaymentsEnabled && !paymentsDisabled
 
   // Quick-claim modal
   const [quickClaimOpen, setQuickClaimOpen] = useState(false)
@@ -205,6 +210,7 @@ export function Dashboard() {
           summary?: DashboardSummary
           recent_payments?: RecentPayment[]
           payments_enabled?: boolean
+          mpesa_environment?: string | null
         }>('/member/dashboard', { auth: true }),
         api<{ notifications: Notification[] }>('/member/notifications', { auth: true }).catch(() => ({ notifications: [] })),
       ])
@@ -213,6 +219,8 @@ export function Dashboard() {
       setSummary(dashboard.summary ?? null)
       setRecentPayments(dashboard.recent_payments ?? [])
       setServerPaymentsEnabled(dashboard.payments_enabled === true)
+      setServerMpesaEnv(dashboard.mpesa_environment ?? null)
+      if (dashboard.payments_enabled === true) setPaymentsDisabled(false)
       setNotifications((notifData.notifications ?? []).slice(0, 3))
       try {
         const docs = await api<{ documents: { document_type: string; verification_status: string }[] }>('/member/identity-docs', { auth: true })
@@ -315,11 +323,12 @@ export function Dashboard() {
 
   function openPayModal() {
     setShowPayModal(true)
-    // Lead with honest disabled messaging unless mock STK preview is on.
-    setPayStep(preferStkPaymentUi(serverPaymentsEnabled) ? 'phone' : 'disabled')
+    // Lead with honest disabled messaging unless mock STK preview is on or the server reports payments enabled.
+    const leadWithStk = preferStkPaymentUi(paymentsOn)
+    setPayStep(leadWithStk ? 'phone' : 'disabled')
     setPayError('')
     setPayPhone(member?.phone ?? '')
-    if (!preferStkPaymentUi(serverPaymentsEnabled)) setPaymentsDisabled(true)
+    if (!leadWithStk) setPaymentsDisabled(true)
   }
 
   async function submitQuickClaim(e: React.FormEvent) {
@@ -464,16 +473,10 @@ export function Dashboard() {
   if (!loading && !registrationFeeLoading && registrationFeePaid === false) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-8 max-w-6xl mx-auto">
-        {isPaymentsUiMock() && (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
-            {PAYMENTS_MOCK_COPY}
-          </div>
-        )}
-        {!isPaymentsUiMock() && (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
-            {PAYMENTS_DISABLED_COPY}
-          </div>
-        )}
+        <PaymentsModeBanner
+          serverPaymentsEnabled={paymentsOn}
+          mpesaEnvironment={serverMpesaEnv}
+        />
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-600">
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -481,8 +484,13 @@ export function Dashboard() {
             </svg>
           </div>
           <h2 className="mt-4 text-xl font-bold text-gray-900">Activate Your Luma Welfare Membership</h2>
+          {paymentsOn && serverMpesaEnv === 'sandbox' && (
+            <div className="mt-3 flex justify-center">
+              <PaymentsSandboxBadge mpesaEnvironment={serverMpesaEnv} />
+            </div>
+          )}
           <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
-            {ACTIVATION_FEE_HONEST_COPY}
+            {activationFeeCopy(paymentsOn, 300)}
           </p>
           <button
               onClick={openPayModal}
@@ -506,7 +514,12 @@ export function Dashboard() {
                 <>
                   <div className="px-6 py-5 border-b border-gray-200">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">Pay activation fee</h3>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-semibold text-gray-900">Pay activation fee</h3>
+                        {paymentsOn && serverMpesaEnv === 'sandbox' && (
+                          <PaymentsSandboxBadge mpesaEnvironment={serverMpesaEnv} />
+                        )}
+                      </div>
                       <button onClick={() => setShowPayModal(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Close">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
@@ -626,7 +639,7 @@ export function Dashboard() {
         description="Here's an overview of your Luma Welfare membership."
         actions={
           activeCards.length > 0 ? (
-            preferStkPaymentUi(serverPaymentsEnabled) ? (
+            preferStkPaymentUi(paymentsOn) ? (
               <button
                 type="button"
                 onClick={() => openContribPay()}
@@ -647,21 +660,11 @@ export function Dashboard() {
         }
       />
 
-      {isPaymentsUiMock() && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
-          {PAYMENTS_MOCK_COPY}
-        </div>
-      )}
-      {!isPaymentsUiMock() && (
-        <div className="mb-4 rounded-xl border border-luma-200 bg-luma-50 px-4 py-3 text-sm text-luma-900" role="status">
-          {MANUAL_CONTRIBUTION_HINT}
-        </div>
-      )}
-      {paymentsDisabled && isPaymentsUiMock() && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
-          {PAYMENTS_DISABLED_COPY}
-        </div>
-      )}
+      <PaymentsModeBanner
+        serverPaymentsEnabled={paymentsOn}
+        mpesaEnvironment={serverMpesaEnv}
+        disabledCopy={MANUAL_CONTRIBUTION_HINT}
+      />
 
       {/* Summary cards */}
       {!loading && !error && summary && (
@@ -1243,7 +1246,12 @@ export function Dashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4" role="dialog" aria-modal="true" aria-label="Pay contribution">
           <div className="w-full max-w-md glass-modal">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900">Pay contribution</h3>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900">Pay contribution</h3>
+                {paymentsOn && serverMpesaEnv === 'sandbox' && (
+                  <PaymentsSandboxBadge mpesaEnvironment={serverMpesaEnv} />
+                )}
+              </div>
               <button type="button" onClick={closeContribPay} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 min-h-[44px] min-w-[44px]" aria-label="Close">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
