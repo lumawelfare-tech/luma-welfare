@@ -5,7 +5,7 @@
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
-const BASE = process.env.BASE_URL || 'http://127.0.0.1:5173'
+const BASE = process.env.BASE_URL || 'https://luma-welfare.vercel.app'
 
 test.describe('Accessibility (axe)', () => {
   test('home page has no serious axe violations', async ({ page }) => {

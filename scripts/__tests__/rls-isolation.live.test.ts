@@ -299,6 +299,7 @@ describeLive('RLS isolation (live)', () => {
 
   it('anonymous cannot read member PII or claim rows', async () => {
     const c = anonClient()
+    const a = admin()
     for (const table of [
       'members',
       'claims',
@@ -318,6 +319,20 @@ describeLive('RLS isolation (live)', () => {
       'kb_chunks',
       'member_documents',
     ] as const) {
+      // A missing relation also answers `data: null`, which the `?? []` below
+      // would swallow as a passing empty result. Probe with the service role
+      // first, so a dropped table fails here instead of passing vacuously.
+      const probe = await a.from(table).select('id').limit(1)
+      const code = probe.error?.code ?? ''
+      const missing =
+        code === 'PGRST205' ||
+        code === '42P01' ||
+        /could not find the table|does not exist/i.test(probe.error?.message ?? '')
+      expect(
+        missing,
+        `${table} is missing from the database — this deny check would pass vacuously`,
+      ).toBe(false)
+
       const res = await c.from(table).select('id').limit(5)
       expect(res.data ?? [], `${table} should be empty for anon`).toEqual([])
     }

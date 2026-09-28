@@ -50,6 +50,29 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
+// jsdom does not implement these; framer-motion (whileInView / layout) needs them.
+class ObserverStub {
+  root = null
+  rootMargin = ''
+  thresholds: number[] = []
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords(): [] {
+    return []
+  }
+}
+Object.defineProperty(globalThis, 'IntersectionObserver', {
+  writable: true,
+  configurable: true,
+  value: ObserverStub,
+})
+Object.defineProperty(globalThis, 'ResizeObserver', {
+  writable: true,
+  configurable: true,
+  value: ObserverStub,
+})
+
 // Mock import.meta.env
 vi.stubEnv('VITE_SUPABASE_URL', 'https://test.supabase.co')
 vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'test-anon-key')

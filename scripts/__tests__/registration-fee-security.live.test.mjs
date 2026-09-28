@@ -1,6 +1,6 @@
 /**
  * Relocated from backend/src/__tests__ during Supabase-only migration.
- * Live / DATABASE_URL required — not run in CI.
+ * Live / DATABASE_URL required ï¿½ not run in CI.
  * Run: node --test --import tsx <this-file>
  */
 /**
@@ -16,18 +16,21 @@
  * Run: node --test src/__tests__/registration-fee-security.test.mjs
  */
 
-import { describe, it, before, after } from 'node:test'
+import { describe, it, before, after, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import pg from 'pg'
 
 const DATABASE_URL = process.env.DATABASE_URL
+const DB_SKIP = DATABASE_URL
+  ? false
+  : 'DATABASE_URL not set - database assertion did not execute'
 const MEMBER_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 const MEMBER_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 let client
 
-// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 // Setup / Teardown
-// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 
 before(async () => {
   if (!DATABASE_URL) {
@@ -65,20 +68,35 @@ before(async () => {
   `, [MEMBER_A, MEMBER_B])
 })
 
-after(async () => {
+// A test that fails inside BEGIN ... ROLLBACK leaves the shared client in an
+// aborted transaction, which would cascade 25P02 onto every later test.
+beforeEach(async () => {
   if (!client) return
-  await client.query('DELETE FROM registration_fees WHERE member_id IN ($1, $2)', [MEMBER_A, MEMBER_B])
-  await client.query('DELETE FROM members WHERE id IN ($1, $2)', [MEMBER_A, MEMBER_B])
-  await client.query('DELETE FROM auth.users WHERE id IN ($1, $2)', [MEMBER_A, MEMBER_B])
-  await client.end()
+  await client.query('ROLLBACK').catch(() => {})
 })
 
-// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+after(async () => {
+  if (!client) return
+  try {
+    // Clear any transaction a failing test left open, otherwise cleanup fails
+    // with 25P02 and client.end() is never reached (process hangs on exit).
+    await client.query('ROLLBACK').catch(() => {})
+    await client.query('DELETE FROM registration_fees WHERE member_id IN ($1, $2)', [MEMBER_A, MEMBER_B])
+    await client.query('DELETE FROM members WHERE id IN ($1, $2)', [MEMBER_A, MEMBER_B])
+    await client.query('DELETE FROM auth.users WHERE id IN ($1, $2)', [MEMBER_A, MEMBER_B])
+  } catch (e) {
+    console.error('cleanup failed:', e.code, e.message)
+  } finally {
+    await client.end().catch(() => {})
+  }
+})
+
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 // Tests
-// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 
 describe('RLS: registration_fees policies exist', () => {
-  it('SELECT policy exists for members', async () => {
+  it('SELECT policy exists for members', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query(
       "SELECT policyname FROM pg_policies WHERE tablename = 'registration_fees' AND cmd = 'SELECT'"
@@ -86,7 +104,7 @@ describe('RLS: registration_fees policies exist', () => {
     assert.ok(rows.length > 0, 'SELECT policy must exist')
   })
 
-  it('INSERT policy exists for members', async () => {
+  it('INSERT policy exists for members', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query(
       "SELECT policyname FROM pg_policies WHERE tablename = 'registration_fees' AND cmd = 'INSERT'"
@@ -94,15 +112,15 @@ describe('RLS: registration_fees policies exist', () => {
     assert.ok(rows.length > 0, 'INSERT policy must exist')
   })
 
-  it('UPDATE policy does NOT exist for members', async () => {
+  it('UPDATE policy does NOT exist for members', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query(
       "SELECT policyname FROM pg_policies WHERE tablename = 'registration_fees' AND cmd = 'UPDATE'"
     )
-    assert.equal(rows.length, 0, 'UPDATE policy must NOT exist GÇö members cannot self-confirm')
+    assert.equal(rows.length, 0, 'UPDATE policy must NOT exist Gï¿½ï¿½ members cannot self-confirm')
   })
 
-  it('DELETE policy does NOT exist for members', async () => {
+  it('DELETE policy does NOT exist for members', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query(
       "SELECT policyname FROM pg_policies WHERE tablename = 'registration_fees' AND cmd = 'DELETE'"
@@ -112,7 +130,7 @@ describe('RLS: registration_fees policies exist', () => {
 })
 
 describe('Schema: registration_fees constraints', () => {
-  it('unique constraint on (member_id, fee_type) exists', async () => {
+  it('unique constraint on (member_id, fee_type) exists', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query(`
       SELECT indexname FROM pg_indexes
@@ -126,25 +144,25 @@ describe('Schema: registration_fees constraints', () => {
     assert.ok(rows.length > 0 || constraints.length > 0, 'Unique constraint on (member_id, fee_type) must exist')
   })
 
-  it('amount defaults to 300', async () => {
+  it('amount defaults to 300', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query(`
       SELECT column_default FROM information_schema.columns
-      WHERE table_name = 'registration_fees' AND column_name = 'amount'
+      WHERE table_schema = 'public' AND table_name = 'registration_fees' AND column_name = 'amount'
     `)
     assert.ok(rows[0]?.column_default?.includes('300'), 'amount must default to 300')
   })
 
-  it('status defaults to unpaid', async () => {
+  it('status defaults to unpaid', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query(`
       SELECT column_default FROM information_schema.columns
-      WHERE table_name = 'registration_fees' AND column_name = 'status'
+      WHERE table_schema = 'public' AND table_name = 'registration_fees' AND column_name = 'status'
     `)
     assert.ok(rows[0]?.column_default?.includes('unpaid'), 'status must default to unpaid')
   })
 
-  it('CHECK constraint limits status values', async () => {
+  it('CHECK constraint limits status values', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query(`
       SELECT pg_get_constraintdef(oid) as def
@@ -158,7 +176,7 @@ describe('Schema: registration_fees constraints', () => {
     assert.ok(rows[0].def.includes('pending'), 'CHECK must include pending')
   })
 
-  it('CHECK constraint limits fee_type to registration', async () => {
+  it('CHECK constraint limits fee_type to registration', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query(`
       SELECT pg_get_constraintdef(oid) as def
@@ -172,7 +190,7 @@ describe('Schema: registration_fees constraints', () => {
 })
 
 describe('Security: member cannot self-mark as paid via direct SQL', () => {
-  it('UPDATE status to paid via member_id match is blocked by RLS', async () => {
+  it('UPDATE status to paid via member_id match is blocked by RLS', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     // First, get the current status
@@ -187,7 +205,7 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     await client.query('BEGIN')
     await client.query(`SET LOCAL role = authenticated`)
     await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
+
     const result = await client.query(`
       UPDATE registration_fees
       SET status = 'paid', paid_at = now()
@@ -196,16 +214,16 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     await client.query('ROLLBACK')
 
     // The update should affect 0 rows due to RLS (no UPDATE policy)
-    assert.equal(result.rowCount, 0, 'UPDATE must affect 0 rows GÇö no UPDATE policy exists')
+    assert.equal(result.rowCount, 0, 'UPDATE must affect 0 rows Gï¿½ï¿½ no UPDATE policy exists')
   })
 
-  it('amount cannot be changed to arbitrary value', async () => {
+  it('amount cannot be changed to arbitrary value', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('BEGIN')
     await client.query(`SET LOCAL role = authenticated`)
     await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
+
     const result = await client.query(`
       UPDATE registration_fees
       SET amount = 0
@@ -213,16 +231,16 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     `, [MEMBER_A])
     await client.query('ROLLBACK')
 
-    assert.equal(result.rowCount, 0, 'UPDATE amount must affect 0 rows GÇö no UPDATE policy')
+    assert.equal(result.rowCount, 0, 'UPDATE amount must affect 0 rows Gï¿½ï¿½ no UPDATE policy')
   })
 
-  it('mpesa_receipt cannot be set by member', async () => {
+  it('mpesa_receipt cannot be set by member', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('BEGIN')
     await client.query(`SET LOCAL role = authenticated`)
     await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
+
     const result = await client.query(`
       UPDATE registration_fees
       SET mpesa_receipt = 'FAKE_RECEIPT'
@@ -230,16 +248,16 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     `, [MEMBER_A])
     await client.query('ROLLBACK')
 
-    assert.equal(result.rowCount, 0, 'UPDATE mpesa_receipt must affect 0 rows GÇö no UPDATE policy')
+    assert.equal(result.rowCount, 0, 'UPDATE mpesa_receipt must affect 0 rows Gï¿½ï¿½ no UPDATE policy')
   })
 
-  it('transaction_reference cannot be set by member', async () => {
+  it('transaction_reference cannot be set by member', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('BEGIN')
     await client.query(`SET LOCAL role = authenticated`)
     await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
+
     const result = await client.query(`
       UPDATE registration_fees
       SET transaction_reference = 'FAKE_REF'
@@ -247,16 +265,16 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     `, [MEMBER_A])
     await client.query('ROLLBACK')
 
-    assert.equal(result.rowCount, 0, 'UPDATE transaction_reference must affect 0 rows GÇö no UPDATE policy')
+    assert.equal(result.rowCount, 0, 'UPDATE transaction_reference must affect 0 rows Gï¿½ï¿½ no UPDATE policy')
   })
 
-  it('payment_method cannot be changed by member', async () => {
+  it('payment_method cannot be changed by member', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('BEGIN')
     await client.query(`SET LOCAL role = authenticated`)
     await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
+
     const result = await client.query(`
       UPDATE registration_fees
       SET payment_method = 'cash'
@@ -264,16 +282,16 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     `, [MEMBER_A])
     await client.query('ROLLBACK')
 
-    assert.equal(result.rowCount, 0, 'UPDATE payment_method must affect 0 rows GÇö no UPDATE policy')
+    assert.equal(result.rowCount, 0, 'UPDATE payment_method must affect 0 rows Gï¿½ï¿½ no UPDATE policy')
   })
 
-  it('paid_at cannot be set by member', async () => {
+  it('paid_at cannot be set by member', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('BEGIN')
     await client.query(`SET LOCAL role = authenticated`)
     await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
+
     const result = await client.query(`
       UPDATE registration_fees
       SET paid_at = now()
@@ -281,18 +299,18 @@ describe('Security: member cannot self-mark as paid via direct SQL', () => {
     `, [MEMBER_A])
     await client.query('ROLLBACK')
 
-    assert.equal(result.rowCount, 0, 'UPDATE paid_at must affect 0 rows GÇö no UPDATE policy')
+    assert.equal(result.rowCount, 0, 'UPDATE paid_at must affect 0 rows Gï¿½ï¿½ no UPDATE policy')
   })
 })
 
 describe('Security: cross-member isolation', () => {
-  it('Member A cannot read Member B registration fee via RLS', async () => {
+  it('Member A cannot read Member B registration fee via RLS', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('BEGIN')
     await client.query(`SET LOCAL role = authenticated`)
     await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
+
     const { rows } = await client.query(
       'SELECT * FROM registration_fees WHERE member_id = $1',
       [MEMBER_B]
@@ -302,13 +320,13 @@ describe('Security: cross-member isolation', () => {
     assert.equal(rows.length, 0, 'Member A must not see Member B registration fees')
   })
 
-  it('Member A cannot modify Member B registration fee', async () => {
+  it('Member A cannot modify Member B registration fee', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('BEGIN')
     await client.query(`SET LOCAL role = authenticated`)
     await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
+
     const result = await client.query(`
       UPDATE registration_fees
       SET status = 'paid'
@@ -319,13 +337,13 @@ describe('Security: cross-member isolation', () => {
     assert.equal(result.rowCount, 0, 'Member A must not be able to update Member B fee')
   })
 
-  it('Member A cannot insert a registration fee for Member B', async () => {
+  it('Member A cannot insert a registration fee for Member B', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('BEGIN')
     await client.query(`SET LOCAL role = authenticated`)
     await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
+
     try {
       await client.query(`
         INSERT INTO registration_fees (member_id, fee_type, amount, currency, status)
@@ -342,10 +360,10 @@ describe('Security: cross-member isolation', () => {
 })
 
 describe('Security: service-role can update (admin operations)', () => {
-  it('Service-role can update registration fee status to paid', async () => {
+  it('Service-role can update registration fee status to paid', { skip: DB_SKIP }, async () => {
     if (!client) return
 
-    // Service-role bypasses RLS GÇö this simulates admin confirmation
+    // Service-role bypasses RLS Gï¿½ï¿½ this simulates admin confirmation
     const result = await client.query(`
       UPDATE registration_fees
       SET status = 'paid', paid_at = now(), mpesa_receipt = 'TEST_RECEIPT'
@@ -370,7 +388,7 @@ describe('Security: service-role can update (admin operations)', () => {
 })
 
 describe('Security: unauthenticated access', () => {
-  it('Unauthenticated user cannot read registration fees', async () => {
+  it('Unauthenticated user cannot read registration fees', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('BEGIN')
@@ -384,7 +402,7 @@ describe('Security: unauthenticated access', () => {
     assert.equal(rows.length, 0, 'Anonymous user must not see registration fees')
   })
 
-  it('Unauthenticated user cannot update registration fees', async () => {
+  it('Unauthenticated user cannot update registration fees', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('BEGIN')
@@ -399,7 +417,7 @@ describe('Security: unauthenticated access', () => {
 })
 
 describe('Security: duplicate registration fee prevention', () => {
-  it('Cannot insert duplicate registration fee for same member', async () => {
+  it('Cannot insert duplicate registration fee for same member', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     try {
@@ -413,7 +431,7 @@ describe('Security: duplicate registration fee prevention', () => {
     }
   })
 
-  it('Cannot insert registration fee with invalid fee_type', async () => {
+  it('Cannot insert registration fee with invalid fee_type', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     try {
@@ -427,7 +445,7 @@ describe('Security: duplicate registration fee prevention', () => {
     }
   })
 
-  it('Cannot insert registration fee with invalid status', async () => {
+  it('Cannot insert registration fee with invalid status', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     try {
@@ -443,12 +461,17 @@ describe('Security: duplicate registration fee prevention', () => {
 })
 
 describe('Regression: members.status default', () => {
-  it('members.status defaults to active', async () => {
+  it('members.status defaults to pending_approval', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query(`
       SELECT column_default FROM information_schema.columns
-      WHERE table_name = 'members' AND column_name = 'status'
+      WHERE table_schema = 'public' AND table_name = 'members' AND column_name = 'status'
     `)
-    assert.ok(rows[0]?.column_default?.includes('active'), 'members.status must default to active')
+    // Registration must not auto-approve: auth-register inserts
+    // pending_approval explicitly and activation is an admin action.
+    assert.ok(
+      rows[0]?.column_default?.includes('pending_approval'),
+      `members.status must default to pending_approval, got ${rows[0]?.column_default}`,
+    )
   })
 })

@@ -231,7 +231,7 @@ Deno.serve(async (req) => {
       if (success && memberId) {
         const { data: feeRow } = await adminClient
           .from('registration_fees')
-          .select('amount, currency')
+          .select('amount, currency, id')
           .eq('member_id', memberId)
           .eq('fee_type', 'registration')
           .maybeSingle()
@@ -252,8 +252,9 @@ Deno.serve(async (req) => {
           emailButtonUrl: 'https://luma-welfare.vercel.app/join',
         })
 
-        if (paidAmount != null) {
+        if (paidAmount != null && feeRow) {
           await adminClient.from('financial_ledger').insert({
+            transaction_id: feeRow.id,
             transaction_type: 'registration_fee',
             member_id: memberId,
             entry_type: 'credit',

@@ -1,6 +1,6 @@
 /**
  * Relocated from backend/src/__tests__ during Supabase-only migration.
- * Live / DATABASE_URL required — not run in CI.
+ * Live / DATABASE_URL required ï¿½ not run in CI.
  * Run: node --test --import tsx <this-file>
  */
 /**
@@ -12,6 +12,9 @@ import assert from 'node:assert/strict'
 import pg from 'pg'
 
 const DATABASE_URL = process.env.DATABASE_URL
+const DB_SKIP = DATABASE_URL
+  ? false
+  : 'DATABASE_URL not set - database assertion did not execute'
 const A = '11111111-1111-1111-1111-111111111111'
 const B = '22222222-2222-2222-2222-222222222222'
 const SUB_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
@@ -51,12 +54,21 @@ before(async () => {
 
 after(async () => {
   if (!client) return
-  await client.query('DELETE FROM contributions WHERE member_id IN ($1, $2)', [A, B])
-  await client.query('DELETE FROM payments WHERE member_id IN ($1, $2)', [A, B])
-  await client.query('DELETE FROM subscriptions WHERE id IN ($1, $2)', [SUB_A, SUB_B])
-  await client.query('DELETE FROM members WHERE id IN ($1, $2)', [A, B])
-  await client.query('DELETE FROM auth.users WHERE id IN ($1, $2)', [A, B])
-  await client.end()
+  try {
+    // A failing test can leave an open/aborted transaction behind; without
+    // this, cleanup fails with 25P02 and client.end() is never reached,
+    // which hangs the whole process on exit.
+    await client.query('ROLLBACK').catch(() => {})
+    await client.query('DELETE FROM contributions WHERE member_id IN ($1, $2)', [A, B])
+    await client.query('DELETE FROM payments WHERE member_id IN ($1, $2)', [A, B])
+    await client.query('DELETE FROM subscriptions WHERE id IN ($1, $2)', [SUB_A, SUB_B])
+    await client.query('DELETE FROM members WHERE id IN ($1, $2)', [A, B])
+    await client.query('DELETE FROM auth.users WHERE id IN ($1, $2)', [A, B])
+  } catch (e) {
+    console.error('cleanup failed:', e.code, e.message)
+  } finally {
+    await client.end().catch(() => {})
+  }
 })
 
 async function insertPayment(memberId, subscriptionId, idempotencyKey, opts = {}) {
@@ -103,7 +115,7 @@ async function countContributions(subscriptionId) {
 }
 
 describe('Phone Validation', () => {
-  it('valid profile phone is present', async () => {
+  it('valid profile phone is present', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query('SELECT phone FROM members WHERE id = $1', [A])
     assert.equal(rows[0].phone, '0711111111')
@@ -126,12 +138,12 @@ describe('Phone Validation', () => {
 })
 
 describe('Payment Amount Protection', () => {
-  it('amount from DB tier not client', async () => {
+  it('amount from DB tier not client', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query('SELECT pt.amount FROM subscriptions s JOIN package_tiers pt ON pt.id = s.package_tier_id WHERE s.id = $1', [SUB_A])
     if (rows.length > 0) assert.ok(Number(rows[0].amount) > 0)
   })
-  it('package attribution chain correct', async () => {
+  it('package attribution chain correct', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     await insertPayment(A, SUB_A, key)
@@ -142,7 +154,7 @@ describe('Payment Amount Protection', () => {
 })
 
 describe('Callback State Machine', () => {
-  it('Pending -> Completed', async () => {
+  it('Pending -> Completed', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_SM1_' + Date.now()
@@ -150,7 +162,7 @@ describe('Callback State Machine', () => {
     const u = await updateStatus(cid, 'Completed', { mpesaReceipt: 'QHK123', fromStatus: 'Pending' })
     assert.equal(u.rows[0].status, 'Completed')
   })
-  it('Completed is terminal', async () => {
+  it('Completed is terminal', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_SM2_' + Date.now()
@@ -159,7 +171,7 @@ describe('Callback State Machine', () => {
     const late = await updateStatus(cid, 'Completed', { mpesaReceipt: 'QHK_LATE', fromStatus: 'Pending' })
     assert.equal(late.rows.length, 0)
   })
-  it('Failed -> Completed rejected', async () => {
+  it('Failed -> Completed rejected', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_SM3_' + Date.now()
@@ -168,7 +180,7 @@ describe('Callback State Machine', () => {
     const r = await updateStatus(cid, 'Completed', { mpesaReceipt: 'QHK789', fromStatus: 'Pending' })
     assert.equal(r.rows.length, 0)
   })
-  it('Pending -> Failed', async () => {
+  it('Pending -> Failed', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_SM4_' + Date.now()
@@ -176,7 +188,7 @@ describe('Callback State Machine', () => {
     const u = await updateStatus(cid, 'Failed', { fromStatus: 'Pending' })
     assert.equal(u.rows[0].status, 'Failed')
   })
-  it('Processing -> Completed', async () => {
+  it('Processing -> Completed', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_SM5_' + Date.now()
@@ -184,7 +196,7 @@ describe('Callback State Machine', () => {
     const u = await updateStatus(cid, 'Completed', { mpesaReceipt: 'QHK_PROC', fromStatus: 'Processing' })
     assert.equal(u.rows[0].status, 'Completed')
   })
-  it('Processing -> Failed', async () => {
+  it('Processing -> Failed', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_SM6_' + Date.now()
@@ -195,7 +207,7 @@ describe('Callback State Machine', () => {
 })
 
 describe('Late Success and Duplicate Callbacks', () => {
-  it('late success after Pending', async () => {
+  it('late success after Pending', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_LS1_' + Date.now()
@@ -203,7 +215,7 @@ describe('Late Success and Duplicate Callbacks', () => {
     const u = await updateStatus(cid, 'Completed', { mpesaReceipt: 'QHK_LATE1', fromStatus: 'Pending' })
     assert.equal(u.rows[0].status, 'Completed')
   })
-  it('duplicate success: idempotent no-op', async () => {
+  it('duplicate success: idempotent no-op', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_LS2_' + Date.now()
@@ -212,7 +224,7 @@ describe('Late Success and Duplicate Callbacks', () => {
     const dup = await updateStatus(cid, 'Completed', { mpesaReceipt: 'QHK_DUP2', fromStatus: 'Pending' })
     assert.equal(dup.rows.length, 0)
   })
-  it('no duplicate contribution', async () => {
+  it('no duplicate contribution', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_LS3_' + Date.now()
@@ -226,14 +238,14 @@ describe('Late Success and Duplicate Callbacks', () => {
 })
 
 describe('STK Push Timeout Handling', () => {
-  it('STK timeout: payment marked Processing', async () => {
+  it('STK timeout: payment marked Processing', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const result = await insertPayment(A, SUB_A, key, { status: 'Processing' })
     assert.equal(result.success, true)
     assert.equal(result.payment.status, 'Processing')
   })
-  it('Processing preserves info for reconciliation', async () => {
+  it('Processing preserves info for reconciliation', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_TIMEOUT_' + Date.now()
@@ -242,13 +254,13 @@ describe('STK Push Timeout Handling', () => {
     assert.ok(payment)
     assert.equal(payment.status, 'Processing')
   })
-  it('retry uses new idempotency key', async () => {
+  it('retry uses new idempotency key', { skip: DB_SKIP }, async () => {
     if (!client) return
     const r1 = await insertPayment(A, SUB_A, crypto.randomUUID(), { status: 'Processing' })
     const r2 = await insertPayment(A, SUB_A, crypto.randomUUID())
     assert.notEqual(r1.payment.id, r2.payment.id)
   })
-  it('no duplicate on retry same key', async () => {
+  it('no duplicate on retry same key', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const r1 = await insertPayment(A, SUB_A, key)
@@ -259,14 +271,14 @@ describe('STK Push Timeout Handling', () => {
 })
 
 describe('Cross-Member Isolation', () => {
-  it('member A cannot query member B payment', async () => {
+  it('member A cannot query member B payment', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const r1 = await insertPayment(A, SUB_A, key)
     const bQuery = await client.query('SELECT id FROM payments WHERE id = $1 AND member_id = $2', [r1.payment.id, B])
     assert.equal(bQuery.rows.length, 0)
   })
-  it('same key for different members creates separate payments', async () => {
+  it('same key for different members creates separate payments', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const r1 = await insertPayment(A, SUB_A, key)
@@ -276,14 +288,14 @@ describe('Cross-Member Isolation', () => {
 })
 
 describe('Package Attribution', () => {
-  it('package_id from subscription not amount', async () => {
+  it('package_id from subscription not amount', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     await insertPayment(A, SUB_A, key, { amount: 1 })
     const { rows } = await client.query('SELECT package_id FROM payments WHERE idempotency_key = $1', [key])
     assert.equal(rows[0].package_id, PKG)
   })
-  it('payment links to correct subscription', async () => {
+  it('payment links to correct subscription', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     await insertPayment(A, SUB_A, key)
@@ -293,7 +305,7 @@ describe('Package Attribution', () => {
 })
 
 describe('Reconciliation State', () => {
-  it('Pending can be reconciled', async () => {
+  it('Pending can be reconciled', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_REC1_' + Date.now()
@@ -301,7 +313,7 @@ describe('Reconciliation State', () => {
     const { rows } = await client.query('SELECT status FROM payments WHERE checkout_request_id = $1', [cid])
     assert.equal(rows[0].status, 'Pending')
   })
-  it('Processing can be reconciled', async () => {
+  it('Processing can be reconciled', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_REC2_' + Date.now()
@@ -309,7 +321,7 @@ describe('Reconciliation State', () => {
     const { rows } = await client.query('SELECT status FROM payments WHERE checkout_request_id = $1', [cid])
     assert.equal(rows[0].status, 'Processing')
   })
-  it('Completed is terminal', async () => {
+  it('Completed is terminal', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const cid = 'ws_CO_REC3_' + Date.now()
@@ -321,7 +333,7 @@ describe('Reconciliation State', () => {
 })
 
 describe('Regression', () => {
-  it('payments has all required columns', async () => {
+  it('payments has all required columns', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'payments' ORDER BY ordinal_position")
     const cols = rows.map(r => r.column_name)
@@ -329,17 +341,17 @@ describe('Regression', () => {
       assert.ok(cols.includes(c), 'payments has ' + c)
     }
   })
-  it('idempotency unique index exists', async () => {
+  it('idempotency unique index exists', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query("SELECT indexname FROM pg_indexes WHERE tablename = 'payments' AND indexname = 'idx_payments_idempotency'")
     assert.equal(rows.length, 1)
   })
-  it('checkout_request_id unique index exists', async () => {
+  it('checkout_request_id unique index exists', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query("SELECT indexname FROM pg_indexes WHERE tablename = 'payments' AND indexname = 'idx_payments_checkout_request'")
     assert.equal(rows.length, 1)
   })
-  it('contributions unique constraint exists', async () => {
+  it('contributions unique constraint exists', { skip: DB_SKIP }, async () => {
     if (!client) return
     const { rows } = await client.query("SELECT indexname FROM pg_indexes WHERE tablename = 'contributions' AND indexname LIKE '%subscription%period%'")
     assert.ok(rows.length > 0)

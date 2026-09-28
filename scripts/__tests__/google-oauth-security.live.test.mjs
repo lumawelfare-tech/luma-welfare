@@ -1,17 +1,17 @@
 /**
  * Relocated from backend/src/__tests__ during Supabase-only migration.
- * Live / DATABASE_URL required — not run in CI.
+ * Live / DATABASE_URL required ï¿½ not run in CI.
  * Run: node --test --import tsx <this-file>
  */
 /**
  * Google OAuth Security Tests
  *
  * Proves that:
- * 1. Existing member + matching Google email GåÆ ALLOW
- * 2. Existing member + different Google email GåÆ DENY
- * 3. No member record + Google email GåÆ DENY
- * 4. Existing member + incomplete registration GåÆ DENY
- * 5. Existing member + suspended/ineligible status GåÆ DENY
+ * 1. Existing member + matching Google email Gï¿½ï¿½ ALLOW
+ * 2. Existing member + different Google email Gï¿½ï¿½ DENY
+ * 3. No member record + Google email Gï¿½ï¿½ DENY
+ * 4. Existing member + incomplete registration Gï¿½ï¿½ DENY
+ * 5. Existing member + suspended/ineligible status Gï¿½ï¿½ DENY
  * 6. Google user cannot create members automatically
  * 7. Google user cannot create registration_fees automatically
  * 8. Member A cannot authenticate as Member B
@@ -28,6 +28,9 @@ import assert from 'node:assert/strict'
 import pg from 'pg'
 
 const DATABASE_URL = process.env.DATABASE_URL
+const DB_SKIP = DATABASE_URL
+  ? false
+  : 'DATABASE_URL not set - database assertion did not execute'
 const MEMBER_A = '11111111-1111-1111-1111-111111111111'
 const MEMBER_B = '22222222-2222-2222-2222-222222222222'
 const FAKE_MEMBER = '33333333-3333-3333-3333-333333333333'
@@ -72,18 +75,44 @@ before(async () => {
 
 after(async () => {
   if (!client) return
-  await client.query('DELETE FROM registration_fees WHERE member_id IN ($1, $2, $3)', [MEMBER_A, MEMBER_B, FAKE_MEMBER])
-  await client.query('DELETE FROM members WHERE id IN ($1, $2, $3)', [MEMBER_A, MEMBER_B, FAKE_MEMBER])
-  await client.query('DELETE FROM auth.users WHERE id IN ($1, $2, $3)', [MEMBER_A, MEMBER_B, FAKE_MEMBER])
-  await client.end()
+  try {
+    // A failing test can leave an open/aborted transaction behind; without
+    // this every cleanup statement fails with 25P02 and client.end() is
+    // never reached, which hangs the whole process on exit.
+    await client.query('ROLLBACK').catch(() => {})
+    await client.query('DELETE FROM registration_fees WHERE member_id IN ($1, $2, $3)', [MEMBER_A, MEMBER_B, FAKE_MEMBER])
+    await client.query('DELETE FROM members WHERE id IN ($1, $2, $3)', [MEMBER_A, MEMBER_B, FAKE_MEMBER])
+    await client.query('DELETE FROM auth.users WHERE id IN ($1, $2, $3)', [MEMBER_A, MEMBER_B, FAKE_MEMBER])
+  } catch (e) {
+    console.error('cleanup failed:', e.code, e.message)
+  } finally {
+    await client.end().catch(() => {})
+  }
 })
 
-// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
-// Authorization Logic Tests (simulating auth-google-authorize)
-// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+/**
+ * members.status is guarded by trg_members_protect_status, which raises
+ * 42501 unless auth.role() = 'service_role'. Scenario setup therefore has to
+ * impersonate the server role, exactly as the real backend does.
+ */
+async function setStatusAsService(id, status) {
+  await client.query('BEGIN')
+  try {
+    await client.query(`SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true)`)
+    await client.query('UPDATE members SET status = $2 WHERE id = $1', [id, status])
+    await client.query('COMMIT')
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw e
+  }
+}
 
-describe('TEST 1: Existing member + matching email GåÆ ALLOW', () => {
-  it('Member A with matching email passes authorization', async () => {
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
+// Authorization Logic Tests (simulating auth-google-authorize)
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
+
+describe('TEST 1: Existing member + matching email Gï¿½ï¿½ ALLOW', () => {
+  it('Member A with matching email passes authorization', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     // Simulate: Google email matches member email
@@ -97,17 +126,19 @@ describe('TEST 1: Existing member + matching email GåÆ ALLOW', () => {
     assert.ok(rows[0].full_name?.length >= 2, 'full_name present')
     assert.ok(rows[0].phone, 'phone present')
 
-    // All checks pass GåÆ authorize
+    // All checks pass Gï¿½ï¿½ authorize
     const authorized = rows[0].status === 'active'
       && rows[0].email
       && rows[0].full_name?.length >= 2
       && rows[0].phone
-    assert.equal(authorized, true, 'Should be authorized')
+    // NB: the && chain yields the last truthy operand (the phone number),
+    // not boolean true, so assert truthiness rather than strict equality.
+    assert.ok(authorized, 'Should be authorized')
   })
 })
 
-describe('TEST 2: Existing member + different email GåÆ DENY', () => {
-  it('Member A with wrong Google email is denied', async () => {
+describe('TEST 2: Existing member + different email Gï¿½ï¿½ DENY', () => {
+  it('Member A with wrong Google email is denied', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const googleEmail = 'wrong@test.com'
@@ -117,12 +148,12 @@ describe('TEST 2: Existing member + different email GåÆ DENY', () => {
     )
 
     const emailMatch = googleEmail.toLowerCase() === rows[0].email.toLowerCase()
-    assert.equal(emailMatch, false, 'Email mismatch GåÆ denied')
+    assert.equal(emailMatch, false, 'Email mismatch Gï¿½ï¿½ denied')
   })
 })
 
-describe('TEST 3: No member record GåÆ DENY', () => {
-  it('Google-only user without member record is denied', async () => {
+describe('TEST 3: No member record Gï¿½ï¿½ DENY', () => {
+  it('Google-only user without member record is denied', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     // FAKE_MEMBER has auth.users record but NO members record
@@ -131,12 +162,12 @@ describe('TEST 3: No member record GåÆ DENY', () => {
       [FAKE_MEMBER]
     )
     assert.equal(rows.length, 0, 'No member record exists')
-    // Authorization check: member must exist GåÆ DENY
+    // Authorization check: member must exist Gï¿½ï¿½ DENY
   })
 })
 
-describe('TEST 4: Incomplete registration GåÆ DENY', () => {
-  it('Member with missing phone is denied', async () => {
+describe('TEST 4: Incomplete registration Gï¿½ï¿½ DENY', () => {
+  it('Member with missing phone is denied', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     // Temporarily set phone to null
@@ -152,14 +183,14 @@ describe('TEST 4: Incomplete registration GåÆ DENY', () => {
     if (!rows[0].email) missing.push('email')
     if (!rows[0].phone) missing.push('phone')
 
-    assert.ok(missing.includes('phone'), 'Phone missing GåÆ denied')
-    assert.equal(missing.length > 0, true, 'Incomplete GåÆ denied')
+    assert.ok(missing.includes('phone'), 'Phone missing Gï¿½ï¿½ denied')
+    assert.equal(missing.length > 0, true, 'Incomplete Gï¿½ï¿½ denied')
 
     // Restore
     await client.query('UPDATE members SET phone = \'0711111111\' WHERE id = $1', [MEMBER_A])
   })
 
-  it('Member with short full_name is denied', async () => {
+  it('Member with short full_name is denied', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     await client.query('UPDATE members SET full_name = \'A\' WHERE id = $1', [MEMBER_A])
@@ -170,49 +201,49 @@ describe('TEST 4: Incomplete registration GåÆ DENY', () => {
     )
 
     assert.ok(rows[0].full_name.length < 2, 'Name too short')
-    // Authorization check: full_name must be >= 2 chars GåÆ DENY
+    // Authorization check: full_name must be >= 2 chars Gï¿½ï¿½ DENY
 
     // Restore
     await client.query('UPDATE members SET full_name = \'Test Member A\' WHERE id = $1', [MEMBER_A])
   })
 })
 
-describe('TEST 5: Suspended/ineligible status GåÆ DENY', () => {
-  it('Suspended member is denied', async () => {
+describe('TEST 5: Suspended/ineligible status Gï¿½ï¿½ DENY', () => {
+  it('Suspended member is denied', { skip: DB_SKIP }, async () => {
     if (!client) return
 
-    await client.query('UPDATE members SET status = \'suspended\' WHERE id = $1', [MEMBER_A])
+    await setStatusAsService(MEMBER_A, 'suspended')
 
     const { rows } = await client.query(
       'SELECT status FROM members WHERE id = $1',
       [MEMBER_A]
     )
     assert.equal(rows[0].status, 'suspended')
-    assert.notEqual(rows[0].status, 'active', 'Not active GåÆ denied')
+    assert.notEqual(rows[0].status, 'active', 'Not active Gï¿½ï¿½ denied')
 
     // Restore
-    await client.query('UPDATE members SET status = \'active\' WHERE id = $1', [MEMBER_A])
+    await setStatusAsService(MEMBER_A, 'active')
   })
 
-  it('Closed member is denied', async () => {
+  it('Closed member is denied', { skip: DB_SKIP }, async () => {
     if (!client) return
 
-    await client.query('UPDATE members SET status = \'closed\' WHERE id = $1', [MEMBER_A])
+    await setStatusAsService(MEMBER_A, 'closed')
 
     const { rows } = await client.query(
       'SELECT status FROM members WHERE id = $1',
       [MEMBER_A]
     )
     assert.equal(rows[0].status, 'closed')
-    assert.notEqual(rows[0].status, 'active', 'Not active GåÆ denied')
+    assert.notEqual(rows[0].status, 'active', 'Not active Gï¿½ï¿½ denied')
 
     // Restore
-    await client.query('UPDATE members SET status = \'active\' WHERE id = $1', [MEMBER_A])
+    await setStatusAsService(MEMBER_A, 'active')
   })
 })
 
 describe('TEST 6: Member cannot be created by Google OAuth', () => {
-  it('FAKE_MEMBER has no members record (not auto-provisioned)', async () => {
+  it('FAKE_MEMBER has no members record (not auto-provisioned)', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const { rows } = await client.query(
@@ -222,7 +253,7 @@ describe('TEST 6: Member cannot be created by Google OAuth', () => {
     assert.equal(rows.length, 0, 'No member record auto-created from Google')
   })
 
-  it('FAKE_MEMBER has no registration_fees record', async () => {
+  it('FAKE_MEMBER has no registration_fees record', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const { rows } = await client.query(
@@ -234,25 +265,30 @@ describe('TEST 6: Member cannot be created by Google OAuth', () => {
 })
 
 describe('TEST 7: Cross-member isolation', () => {
-  it('Member A cannot access Member B data via RLS', async () => {
+  it('Member A cannot access Member B data via RLS', { skip: DB_SKIP }, async () => {
     if (!client) return
 
+    let rows
     await client.query('BEGIN')
-    await client.query(`SET LOCAL role = authenticated`)
-    await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
-    const { rows } = await client.query(
-      'SELECT * FROM members WHERE id = $1',
-      [MEMBER_B]
-    )
-    await client.query('ROLLBACK')
+    try {
+      await client.query(`SET LOCAL role = authenticated`)
+      await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
+      rows = (await client.query(
+        'SELECT * FROM members WHERE id = $1',
+        [MEMBER_B]
+      )).rows
+    } finally {
+      // Always release the transaction, otherwise a failure here poisons
+      // the shared client with 25P02 for every later test.
+      await client.query('ROLLBACK').catch(() => {})
+    }
 
     assert.equal(rows.length, 0, 'RLS blocks cross-member read')
   })
 })
 
 describe('TEST 8: RLS enforcement on registration_fees', () => {
-  it('registration_fees has SELECT policy', async () => {
+  it('registration_fees has SELECT policy', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const { rows } = await client.query(
@@ -261,7 +297,7 @@ describe('TEST 8: RLS enforcement on registration_fees', () => {
     assert.ok(rows.length > 0, 'SELECT policy exists')
   })
 
-  it('registration_fees has INSERT policy', async () => {
+  it('registration_fees has INSERT policy', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const { rows } = await client.query(
@@ -270,7 +306,7 @@ describe('TEST 8: RLS enforcement on registration_fees', () => {
     assert.ok(rows.length > 0, 'INSERT policy exists')
   })
 
-  it('registration_fees has NO UPDATE policy', async () => {
+  it('registration_fees has NO UPDATE policy', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const { rows } = await client.query(
@@ -281,17 +317,24 @@ describe('TEST 8: RLS enforcement on registration_fees', () => {
 })
 
 describe('TEST 9: Schema constraints', () => {
-  it('members.status defaults to active', async () => {
+  it('members.status defaults to pending_approval', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const { rows } = await client.query(`
       SELECT column_default FROM information_schema.columns
-      WHERE table_name = 'members' AND column_name = 'status'
+      WHERE table_schema = 'public' AND table_name = 'members' AND column_name = 'status'
     `)
-    assert.ok(rows[0]?.column_default?.includes('active'), 'Default is active')
+    // A new member must never default to 'active' â€” registration inserts
+    // pending_approval explicitly (auth-register/index.ts) and activation is
+    // an admin action. Migration 20260825120000 announced an 'active' default
+    // but never emitted the DDL, so the row default must stay locked down.
+    assert.ok(
+      rows[0]?.column_default?.includes('pending_approval'),
+      `Default must be pending_approval, got ${rows[0]?.column_default}`,
+    )
   })
 
-  it('registration_fees.amount defaults to 300', async () => {
+  it('registration_fees.amount defaults to 300', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const { rows } = await client.query(`
@@ -301,7 +344,7 @@ describe('TEST 9: Schema constraints', () => {
     assert.ok(rows[0]?.column_default?.includes('300'), 'Default is 300')
   })
 
-  it('registration_fees.status defaults to unpaid', async () => {
+  it('registration_fees.status defaults to unpaid', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const { rows } = await client.query(`
@@ -311,7 +354,7 @@ describe('TEST 9: Schema constraints', () => {
     assert.ok(rows[0]?.column_default?.includes('unpaid'), 'Default is unpaid')
   })
 
-  it('unique constraint on registration_fees (member_id, fee_type)', async () => {
+  it('unique constraint on registration_fees (member_id, fee_type)', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const { rows } = await client.query(`
@@ -323,7 +366,7 @@ describe('TEST 9: Schema constraints', () => {
 })
 
 describe('TEST 10: Duplicate registration fee prevention', () => {
-  it('Cannot insert duplicate registration fee', async () => {
+  it('Cannot insert duplicate registration fee', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     try {
@@ -337,7 +380,7 @@ describe('TEST 10: Duplicate registration fee prevention', () => {
     }
   })
 
-  it('Cannot insert with invalid fee_type', async () => {
+  it('Cannot insert with invalid fee_type', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     try {
@@ -351,7 +394,7 @@ describe('TEST 10: Duplicate registration fee prevention', () => {
     }
   })
 
-  it('Cannot insert with invalid status', async () => {
+  it('Cannot insert with invalid status', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     try {
@@ -367,24 +410,27 @@ describe('TEST 10: Duplicate registration fee prevention', () => {
 })
 
 describe('TEST 11: Members cannot self-mark registration fee as paid', () => {
-  it('UPDATE blocked by RLS (no UPDATE policy)', async () => {
+  it('UPDATE blocked by RLS (no UPDATE policy)', { skip: DB_SKIP }, async () => {
     if (!client) return
 
+    let result
     await client.query('BEGIN')
-    await client.query(`SET LOCAL role = authenticated`)
-    await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
-    await client.query(`SET LOCAL role = authenticator`)
-    const result = await client.query(`
-      UPDATE registration_fees SET status = 'paid' WHERE member_id = $1
-    `, [MEMBER_A])
-    await client.query('ROLLBACK')
+    try {
+      await client.query(`SET LOCAL role = authenticated`)
+      await client.query(`SET LOCAL request.jwt.claims = '{"sub":"${MEMBER_A}"}'`)
+      result = await client.query(`
+        UPDATE registration_fees SET status = 'paid' WHERE member_id = $1
+      `, [MEMBER_A])
+    } finally {
+      await client.query('ROLLBACK').catch(() => {})
+    }
 
     assert.equal(result.rowCount, 0, 'UPDATE blocked by RLS')
   })
 })
 
 describe('TEST 12: Service-role can update (admin operations)', () => {
-  it('Service-role can update registration fee', async () => {
+  it('Service-role can update registration fee', { skip: DB_SKIP }, async () => {
     if (!client) return
 
     const result = await client.query(`

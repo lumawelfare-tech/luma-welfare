@@ -25,17 +25,42 @@ function loadConfig() {
   let projectRef = ''
   let apiKey = ''
 
+  // 1. supabase/config.toml (local dev stack declares project_id)
   try {
     const config = readFileSync(configPath, 'utf-8')
     const match = config.match(/project_id\s*=\s*"([^"]+)"/)
     if (match) projectRef = match[1]
   } catch { /* ignore */ }
 
+  // 2. Fall back to SUPABASE_URL — the deployed project ref lives there,
+  //    and config.toml has no project_id when only the hosted project is used.
+  if (!projectRef) {
+    const candidates: string[] = [
+      process.env.SUPABASE_URL ?? '',
+      process.env.VITE_SUPABASE_URL ?? '',
+    ]
+    try {
+      const env = readFileSync(envPath, 'utf-8')
+      const m = env.match(/^(?:SUPABASE_URL|VITE_SUPABASE_URL)=(.+)$/m)
+      if (m) candidates.push(m[1].trim())
+    } catch { /* ignore */ }
+
+    for (const candidate of candidates) {
+      const host = candidate.replace(/\/+$/, '').replace(/^https?:\/\//, '').split('/')[0]
+      if (host.endsWith('.supabase.co')) {
+        projectRef = host.slice(0, -'.supabase.co'.length)
+        break
+      }
+    }
+  }
+
   try {
     const env = readFileSync(envPath, 'utf-8')
     const match = env.match(/VITE_SUPABASE_PUBLISHABLE_KEY=(.+)/)
     if (match) apiKey = match[1].trim()
   } catch { /* ignore */ }
+
+  if (!apiKey) apiKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? ''
 
   return { projectRef, apiKey }
 }
@@ -151,28 +176,49 @@ describeIfConfig('CORS Headers', () => {
 
 describeIfConfig('Public Endpoints', () => {
   it('public-data returns valid JSON for packages', async () => {
-    const { status, body } = await callFunction('public-data?action=packages')
+    const { status, body } = await callFunction('public-data?resource=packages')
+    expect(status).toBe(200)
+    expect(body).toHaveProperty('packages')
+    expect(Array.isArray((body as { packages: unknown[] }).packages)).toBe(true)
+  })
+
+  it('public-data returns valid JSON for media', async () => {
+    const { status, body } = await callFunction('public-data?resource=media')
     expect(status).toBe(200)
     expect(body).toHaveProperty('items')
     expect(Array.isArray((body as { items: unknown[] }).items)).toBe(true)
   })
 
-  it('public-data returns valid JSON for media', async () => {
-    const { status, body } = await callFunction('public-data?action=media')
-    expect(status).toBe(200)
-    expect(body).toHaveProperty('items')
-  })
-
   it('public-data returns valid JSON for gallery', async () => {
-    const { status, body } = await callFunction('public-data?action=gallery')
+    const { status, body } = await callFunction('public-data?resource=gallery')
     expect(status).toBe(200)
     expect(body).toHaveProperty('items')
+    expect(Array.isArray((body as { items: unknown[] }).items)).toBe(true)
   })
 
   it('public-data returns valid JSON for news', async () => {
-    const { status, body } = await callFunction('public-data?action=news')
+    const { status, body } = await callFunction('public-data?resource=news')
     expect(status).toBe(200)
     expect(body).toHaveProperty('items')
+    expect(Array.isArray((body as { items: unknown[] }).items)).toBe(true)
+  })
+
+  it('public-data defaults to packages when resource is omitted', async () => {
+    const { status, body } = await callFunction('public-data')
+    expect(status).toBe(200)
+    expect(body).toHaveProperty('packages')
+  })
+
+  it('public-data rejects an unknown resource with 400', async () => {
+    const { status, body } = await callFunction('public-data?resource=does-not-exist')
+    expect(status).toBe(400)
+    expect(body).toHaveProperty('message')
+  })
+
+  it('public-data rejects non-GET methods with 405', async () => {
+    const { status, body } = await callFunction('public-data', { method: 'POST', body: {} })
+    expect(status).toBe(405)
+    expect(body).toHaveProperty('message')
   })
 })
 

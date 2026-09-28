@@ -1,0 +1,34 @@
+-- =============================================================================
+-- Fix: payment_status enum is missing the labels the state machine allows
+-- =============================================================================
+-- Bug
+--   supabase/migrations/20260918120650_restore_missing_part1_payments.sql
+--   created payments.trg_payments_state_machine ->
+--   enforce_payment_state_machine(), whose body reads:
+--
+--     IF OLD.status = 'Pending'
+--        AND NEW.status IN ('Completed', 'Failed', 'Cancelled', 'Timeout')
+--
+--   PostgreSQL coerces those unknown literals to payment_status at parse
+--   analysis time. The enum only contains
+--   'Pending | Completed | Failed | Reversed | Processing', so 'Cancelled'
+--   (and 'Timeout') raise:
+--
+--     22P02  invalid input value for enum payment_status: "Cancelled"
+--     where: PL/pgSQL function enforce_payment_state_machine() line 1 at IF
+--
+-- Impact
+--   EVERY UPDATE that changes payments.status fails and rolls back. M-Pesa
+--   callbacks, admin reconciliation and test coverage of the payment
+--   state machine are all dead in production. Live verification: a
+--   `UPDATE payments SET status = 'Completed'` returns 22P02.
+--
+-- Fix
+--   Add the two labels the trigger (and docs/PHASE6_ENGINEERING_REPORT.md,
+--   and the 'Cancelled' mapping in member-dashboard) already assume exist.
+--   ADD VALUE only appends labels; existing rows and CHECK constraints are
+--   untouched.
+-- ============================================================================
+
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'Cancelled';
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'Timeout';

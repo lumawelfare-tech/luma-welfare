@@ -183,11 +183,21 @@ async function apiInternal<T = unknown>(
   }
 
   const subSegments = pathSegments.slice(divergeIndex)
-  if (subSegments.length > 0 && subSegments[0]) {
-    extraParams.push(`resource_id=${encodeURIComponent(subSegments[0])}`)
-  }
-  if (subSegments.length > 1 && subSegments[1]) {
-    extraParams.push(`action=${encodeURIComponent(subSegments[1])}`)
+  if (functionName === 'public-data') {
+    // public-data selects its payload with `resource` (not `resource_id`).
+    // Derive it from the path so a bare api('/news') cannot silently fall
+    // back to the default `packages` payload. A caller-supplied ?resource=
+    // always wins.
+    if (subSegments[0] && !/[?&]resource=[^&]*/.test(search)) {
+      extraParams.push(`resource=${encodeURIComponent(subSegments[0])}`)
+    }
+  } else {
+    if (subSegments.length > 0 && subSegments[0]) {
+      extraParams.push(`resource_id=${encodeURIComponent(subSegments[0])}`)
+    }
+    if (subSegments.length > 1 && subSegments[1]) {
+      extraParams.push(`action=${encodeURIComponent(subSegments[1])}`)
+    }
   }
 
   // Merge extra params with existing query string

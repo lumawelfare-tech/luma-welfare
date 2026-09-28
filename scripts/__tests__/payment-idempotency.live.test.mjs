@@ -1,6 +1,6 @@
 /**
  * Relocated from backend/src/__tests__ during Supabase-only migration.
- * Live / DATABASE_URL required — not run in CI.
+ * Live / DATABASE_URL required ï¿½ not run in CI.
  * Run: node --test --import tsx <this-file>
  */
 /**
@@ -17,11 +17,14 @@ import { describe, it, before, after, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import pg from 'pg'
 
-// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 // Database connection
-// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 
 const DATABASE_URL = process.env.DATABASE_URL
+const DB_SKIP = DATABASE_URL
+  ? false
+  : 'DATABASE_URL not set - database assertion did not execute'
 const TEST_MEMBER_A = '11111111-1111-1111-1111-111111111111'
 const TEST_MEMBER_B = '22222222-2222-2222-2222-222222222222'
 const TEST_SUB_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
@@ -68,13 +71,21 @@ before(async () => {
 
 after(async () => {
   if (!client) return
-  // Clean up test data
-  await client.query('DELETE FROM contributions WHERE member_id IN ($1, $2)', [TEST_MEMBER_A, TEST_MEMBER_B])
-  await client.query('DELETE FROM payments WHERE member_id IN ($1, $2)', [TEST_MEMBER_A, TEST_MEMBER_B])
-  await client.query('DELETE FROM subscriptions WHERE id = $1', [TEST_SUB_A])
-  await client.query('DELETE FROM members WHERE id IN ($1, $2)', [TEST_MEMBER_A, TEST_MEMBER_B])
-  await client.query('DELETE FROM auth.users WHERE id IN ($1, $2)', [TEST_MEMBER_A, TEST_MEMBER_B])
-  await client.end()
+  try {
+    // Clear any transaction a failing test left open, otherwise cleanup fails
+    // with 25P02 and client.end() is never reached (process hangs on exit).
+    await client.query('ROLLBACK').catch(() => {})
+    // Clean up test data
+    await client.query('DELETE FROM contributions WHERE member_id IN ($1, $2)', [TEST_MEMBER_A, TEST_MEMBER_B])
+    await client.query('DELETE FROM payments WHERE member_id IN ($1, $2)', [TEST_MEMBER_A, TEST_MEMBER_B])
+    await client.query('DELETE FROM subscriptions WHERE id = $1', [TEST_SUB_A])
+    await client.query('DELETE FROM members WHERE id IN ($1, $2)', [TEST_MEMBER_A, TEST_MEMBER_B])
+    await client.query('DELETE FROM auth.users WHERE id IN ($1, $2)', [TEST_MEMBER_A, TEST_MEMBER_B])
+  } catch (e) {
+    console.error('cleanup failed:', e.code, e.message)
+  } finally {
+    await client.end().catch(() => {})
+  }
 })
 
 // Helper: insert a payment directly (simulates what the backend does)
@@ -94,7 +105,7 @@ async function insertPayment(memberId, idempotencyKey, opts = {}) {
     return { success: true, payment: result.rows[0] }
   } catch (err) {
     if (err.code === '23505') {
-      // Unique violation GÇö query existing
+      // Unique violation Gï¿½ï¿½ query existing
       const existing = await client.query(
         'SELECT id, checkout_request_id, status FROM payments WHERE member_id = $1 AND idempotency_key = $2',
         [memberId, idempotencyKey]
@@ -125,12 +136,12 @@ async function completePayment(checkoutRequestId, mpesaReceipt) {
   return update.rows[0] || null
 }
 
-// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 // Tests
-// GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 
 describe('Scenario A: Single Pay click', () => {
-  it('one initiation creates exactly one payment', async () => {
+  it('one initiation creates exactly one payment', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const result = await insertPayment(TEST_MEMBER_A, key)
@@ -141,7 +152,7 @@ describe('Scenario A: Single Pay click', () => {
 })
 
 describe('Scenario B: Double-click (same requestId)', () => {
-  it('two requests with same requestId GÇö exactly one payment', async () => {
+  it('two requests with same requestId Gï¿½ï¿½ exactly one payment', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
 
@@ -164,7 +175,7 @@ describe('Scenario B: Double-click (same requestId)', () => {
 })
 
 describe('Scenario C: Network timeout (retry with same key)', () => {
-  it('retry returns existing payment, no new STK Push needed', async () => {
+  it('retry returns existing payment, no new STK Push needed', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
 
@@ -187,7 +198,7 @@ describe('Scenario C: Network timeout (retry with same key)', () => {
 })
 
 describe('Scenario D: Concurrent requests (same key)', () => {
-  it('database uniqueness prevents duplicate initiation', async () => {
+  it('database uniqueness prevents duplicate initiation', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
 
@@ -217,7 +228,7 @@ describe('Scenario D: Concurrent requests (same key)', () => {
 })
 
 describe('Scenario E: Existing CheckoutRequestID', () => {
-  it('retry returns existing payment with checkout_request_id', async () => {
+  it('retry returns existing payment with checkout_request_id', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
 
@@ -247,7 +258,7 @@ describe('Scenario E: Existing CheckoutRequestID', () => {
 })
 
 describe('Scenario F: Repeated callback (same CheckoutRequestID)', () => {
-  it('callback processed multiple times GÇö financial records remain exactly once', async () => {
+  it('callback processed multiple times Gï¿½ï¿½ financial records remain exactly once', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
     const checkoutId = `ws_CO_CB_${Date.now()}`
@@ -263,12 +274,12 @@ describe('Scenario F: Repeated callback (same CheckoutRequestID)', () => {
       [checkoutId, r1.payment.id]
     )
 
-    // First callback GÇö succeeds
+    // First callback Gï¿½ï¿½ succeeds
     const c1 = await completePayment(checkoutId, receipt)
     assert.ok(c1, 'First callback should complete payment')
     assert.equal(c1.status, 'Completed')
 
-    // Second callback GÇö should be no-op
+    // Second callback Gï¿½ï¿½ should be no-op
     const c2 = await completePayment(checkoutId, receipt)
     assert.equal(c2, null, 'Second callback should be no-op (already Completed)')
 
@@ -286,7 +297,7 @@ describe('Scenario F: Repeated callback (same CheckoutRequestID)', () => {
 })
 
 describe('Scenario G: Different requestIds', () => {
-  it('two genuinely separate payments are treated separately', async () => {
+  it('two genuinely separate payments are treated separately', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key1 = crypto.randomUUID()
     const key2 = crypto.randomUUID()
@@ -301,7 +312,7 @@ describe('Scenario G: Different requestIds', () => {
 })
 
 describe('Scenario H: Cross-member attack', () => {
-  it('member A cannot query member B payment by idempotency key', async () => {
+  it('member A cannot query member B payment by idempotency key', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
 
@@ -309,7 +320,7 @@ describe('Scenario H: Cross-member attack', () => {
     const r1 = await insertPayment(TEST_MEMBER_A, key)
     assert.equal(r1.success, true)
 
-    // Member B tries same key GÇö should succeed (different member scope)
+    // Member B tries same key Gï¿½ï¿½ should succeed (different member scope)
     const r2 = await insertPayment(TEST_MEMBER_B, key)
     assert.equal(r2.success, true, 'Different member can use same key')
     assert.notEqual(r1.payment.id, r2.payment.id, 'Different payment ids')
@@ -328,7 +339,7 @@ describe('Scenario H: Cross-member attack', () => {
     assert.notEqual(aPayments.rows[0].id, bPayments.rows[0].id, 'Different payment ids')
   })
 
-  it('member A cannot access member B payment by payment id', async () => {
+  it('member A cannot access member B payment by payment id', { skip: DB_SKIP }, async () => {
     if (!client) return
     const key = crypto.randomUUID()
 
@@ -345,7 +356,7 @@ describe('Scenario H: Cross-member attack', () => {
 })
 
 describe('Scenario I: Existing regression tests', () => {
-  it('payments table still has all required columns', async () => {
+  it('payments table still has all required columns', { skip: DB_SKIP }, async () => {
     if (!client) return
     const cols = await client.query(`
       SELECT column_name FROM information_schema.columns
@@ -368,7 +379,7 @@ describe('Scenario I: Existing regression tests', () => {
     assert.ok(colNames.includes('checkout_request_id'), 'has checkout_request_id')
   })
 
-  it('unique constraint on idempotency_key exists', async () => {
+  it('unique constraint on idempotency_key exists', { skip: DB_SKIP }, async () => {
     if (!client) return
     const idx = await client.query(`
       SELECT indexname FROM pg_indexes
@@ -377,7 +388,7 @@ describe('Scenario I: Existing regression tests', () => {
     assert.equal(idx.rows.length, 1, 'idempotency unique index exists')
   })
 
-  it('unique constraint on checkout_request_id exists', async () => {
+  it('unique constraint on checkout_request_id exists', { skip: DB_SKIP }, async () => {
     if (!client) return
     const idx = await client.query(`
       SELECT indexname FROM pg_indexes
@@ -386,7 +397,7 @@ describe('Scenario I: Existing regression tests', () => {
     assert.equal(idx.rows.length, 1, 'checkout_request unique index exists')
   })
 
-  it('contributions still has unique(subscription_id, period)', async () => {
+  it('contributions still has unique(subscription_id, period)', { skip: DB_SKIP }, async () => {
     if (!client) return
     const idx = await client.query(`
       SELECT indexname FROM pg_indexes
